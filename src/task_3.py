@@ -5,6 +5,12 @@ import sys
 
 import kernels3
 
+def create_context():
+    c = cl.create_some_context(answers=[1, 0])
+    print(c.get_info(cl.context_info.DEVICES))
+    return c
+
+
 def allocate_image(ctx, w, h) :
     fmt = cl.ImageFormat(cl.channel_order.RGBA, cl.channel_type.UNSIGNED_INT8)
     return cl.Image(ctx, cl.mem_flags.WRITE_ONLY, fmt, shape=(w, h))
@@ -14,7 +20,7 @@ def pixmap_from_raw_image(img: np.ndarray):
     image = QtGui.QImage(img.data, img.shape[0], img.shape[1], QtGui.QImage.Format_ARGB32)
     pixmap = QtGui.QPixmap()
     pixmap.convertFromImage(image)
-    return pixmap
+    return pixmap, image
 
 
 def type():
@@ -40,8 +46,8 @@ class BifurcationTree:
         self.image = np.empty((w, h, 4), dtype=np.uint8)
 
     def compute(self, A, B, start, stop, x_start, skip, samples_count, x_max):
-        result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=samples_count * self.w * typesize())
-        result_minmax_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=self.w * 2 * typesize())
+        self.result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=samples_count * self.w * typesize())
+        self.result_minmax_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=self.w * 2 * typesize())
 
         self.program.prepare_bifurcation_tree(
             self.queue, (self.w, ), None,
@@ -50,33 +56,36 @@ class BifurcationTree:
             real(start), real(stop),
             real(x_start), real(x_max),
             np.int32(skip), np.int32(samples_count),
-            result_device, result_minmax_device
+            self.result_device, self.result_minmax_device
         )
         result_minmax = np.empty((self.w*2,), dtype=type())
 
-        cl.enqueue_copy(self.queue, result_minmax, result_minmax_device)
+        cl.enqueue_copy(self.queue, result_minmax, self.result_minmax_device)
 
-        return result_device, min(result_minmax), max(result_minmax)
+        return self.result_device, min(result_minmax), max(result_minmax)
 
     def draw(self, A, B, start, stop, x_start, skip, samples_count=None):
-        result_device, min_, max_ = self.compute(A, B, start, stop, x_start, skip,
+        self.result_device, min_, max_ = self.compute(A, B, start, stop, x_start, skip,
                                                  self.h if samples_count is None else samples_count, 500)
-
         self.clear()
 
         # print(min_, max_)
+        # print("drawing")
 
         self.program.draw_bifurcation_tree(
             self.queue, (self.w, ), None,
-            result_device,
+            self.result_device,
             np.int32(samples_count),
             real(min_), real(max_),
             real(self.h),
             self.image_device
         )
 
-        cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.w, self.h))
+        # print("drawn")
+        # print( self.image.shape, self.image.size, self.image_device.__sizeof__())
 
+        cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.w, self.h))
+        # print("copy-out")
         return pixmap_from_raw_image(self.image)
 
     def clear(self, read_back=False):
@@ -141,7 +150,7 @@ class ImageWidget(QtGui.QLabel):
 class App(QtGui.QWidget):
     def __init__(self, parent=None):
         self.w, self.h = 512, 512
-        self.ctx = cl.create_some_context()
+        self.ctx = create_context()
         self.queue = cl.CommandQueue(self.ctx)
         self.prg = cl.Program(self.ctx, kernels3.DYNAMIC_MAP_KERNEL_SOURCE).build()
 
@@ -226,7 +235,7 @@ class App(QtGui.QWidget):
         self.image_bif = allocate_image(self.ctx, self.w, self.h)
 
         self.use_param_A = False
-        self.skip = 8192
+        self.skip = 512
         self.samples = self.w
         self.samples_map = 100
 
@@ -249,7 +258,7 @@ class App(QtGui.QWidget):
                                   self.x_min, self.y_min, self.x_max, self.y_max,
                                    start*self.mul, samples_count=self.samples_map, skip=self.samples+self.skip-self.samples_map+1,
                                   image=self.image)
-        self.image_label.setPixmap(pixmap_from_raw_image(img))
+        self.image_label.setPixmap(pixmap_from_raw_image(img)[0])
 
     def draw_tree(self, param_A, param_B):
         # print("Drawing for a = %f, b = %f" % (param_A, param_B))
@@ -257,9 +266,12 @@ class App(QtGui.QWidget):
         param_A = None if not self.use_param_A else param_A
         param_B = None if self.use_param_A else param_B
         if self.use_param_A:
-            self.image2_label.setPixmap(self.bif_tree.draw(param_A, param_B, self.y_min, self.y_max, self.start, self.skip, self.samples))
+            self._p, self._i = self.bif_tree.draw(param_A, param_B, self.y_min, self.y_max, self.start, self.skip, self.samples)
         else:
-            self.image2_label.setPixmap(self.bif_tree.draw(param_A, param_B, 0, self.x_max, self.start, self.skip, self.samples))
+            self._p, self._i = self.bif_tree.draw(param_A, param_B, 0, self.x_max, self.start, self.skip, self.samples)
+
+        # print("TOTALLY DONE")
+        self.image2_label.setPixmap(self._p)
 
     def active_param_value(self):
         return self.last_params[0 if not self.use_param_A else 1]

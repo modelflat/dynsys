@@ -3,6 +3,11 @@ import pyopencl as cl
 import numpy as np
 import sys
 
+def create_context():
+    c = cl.create_some_context(answers=[1, 0])
+    print(c.get_info(cl.context_info.DEVICES))
+    return c
+
 
 from utils import pixmap_from_raw_image, translate
 
@@ -26,7 +31,7 @@ PHASE_PORTRAIT_KERNEL_SOURCE = """
 #define real double
 #define real2 double2
 
-#define STEP 1e-4
+#define STEP 1e-3
 
 real2 system(real2 v, real m, real b) {
     real2 p = (real2)(
@@ -168,7 +173,7 @@ class PhasePortrait:
         self.program.draw_phase_portrait(self.queue, (self.w // red, self.h // red), None,
                                          real(m), real(b),
                                          real(x_min), real(x_max), real(y_min), real(y_max),
-                                         np.int32(40000), np.int32(self.w), np.int32(self.h),
+                                         np.int32(20000), np.int32(self.w), np.int32(self.h),
                                          self.image_device)
 
         cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0,0), region=(self.w, self.h))
@@ -235,7 +240,7 @@ class ImageWidget(QtGui.QLabel):
 class App(QtGui.QWidget):
     def __init__(self, parent=None):
         self.w, self.h = 512, 512
-        self.ctx = cl.create_some_context()
+        self.ctx = create_context()
         self.queue = cl.CommandQueue(self.ctx)
 
         self.param_map = ParameterMap(self.ctx, self.queue, self.w,  self.h)
