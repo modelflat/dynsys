@@ -1,16 +1,16 @@
 BIFURCATION_TREE_KERNEL_SOURCE = """
 
-#define real double
-#define real2 double2
+#define real float
+#define real2 float2
 
-real2 map_function(real2 v, real param_A, real param_B) {
-    real xp = 1 - param_A*v.x*v.x - param_B*v.y; 
+real2 map_function(real2 v, real b, real lam) {
+    real xp = 1 - lam*v.x*v.x + b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
 
 kernel void clear(write_only image2d_t img) {
-    write_imageui(img, (int2)(get_global_id(0), get_global_id(1)), (uint4)(0));
+    write_imageui(img, (int2)(get_global_id(0), get_global_id(1)), (uint4)(255));
 }
 
 
@@ -41,7 +41,6 @@ kernel void prepare_bifurcation_tree(
         //if (x > max_ && x < x_max) max_ = x;
     }
 
-
     for (int i = 0; i < samples_count; ++i) {
         if (use_a) {
             v = map_function(v, param_A, value);
@@ -57,7 +56,7 @@ kernel void prepare_bifurcation_tree(
 }
 
 kernel void draw_bifurcation_tree(
-    const global double* samples,
+    const global real* samples,
     const int samples_count,
     const real min_, const real max_,
     const real height,
@@ -76,11 +75,11 @@ kernel void draw_bifurcation_tree(
 
 DYNAMIC_MAP_KERNEL_SOURCE = """
 
-#define real double
-#define real2 double2
+#define real float
+#define real2 float2
 
-real2 map_function(real2 v, real param_A, real param_B) {
-    real xp = 1 - param_B*v.x*v.x - param_A*v.y; 
+real2 map_function(real2 v, real b, real lam) {
+    real xp = 1 - lam*v.x*v.x + b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
@@ -107,16 +106,10 @@ float3 hsv2rgb(float3 hsv) {
 
 #define VALUE_DETECTION_PRECISION 1e-3
 
-//#define GENERATE_COLORS
-
 float3 color_for_count(int count, int total) {
     if (count == total) {
         return 0.3;
     }
-#ifdef GENERATE_COLORS
-    const float d = (float)total / (float)count;
-    return hsv2rgb((float3)(d * 360.0, 1.0, 1.0));
-#else
     const float d = count < 8? 1.0 : .5;
     switch(count % 8) {
         case 1:
@@ -136,7 +129,6 @@ float3 color_for_count(int count, int total) {
         default:
             return count == 8 ? 1 : .7;
     }
-#endif
 }
 
 kernel void compute_map(
@@ -165,20 +157,18 @@ kernel void compute_map(
     for (int i = 0; i < samples_count; ++i) {
         v = APPLY_MAP(v);
         samples[i] = v;
-        //if (samples_count <= 16) {
-            int found = 0;
-            for (int j = 0; j < i; ++j) {
-                if (fabs(samples[j].x - v.x) < VALUE_DETECTION_PRECISION &&
-                    fabs(samples[j].y - v.y) < VALUE_DETECTION_PRECISION) {
-                    found = 1;
-                    break;
-                }
+        int found = 0;
+        for (int j = 0; j < i; ++j) {
+            if (fabs(samples[j].x - v.x) < VALUE_DETECTION_PRECISION &&
+                fabs(samples[j].y - v.y) < VALUE_DETECTION_PRECISION) {
+                found = 1;
+                break;
             }
-            if (!found) ++uniques;
-        //}
+        }
+        if (!found) ++uniques;
     }
     
-    write_imageui(map, id, convert_uint4_rtz(255*(float4)(color_for_count(uniques, samples_count), 1.0)).zyxw);
+    write_imageui(map, (int2)(id.x, id.y), convert_uint4_rtz(255*(float4)(color_for_count(uniques, samples_count), 1.0)).zyxw);
 }
 
 """
@@ -186,11 +176,11 @@ kernel void compute_map(
 
 ATTRACTOR_KS = """
 
-#define real double
-#define real2 double2
+#define real float
+#define real2 float2
 
-real2 system(real2 v, real param_A, real param_B) {
-    real xp = 1 - param_B*v.x*v.x - param_A*v.y; 
+real2 system(real2 v, real b, real lam) {
+    real xp = 1 - lam*v.x*v.x + b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
@@ -209,13 +199,15 @@ kernel void draw_phase_portrait(
     const int2 id = (int2)(get_global_id(0), get_global_id(1));
     const real2 grid_step = (real2)((x_max - x_min)/get_global_size(0), (y_max - y_min)/get_global_size(1));
     
-    real2 point = (real2)(x_min + id.x*grid_step.x, y_min + id.y*grid_step.y);
+    real2 point = (real2)(x_min + id.x*grid_step.x, y_min + (get_global_size(1) - id.y)*grid_step.y);
     
     for (int i = 0; i < step_count; ++i) {
         point = system(point, a, b);
+        if (step_count - i == 1) {
+        }
     }
-    int2 coord = (int2)( (point.x - x_min)/(x_max - x_min)*w, (point.y - y_min)/(y_max - y_min)*h);
-    write_imageui(result, coord, (uint4)((uint3)(0), 255));
+            int2 coord = (int2)( (point.x - x_min)/(x_max - x_min)*w, (point.y - y_min)/(y_max - y_min)*h);
+            write_imageui(result, (int2)(coord.y, w - coord.x), (uint4)((uint3)(0), 255));
     
 }
 

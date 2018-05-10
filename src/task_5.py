@@ -5,6 +5,21 @@ import sys
 
 import kernels5
 
+MAP_BOUNDS = (
+    (0, 2),   # lambda
+    (-.5, .5) # b
+)
+
+ATT_BOUNDS = (
+    (-2, 2), (-2, 2)
+)
+
+def create_context():
+    c = cl.create_some_context(answers=[1, 0])
+    print(c.get_info(cl.context_info.DEVICES))
+    return c
+
+
 from utils import *
 
 class BifurcationTree:
@@ -69,9 +84,15 @@ def compute_dynamic_map(ctx, prg, queue, w, h, x_min, y_min, x_max, y_max, start
     global samples_device
     samples_device = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=2*w*h*samples_count*typesize())
 
+    # x_min, x_max = MAP_BOUNDS[1]
+    # y_min, y_max = MAP_BOUNDS[0]
+
+    # x_min, x_max = -x_max, -x_min
+
     prg.compute_map(queue, (w, h), None,
-                    real(x_min), real(x_max), real(y_min), real(y_max),
-                    real(start), real(0), np.int32(samples_count), np.int32(skip),
+                    real(x_min), real(x_max),
+                    real(y_min), real(y_max),
+                    real(0), real(0), np.int32(samples_count), np.int32(skip),
                     samples_device, result_device )
 
     result = np.empty((w, h, 4), dtype=np.uint8)
@@ -126,9 +147,11 @@ class PhasePortrait:
 
     def draw(self, m, b, x_min, x_max, y_min, y_max):
         self.clear()
-        red = 30
+        red = 10
+        x_min, x_max = ATT_BOUNDS[0]
+        y_min, y_max = ATT_BOUNDS[1]
         self.program.draw_phase_portrait(self.queue, (self.w // red, self.h // red), None,
-                                         real(m), real(b),
+                                         real(-m), real(b),
                                          real(x_min), real(x_max), real(y_min), real(y_max),
                                          np.int32(40000), np.int32(self.w), np.int32(self.h),
                                          self.image_device)
@@ -140,7 +163,7 @@ class PhasePortrait:
 class App(QtGui.QWidget):
     def __init__(self, parent=None):
         self.w, self.h = 512, 512
-        self.ctx = cl.create_some_context()
+        self.ctx = create_context()
         self.queue = cl.CommandQueue(self.ctx)
         self.prg = cl.Program(self.ctx, kernels5.DYNAMIC_MAP_KERNEL_SOURCE).build()
 
@@ -149,12 +172,15 @@ class App(QtGui.QWidget):
 
         super(App, self).__init__(parent)
 
-        self.setWindowTitle('Dynamic Map')
+        self.setWindowTitle('Task 5')
 
-        self.y_min = 1.2
-        self.y_max = 1.6
-        self.x_min = -.33
-        self.x_max = .08
+        # self.y_min = 1
+        # self.y_max = 2
+        # self.x_min = -.5
+        # self.x_max = .5
+
+        self.x_min, self.x_max = MAP_BOUNDS[1]
+        self.y_min, self.y_max = MAP_BOUNDS[0]
 
         self.coord_label = QtGui.QLabel()
         self.image_label = ImageWidget()
@@ -171,9 +197,8 @@ class App(QtGui.QWidget):
         self.pA, self.pB = None, None
         self.pA_d, self.pB_d = -1, -1
 
-        self.image_label.onMouseMove(lambda x, y, ev: self.coord_label.setText("a = %f; b = %f" % (
-            translate(x, self.w, self.x_min, self.x_max),
-            translate(self.h - y, self.h, self.y_min, self.y_max)
+        self.image_label.onMouseMove(lambda x, y, ev: self.coord_label.setText("lam = %f; b = %f" % (
+            translate(self.h - y, self.h, self.y_min, self.y_max), translate(x, self.w, self.x_min, self.x_max),
         )), draw_tree_lam)
         self.image_label.onMouseClick(draw_tree_lam)
 
@@ -188,7 +213,8 @@ class App(QtGui.QWidget):
 
         self.image2_label.onMouseMove(lambda x, y, ev: not any(self.last_params) or self.coord_label.setText("lam = %f, b = %f" % (
             translate(x, self.w, self.x_min, self.x_max) if not self.use_param_A else self.last_params[0],
-            translate(x, self.w, self.x_min, self.x_max) if self.use_param_A else self.last_params[1]
+            translate(x, self.w, self.x_min, self.x_max) if self.use_param_A else self.last_params[1],
+
         )), lambda *args: None)
 
         def custom_paintEvent(self2, evt):
@@ -229,9 +255,9 @@ class App(QtGui.QWidget):
         layout.addWidget(self.mblabel)
 
         self.use_param_A = False
-        self.skip = 2048
+        self.skip = 0
         self.samples = self.w
-        self.samples_map = 32
+        self.samples_map = 100
 
         self.draw_map(0.0)
         self.last_params = (None, None)
@@ -257,7 +283,9 @@ class App(QtGui.QWidget):
                                   self.x_min, self.y_min, self.x_max, self.y_max,
                                    start*self.mul, samples_count=self.samples_map, skip=self.samples+self.skip-self.samples_map+1,
                                   image=self.image)
-        self.image_label.setPixmap(pixmap_from_raw_image(img))
+        self.pm = pixmap_from_raw_image(img)
+        self.pixmap_reflect = self.pm.transformed(Qt.QTransform().scale(-1, 1))
+        self.image_label.setPixmap(self.pixmap_reflect)
 
     def active_param_value(self):
         return self.last_params[0 if not self.use_param_A else 1]

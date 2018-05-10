@@ -5,6 +5,7 @@ import sys
 
 import kernels3
 
+
 def create_context():
     c = cl.create_some_context(answers=[1, 0])
     print(c.get_info(cl.context_info.DEVICES))
@@ -249,6 +250,8 @@ class App(QtGui.QWidget):
         if QKeyEvent.key() == QtCore.Qt.Key_Q:
             print("switching param is disabled")
             # self.use_param_A = not self.use_param_A
+        if QKeyEvent.key() == QtCore.Qt.Key_I and all(self.last_params):
+            pass
 
     def mouseDoubleClickEvent(self, event):
         self.draw_map(self.start)

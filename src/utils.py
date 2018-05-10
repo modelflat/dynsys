@@ -15,13 +15,13 @@ def pixmap_from_raw_image(img: np.ndarray):
 
 
 def type():
-    return np.float64
+    return np.float32
 
 def real(arg):
     return type()(arg)
 
 def typesize():
-    return 8
+    return 4
 
 
 def translate(x, d, a, b):
