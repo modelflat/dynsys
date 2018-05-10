@@ -3,8 +3,10 @@ import pyopencl as cl
 import numpy as np
 import sys
 
-import kernels3
+from dynsys.common import TypeConfig
+real, real_size = TypeConfig(np.float32)
 
+import kernels3
 
 def create_context():
     c = cl.create_some_context(answers=[1, 0])
@@ -22,16 +24,6 @@ def pixmap_from_raw_image(img: np.ndarray):
     pixmap = QtGui.QPixmap()
     pixmap.convertFromImage(image)
     return pixmap, image
-
-
-def type():
-    return np.float64
-
-def real(arg):
-    return type()(arg)
-
-def typesize():
-    return 8
 
 
 def translate(x, d, a, b):
