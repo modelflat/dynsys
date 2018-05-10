@@ -85,38 +85,6 @@ real2 map_function(real2 v, real param_A, real param_B) {
     return (real2)(xp, yp);
 }
 
-void makeHeap(global real* data, int n, int i) {
-    while (true) {
-        int smallest = i;
-        int l = (i << 1) + 1;
-        int r = (i << 1) + 2;
-
-        if (l < n && data[l] < data[smallest]) {
-            smallest = l;
-        }
-        if (r < n && data[r] < data[smallest]) {
-            smallest = r;
-        }
-        if (smallest == i) {
-            return; // already smallest
-        }
-        real t = *(data + i); *(data + i) = *(data + smallest); *(data + smallest) = t;
-        i = smallest;
-    }
-}
-
-void heapSort(global real* data, int n)
-{
-    for (int i = n / 2 - 1; i >= 0; --i) {
-        makeHeap(data, n, i);
-    }
-    
-    for (int i = n - 1; i >= 0; --i) {
-        real t = *(data); *(data) = *(data + i); *(data + i) = t;
-        makeHeap(data, i, 0);
-    }
-}
-
 float3 hsv2rgb(float3 hsv) {
     const float c = hsv.y * hsv.z;
     const float x = c * (1 - fabs(fmod( hsv.x / 60, 2 ) - 1));
@@ -211,6 +179,44 @@ kernel void compute_map(
     }
     
     write_imageui(map, id, convert_uint4_rtz(255*(float4)(color_for_count(uniques, samples_count), 1.0)).zyxw);
+}
+
+"""
+
+
+ATTRACTOR_KS = """
+
+#define real double
+#define real2 double2
+
+real2 system(real2 v, real param_A, real param_B) {
+    real xp = 1 - param_B*v.x*v.x - param_A*v.y; 
+    real yp = v.x;
+    return (real2)(xp, yp);
+}
+
+kernel void clear(write_only image2d_t img) {
+    write_imageui(img, (int2)(get_global_id(0), get_global_id(1)), (uint4)(1.0));
+}
+
+kernel void draw_phase_portrait(
+    const real a, const real b,
+    const real x_min, const real x_max, const real y_min, const real y_max,
+    const int step_count, 
+    const int w, const int h,
+    write_only image2d_t result
+) {
+    const int2 id = (int2)(get_global_id(0), get_global_id(1));
+    const real2 grid_step = (real2)((x_max - x_min)/get_global_size(0), (y_max - y_min)/get_global_size(1));
+    
+    real2 point = (real2)(x_min + id.x*grid_step.x, y_min + id.y*grid_step.y);
+    
+    for (int i = 0; i < step_count; ++i) {
+        point = system(point, a, b);
+    }
+    int2 coord = (int2)( (point.x - x_min)/(x_max - x_min)*w, (point.y - y_min)/(y_max - y_min)*h);
+    write_imageui(result, coord, (uint4)((uint3)(0), 255));
+    
 }
 
 """

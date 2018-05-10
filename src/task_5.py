@@ -113,6 +113,30 @@ class ImageWidget(QtGui.QLabel):
             self._customPaintEvent(self, QPaintEvent)
 
 
+class PhasePortrait:
+
+    def __init__(self, ctx, queue, w, h):
+        self.ctx, self.queue, self.w, self.h = ctx, queue, w, h
+        self.program = cl.Program(ctx, kernels5.ATTRACTOR_KS).build()
+        self.image_device = allocate_image(ctx, w, h)
+        self.image = np.empty((w, h, 4), dtype=np.uint8)
+
+    def clear(self):
+        self.program.clear(self.queue, (self.w, self.h), None, self.image_device)
+
+    def draw(self, m, b, x_min, x_max, y_min, y_max):
+        self.clear()
+        red = 30
+        self.program.draw_phase_portrait(self.queue, (self.w // red, self.h // red), None,
+                                         real(m), real(b),
+                                         real(x_min), real(x_max), real(y_min), real(y_max),
+                                         np.int32(40000), np.int32(self.w), np.int32(self.h),
+                                         self.image_device)
+
+        cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0,0), region=(self.w, self.h))
+
+        return self.image
+
 class App(QtGui.QWidget):
     def __init__(self, parent=None):
         self.w, self.h = 512, 512
@@ -120,6 +144,7 @@ class App(QtGui.QWidget):
         self.queue = cl.CommandQueue(self.ctx)
         self.prg = cl.Program(self.ctx, kernels5.DYNAMIC_MAP_KERNEL_SOURCE).build()
 
+        self.attract = PhasePortrait(self.ctx, self.queue, self.w,  self.h)
         self.bif_tree = BifurcationTree(self.ctx, self.queue, self.w, self.h)
 
         super(App, self).__init__(parent)
@@ -140,7 +165,7 @@ class App(QtGui.QWidget):
         def draw_tree_lam(x, y, ev):
             self.pA, self.pA_d = translate(x, self.w, self.x_min, self.x_max), x
             self.pB, self.pB_d = translate(self.h - y, self.h, self.y_min, self.y_max), y
-            self.draw_tree(self.pA, self.pB)
+            self.draw_phase_portrait(self.pA, self.pB)
             self.image_label.repaint()
 
         self.pA, self.pB = None, None
@@ -161,7 +186,7 @@ class App(QtGui.QWidget):
 
         self.image_label.onPaint(custom_paintEvent_crosshair)
 
-        self.image2_label.onMouseMove(lambda x, y, ev: not any(self.last_params) or self.coord_label.setText("a = %f, b = %f" % (
+        self.image2_label.onMouseMove(lambda x, y, ev: not any(self.last_params) or self.coord_label.setText("lam = %f, b = %f" % (
             translate(x, self.w, self.x_min, self.x_max) if not self.use_param_A else self.last_params[0],
             translate(x, self.w, self.x_min, self.x_max) if self.use_param_A else self.last_params[1]
         )), lambda *args: None)
@@ -200,6 +225,9 @@ class App(QtGui.QWidget):
         self.image = allocate_image(self.ctx, self.w, self.h )
         self.image_bif = allocate_image(self.ctx, self.w, self.h)
 
+        self.mblabel = QtGui.QLabel()
+        layout.addWidget(self.mblabel)
+
         self.use_param_A = False
         self.skip = 2048
         self.samples = self.w
@@ -219,22 +247,17 @@ class App(QtGui.QWidget):
     def mouseDoubleClickEvent(self, event):
         self.draw_map(self.start)
 
+    def draw_phase_portrait(self, m, b):
+        self.m, self.b = m, b
+        self.mblabel.setText("lam = %f, b = %f" % (self.m, self.b))
+        self.image2_label.setPixmap(pixmap_from_raw_image(self.attract.draw(m, b, self.x_min, self.x_max, self.y_min, self.y_max)))
+
     def draw_map(self, start):
         img = compute_dynamic_map(self.ctx, self.prg, self.queue, self.w, self.h,
                                   self.x_min, self.y_min, self.x_max, self.y_max,
                                    start*self.mul, samples_count=self.samples_map, skip=self.samples+self.skip-self.samples_map+1,
                                   image=self.image)
         self.image_label.setPixmap(pixmap_from_raw_image(img))
-
-    def draw_tree(self, param_A, param_B):
-        # print("Drawing for a = %f, b = %f" % (param_A, param_B))
-        self.last_params = param_A, param_B
-        param_A = None if not self.use_param_A else param_A
-        param_B = None if self.use_param_A else param_B
-        if self.use_param_A:
-            self.image2_label.setPixmap(self.bif_tree.draw(param_A, param_B, self.y_min, self.y_max, self.start, self.skip, self.samples))
-        else:
-            self.image2_label.setPixmap(self.bif_tree.draw(param_A, param_B, 0, self.x_max, self.start, self.skip, self.samples))
 
     def active_param_value(self):
         return self.last_params[0 if not self.use_param_A else 1]
