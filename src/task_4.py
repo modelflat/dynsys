@@ -2,12 +2,45 @@ from PyQt4 import QtGui, Qt, QtCore
 import pyopencl as cl
 import numpy as np
 import sys
+import matplotlib.pyplot as pp
+
 
 def create_context():
     c = cl.create_some_context(answers=[1, 0])
     print(c.get_info(cl.context_info.DEVICES))
     return c
 
+
+class Map:
+
+    def __init__(self, lam):
+        self.lam = lam
+
+    def __call__(self, x, y):
+        return (self.lam - x**2)*x
+
+    def plot_curves(self, style1, style2):
+        x = np.linspace(-self.lam, self.lam, 100)
+        pp.plot(x, x, style1, x, self(x), style2)
+
+    def compute_iterations(self, x, iter_count):
+        result = np.ndarray((iter_count, 2), dtype=np.float64)
+        for i in range(0, iter_count, 2):
+            x_next = self(x)
+            result[i] = x, x_next
+            result[i + 1] = x_next, x_next
+            x = x_next
+        return result
+
+    def plot_iterations(self, x0, iter_count, style):
+        xl, yl = self.compute_iterations(x0, iter_count).T
+        pp.plot(xl, yl, style)
+
+    def plot(self, x0, iter_count, style="r-", style1="g-", style2="b-"):
+        self.plot_curves(style1, style2)
+        self.plot_iterations(x0, iter_count, style)
+        pp.xlabel('Xn'); pp.ylabel('Xn+1')
+        pp.grid()
 
 from utils import pixmap_from_raw_image, translate
 
@@ -31,7 +64,7 @@ PHASE_PORTRAIT_KERNEL_SOURCE = """
 #define real double
 #define real2 double2
 
-#define STEP 1e-3
+#define STEP 4e-4
 
 real2 system(real2 v, real m, real b) {
     real2 p = (real2)(
@@ -58,11 +91,11 @@ kernel void draw_phase_portrait(
     real2 point = (real2)(x_min + id.x*grid_step.x, y_min + id.y*grid_step.y);
     
     for (int i = 0; i < step_count; ++i) {
-        int2 coord = (int2)( (point.x - x_min)/(x_max - x_min)*w, (point.y - y_min)/(y_max - y_min)*h);
-        
-        write_imageui(result, coord, (uint4)((uint3)(0), 255));
-        
         point = system(point, a, b);
+        if (step_count - i < 15) {
+            int2 coord = (int2)( (point.x - x_min)/(x_max - x_min)*w, (point.y - y_min)/(y_max - y_min)*h);
+            write_imageui(result, coord, (uint4)((uint3)(0), 255));
+        }
     }
 }
 
@@ -120,37 +153,27 @@ kernel void draw_parameter_map(
 ) {
     
     const int2 id = (int2)(get_global_id(0), get_global_id(1));
-    samples += (id.x * get_global_size(1) + id.y)*samples_count;
+    //samples += (id.x * get_global_size(1) + id.y)*samples_count;
     
-    real2 v = (real2)(x_start, y_start);
+    //real2 v = (real2)(x_start, y_start);
     
     const real2 par = (real2)(
         a_min + id.x*(a_max - a_min)/get_global_size(0), 
-        b_min + (get_global_size(1) - id.y)*(b_max - b_min) / get_global_size(1)
+        b_min + (id.y)*(b_max - b_min) / get_global_size(1)
     );
-    
-    for (int i = 0; i < skip; ++i) {
-        v = system(v, par.x, par.y);
-    }
     
     int uniques = 0;
     
-    for (int i = 0; i < samples_count; ++i) {
-        v = system(v, par.x, par.y);
-        int found = 0;
-        for (int j = 0; j < i; ++j) {
-            if (fabs( samples[j].x - v.x ) < 1e-4 && fabs( samples[j].y - v.y ) < 1e-4) {
-                found = 1;
-                break;
-            }
-        }
-        if (!found) ++uniques;
+    #define D 5e-3
+    uint4 color = (uint4)(0, 0, 0, 255);
+    if (fabs(par.y - (1 - sqrt(par.x))) < D) {
+        color.xyz = (uint3)(255, 0, 0);
+    } else if (fabs(par.y - (1 + sqrt(par.x))) < D) { 
+        color.xyz = (uint3)(0, 255, 0);
+    } else if (fabs(par.y - 2*par.x) < D) { 
+        color.xyz = (uint3)(0, 0, 255);
     }
-    
-    write_imageui(result, (int2)(id.x, get_global_size(1) - id.y), 
-        convert_uint4_rtz(255*(float4)(color_for_count(uniques, samples_count), 1.0)).zyxw);
-    // write_imagef(result, (int2)(id.x, get_global_size(1) - id.y), (float4)(, .3, 1.0).zyxw);
-    
+    write_imageui(result, (int2)(id.x, get_global_size(1) - id.y), color);
 }
 
 """
@@ -169,7 +192,12 @@ class PhasePortrait:
 
     def draw(self, m, b, x_min, x_max, y_min, y_max):
         self.clear()
-        red = 30
+        red = 6
+        x_min = -3
+        x_max = 3
+        y_min = -3
+        y_max = 3
+
         self.program.draw_phase_portrait(self.queue, (self.w // red, self.h // red), None,
                                          real(m), real(b),
                                          real(x_min), real(x_max), real(y_min), real(y_max),
@@ -190,7 +218,13 @@ class ParameterMap:
 
     def draw(self, x_start, y_start, a_min, a_max, b_min, b_max, skip, samples_count):
 
-        samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_type_size()*2*self.w*self.h*samples_count)
+        # a_min = 0
+        # a_max = 5
+        # b_min = 0
+        # b_max = 5
+
+        samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_type_size()
+                                   )#*2*self.w*self.h*samples_count)
 
         self.program.draw_parameter_map(self.queue, (self.w, self.h), None,
                                         real(x_start), real(y_start),
@@ -250,10 +284,10 @@ class App(QtGui.QWidget):
 
         self.setWindowTitle('Task 4')
 
-        self.x_min = 0
-        self.x_max = 1.2
-        self.y_min = -2
-        self.y_max = 2
+        self.x_min = 0#-1.2
+        self.x_max = 3
+        self.y_min = 0#-2
+        self.y_max = 3
 
         self.coord_label = QtGui.QLabel()
         self.image_label = ImageWidget()
@@ -270,7 +304,7 @@ class App(QtGui.QWidget):
         self.pA, self.pB = None, None
         self.pA_d, self.pB_d = -1, -1
 
-        self.image_label.onMouseMove(lambda x, y, ev: self.coord_label.setText("a = %f; b = %f" % (
+        self.image_label.onMouseMove(lambda x, y, ev: self.coord_label.setText("m = %f; b = %f" % (
             translate(x, self.w, self.x_min, self.x_max),
             translate(self.h - y, self.h, self.y_min, self.y_max)
         )), draw_tree_lam)
