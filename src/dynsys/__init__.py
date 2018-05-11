@@ -1,2 +1,2 @@
 
-from .iterative_diagram import iterative_diagram_kernel
+from .iterative_diagram import iteration_diagram_source

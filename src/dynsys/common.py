@@ -1,7 +1,13 @@
 import numpy as np
 import pyopencl as cl
+from .common_source import COMMON_SOURCE
 from PyQt4 import Qt, QtGui, QtCore
 import sys
+
+
+def make_cl_source(*args, type_config=None):
+    return type_config.cl() + "\n" + \
+           COMMON_SOURCE + "\n" + "\n".join(args)
 
 
 def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
@@ -21,17 +27,23 @@ def to_pixmap(img):
     return pixmap
 
 
-def qt_vstack_widgets(*args):
+def qt_vstack(*args):
     l = QtGui.QVBoxLayout()
     for a in args:
-        l.addWidget(a)
+        if isinstance(a, Qt.QLayout):
+            l.addLayout(a)
+        else:
+            l.addWidget(a)
     return l
 
 
-def qt_hstack_widgets(*args):
+def qt_hstack(*args):
     l = QtGui.QHBoxLayout()
     for a in args:
-        l.addWidget(a)
+        if isinstance(a, Qt.QLayout):
+            l.addLayout(a)
+        else:
+            l.addWidget(a)
     return l
 
 
@@ -158,9 +170,7 @@ class ParametrizedImageWidget(Qt.QWidget):
 
         self.image_widget = ImageWidget(custom_mouse_move=_custom_mouse_move, crosshair=Crosshair(crosshair_color))
 
-        self.setLayout(qt_vstack_widgets(
-            self.image_widget, self.position_label
-        ))
+        self.setLayout(qt_vstack(self.image_widget, self.position_label))
 
     def set_image(self, image):
         self.image_widget.set_numpy_image(image)

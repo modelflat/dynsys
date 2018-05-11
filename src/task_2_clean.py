@@ -2,15 +2,16 @@ import dynsys.iterative_diagram as itd
 from dynsys.common import *
 from PyQt4 import QtGui
 
+
 class App(SimpleApp):
     def __init__(self):
         super(App, self).__init__("Iterative Diagram")
         self.w, self.h = 512, 512
-        self.diag = itd.IterativeDiagram(self.ctx, self.queue, self.w, self.h, """
-        real carrying_function(real x, real lam) {
-            return (lam - x*x)*x;
-        }
-        #define map_function carrying_function
+        self.diag = itd.IterationDiagram(self.ctx, self.queue, self.w, self.h, """
+            real map_function(real x, real lam) {
+                return (lam - x*x)*x;
+            }
+            #define carrying_function map_function
         """)
 
         self.bounds = itd.Bounds(-2, 2, -2, 2)
@@ -30,11 +31,13 @@ class App(SimpleApp):
 
         self.info_label = QtGui.QLabel()
 
-        layout = Qt.QVBoxLayout()
-        layout.addLayout(qt_hstack_widgets(self.iter_diag_image, self.lambda_slider))
-        layout.addLayout(qt_vstack_widgets(self.x0_slider, self.iter_slider))
-        layout.addWidget(self.info_label)
-        self.setLayout(layout )
+        self.setLayout(
+            qt_vstack(
+                qt_hstack(self.iter_diag_image, self.lambda_slider),
+                qt_vstack(self.x0_slider, self.iter_slider),
+                self.info_label
+            )
+        )
 
         self.draw_diag()
 
