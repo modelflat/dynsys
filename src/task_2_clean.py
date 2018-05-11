@@ -1,4 +1,4 @@
-import dynsys.iterative_diagram as itd
+import dynsys.cobweb_diagram as itd
 from dynsys.common import *
 from PyQt4 import QtGui
 
@@ -7,14 +7,16 @@ class App(SimpleApp):
     def __init__(self):
         super(App, self).__init__("Iterative Diagram")
         self.w, self.h = 512, 512
-        self.diag = itd.IterationDiagram(self.ctx, self.queue, self.w, self.h, """
+
+        self.bounds = itd.Bounds(-2, 2, -2, 2)
+
+        self.diag = itd.CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.bounds, """
             real map_function(real x, real lam) {
                 return (lam - x*x)*x;
             }
             #define carrying_function map_function
         """)
 
-        self.bounds = itd.Bounds(-2, 2, -2, 2)
 
         self.x0, self.lam, self.iter_count = .1, 1.2, 1000
 

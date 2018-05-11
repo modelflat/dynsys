@@ -1,2 +1,2 @@
 
-from .iterative_diagram import iteration_diagram_source
+from .cobweb_diagram import cobweb_diagram_source

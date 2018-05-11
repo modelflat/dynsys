@@ -6,8 +6,7 @@ import sys
 
 
 def make_cl_source(*args, type_config=None):
-    return type_config.cl() + "\n" + \
-           COMMON_SOURCE + "\n" + "\n".join(args)
+    return type_config.cl() + "\n" + COMMON_SOURCE + "\n" + "\n".join(args)
 
 
 def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
@@ -205,3 +204,15 @@ class IntegerSlider(QtGui.QSlider):
         super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
         super().setMinimum(min_val)
         super().setMaximum(max_val)
+
+
+class ComputedImage:
+
+    def __init__(self, ctx, queue, width, height, bounds, *sources, type_config=float_config):
+        self.ctx, self.queue, self.tc = ctx, queue, type_config
+        self.width, self.height = width, height
+        self.image, self.image_device = allocate_image(ctx, width, height)
+        self.bounds = bounds
+        self.program = cl.Program(ctx, make_cl_source(
+            *sources, type_config=type_config
+        )).build()

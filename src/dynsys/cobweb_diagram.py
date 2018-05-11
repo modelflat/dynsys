@@ -1,10 +1,11 @@
-import pyopencl as cl
 import numpy as np
-from .common import Bounds, allocate_image, make_cl_source, float_config
+import pyopencl as cl
 
-iteration_diagram_source = """
+from .common import ComputedImage, float_config
 
-// compute samples for diagram, single-threaded (usually iterations count are small enough, and we avoid copying data)
+cobweb_diagram_source = """
+
+// compute samples for diagram, single-threaded (usually iterations count is small enough, and we avoid copying data)
 kernel void compute_samples(
     const real start, const real lambda,
     const int samples_count,
@@ -25,7 +26,7 @@ kernel void compute_samples(
 #define CARRY_COLOR    (uint4)(128, 255, 0, 255)
 #define FILL_COLOR     (uint4)(255)
 
-// draw background (secant line and carrying function) for this iteration diagram
+// draw background (secant line and carrying function) for this cobweb diagram
 kernel void draw_background(
     const real lambda,
     const real x_min, const real x_max, const real y_min, const real y_max,
@@ -49,7 +50,7 @@ kernel void draw_background(
 
 #define ITER_COLOR (uint4)(0, 0, 0, 255)
 
-kernel void draw_iteration_diagram(
+kernel void draw_cobweb_diagram(
     const global real* samples,
     const real x_min, const real x_max, const real y_min, const real y_max,
     const int width, const int height,    
@@ -85,37 +86,28 @@ kernel void draw_iteration_diagram(
 """
 
 
-class IterationDiagram:
+class CobwebDiagram(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, carrying_function_source: str, type_config=float_config):
-        self.ctx, self.queue, self.tc = ctx, queue, type_config
-        self.width, self.height = width, height
-        self.image, self.image_device = allocate_image(ctx, width, height)
-        self._bounds = None
-        self.program = cl.Program(ctx, make_cl_source(
-            carrying_function_source, iteration_diagram_source, type_config=type_config
-        )).build()
+    def __init__(self, ctx, queue, width, height, bounds, carrying_function_source, type_config=float_config):
+        ComputedImage.__init__(self, ctx, queue, width, height, bounds,
+                               carrying_function_source, cobweb_diagram_source,
+                               type_config=type_config)
         self.compute_samples = self.program.compute_samples
 
-    def bounds(self, bounds: Bounds):
-        self._bounds = bounds
-
-    def __call__(self, x0, lam, iter_count, bounds: Bounds = None, queue=None):
+    def __call__(self, x0, lam, iter_count, bounds=None, queue=None):
         if bounds is None:
-            bounds = self._bounds
-
+            bounds = self.bounds
         if queue is None:
             queue = self.queue
 
         real, real_size = self.tc()
 
-        samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_size*iter_count)
+        samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_size * iter_count)
 
-        self.compute_samples.set_args(
-            real(x0), real(lam), np.int32(iter_count),
-            samples_device
-        )
+        self.compute_samples.set_args(real(x0), real(lam), np.int32(iter_count), samples_device)
+
         cl.enqueue_task(queue, self.compute_samples)
+
         self.program.draw_background(queue, (self.width, self.height), None,
                                      real(lam),
                                      real(bounds.x_min), real(bounds.x_max),
@@ -123,14 +115,13 @@ class IterationDiagram:
                                      self.image_device
                                      )
 
-        self.program.draw_iteration_diagram(queue, (iter_count,), None,
-                                            samples_device,
-                                            real(bounds.x_min), real(bounds.x_max),
-                                            real(bounds.y_min), real(bounds.y_max),
-                                            np.int32(self.width), np.int32(self.height),
-                                            self.image_device
-                                            )
+        self.program.draw_cobweb_diagram(queue, (iter_count,), None,
+                                         samples_device,
+                                         real(bounds.x_min), real(bounds.x_max),
+                                         real(bounds.y_min), real(bounds.y_max),
+                                         np.int32(self.width), np.int32(self.height),
+                                         self.image_device
+                                         )
 
         cl.enqueue_copy(queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
-
         return self.image
