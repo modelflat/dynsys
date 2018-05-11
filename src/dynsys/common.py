@@ -21,15 +21,15 @@ def to_pixmap(img):
     return pixmap
 
 
-def qt_hstack_widgets(*args):
-    l = QtGui.QHBoxLayout()
+def qt_vstack_widgets(*args):
+    l = QtGui.QVBoxLayout()
     for a in args:
         l.addWidget(a)
     return l
 
 
-def qt_vstack_widgets(*args):
-    l = QtGui.QVBoxLayout()
+def qt_hstack_widgets(*args):
+    l = QtGui.QHBoxLayout()
     for a in args:
         l.addWidget(a)
     return l
@@ -164,3 +164,34 @@ class ParametrizedImageWidget(Qt.QWidget):
 
     def set_image(self, image):
         self.image_widget.set_numpy_image(image)
+
+
+class RealSlider(QtGui.QSlider):
+
+    valueChanged = Qt.pyqtSignal(float)
+
+    def __init__(self, min_val, max_val, steps=10000, horizontal=True):
+        QtGui.QSlider.__init__(self)
+        self.steps = steps
+        self.min_val = min_val
+        self.max_val = max_val
+        super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
+        super().setMinimum(0)
+        super().setMaximum(self.steps)
+        super().valueChanged.connect(self._valueChanged)
+
+    @QtCore.pyqtSlot(int)
+    def _valueChanged(self, int_val):
+        self.valueChanged.emit(self.value())
+
+    def value(self):
+        return float(super().value()) / self.steps * (self.max_val - self.min_val) + self.min_val
+
+
+class IntegerSlider(QtGui.QSlider):
+
+    def __init__(self, min_val, max_val, horizontal=True):
+        QtGui.QSlider.__init__(self)
+        super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
+        super().setMinimum(min_val)
+        super().setMaximum(max_val)
