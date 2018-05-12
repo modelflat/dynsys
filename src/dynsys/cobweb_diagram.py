@@ -5,13 +5,23 @@ from .common import ComputedImage, float_config
 
 cobweb_diagram_source = """
 
+#ifndef carrying_function
+#define carrying_function map_function
+#endif
+
 // compute samples for diagram, single-threaded (usually iterations count is small enough, and we avoid copying data)
 kernel void compute_samples(
     const real start, const real lambda,
+    const int skip_first,
     const int samples_count,
     global real* samples
 ) {
     real x = start;
+    
+    for (int i = 0; i < skip_first; ++i) {
+        x = map_function(x, lambda);
+    }
+    
     samples[0] = x;
     samples[1] = x;
     for (int i = 2; i < samples_count; ++i) {
@@ -33,7 +43,7 @@ kernel void draw_background(
     write_only image2d_t result
 ) {
     const int2 id = ID_2D;
-    const real2 v = TRANSLATE_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
+    const real2 v = TRANSLATE_2D_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
     
     if (NEAR(v.y, v.x, ABS_ERROR)) {
         write_imageui(result, id, CROSSING_COLOR);
@@ -64,23 +74,26 @@ kernel void draw_cobweb_diagram(
     
     const real3 x = (real3)(samples[id], samples[id+1], samples[id+2]);
     const int2 size = (int2)(width, height);
-    const int2 p1 = TRANSLATE_BACK_INV_Y( x.s01, size, x_min, x_max, y_min, y_max );
-    const int2 p2 = TRANSLATE_BACK_INV_Y( x.s12, size, x_min, x_max, y_min, y_max );
+    const int2 p1 = TRANSLATE_BACK_2D_INV_Y( x.s01, x_min, x_max, y_min, y_max, size );
+    const int2 p2 = TRANSLATE_BACK_2D_INV_Y( x.s12, x_min, x_max, y_min, y_max, size );
     
     int2 line = (int2)(min(p1.x, p2.x), max(p1.x, p2.x));
-    for (int i = clamp(line.s0, 0, width); i <= line.s1; ++i) {
-        if (i < width && i >= 0) {
-            write_imageui(result, (int2)(i, p1.y), ITER_COLOR);
+    if (p1.y < height && p1.y >= 0) {
+        for (int i = clamp(line.s0, 0, width); i <= line.s1; ++i) {
+            if (i < width && i >= 0) {
+                write_imageui(result, (int2)(i, p1.y), ITER_COLOR);
+            }
         }
     }
     
     line = (int2)(min(p1.y, p2.y), max(p1.y, p2.y));
-    for (int i = clamp(line.s0, 0, height); i <= line.s1; ++i) {
-        if (i < height && i >= 0) {
-            write_imageui(result, (int2)(p2.x, i), ITER_COLOR);
+    if (p2.x < width && p2.x >= 0) {
+        for (int i = clamp(line.s0, 0, height); i <= line.s1; ++i) {
+            if (i < height && i >= 0) {
+                write_imageui(result, (int2)(p2.x, i), ITER_COLOR);
+            }
         }
     }
-        
 }
 
 """
@@ -94,17 +107,21 @@ class CobwebDiagram(ComputedImage):
                                type_config=type_config)
         self.compute_samples = self.program.compute_samples
 
-    def __call__(self, x0, lam, iter_count, bounds=None, queue=None):
+    def __call__(self, x0, lam, iter_count, skip_first=0, bounds=None, queue=None):
         if bounds is None:
             bounds = self.bounds
         if queue is None:
             queue = self.queue
 
+        iter_count = max( iter_count - skip_first, 1 )
+
         real, real_size = self.tc()
 
         samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_size * iter_count)
 
-        self.compute_samples.set_args(real(x0), real(lam), np.int32(iter_count), samples_device)
+        self.compute_samples.set_args(real(x0), real(lam),
+                                      np.int32(skip_first),
+                                      np.int32(iter_count), samples_device)
 
         cl.enqueue_task(queue, self.compute_samples)
 

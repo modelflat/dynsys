@@ -46,7 +46,6 @@ def qt_hstack(*args):
     return l
 
 
-
 class Bounds:
 
     def __init__(self, x_min, x_max, y_min, y_max):
@@ -55,8 +54,25 @@ class Bounds:
         self.y_min = y_min
         self.y_max = y_max
 
-    def from_integer(self, v, v_max):
+    def from_integer_x(self, v, v_max):
         return self.x_min + v / v_max * (self.x_max - self.x_min)
+
+    def clamp_x(self, v):
+        return np.clip(v, self.x_min, self.x_max)
+
+    def clamp_y(self, v):
+        return np.clip(v, self.y_min, self.y_max)
+
+    def from_integer_y(self, v, v_max, invert=True):
+        return self.y_min + ((v_max - v) if invert else v)/ v_max * (self.y_max - self.y_min)
+
+    @staticmethod
+    def x(x_min, x_max):
+        return Bounds(x_min, x_max, None, None)
+
+    @staticmethod
+    def y(y_min, y_max):
+        return Bounds(None, None, y_min, y_max)
 
 
 TYPES = {
@@ -107,9 +123,10 @@ class SimpleApp(QtGui.QWidget):
 
 class Crosshair:
 
-    def __init__(self, color=QtCore.Qt.red):
+    def __init__(self, color=QtCore.Qt.red, shape=(True, True)):
         self.x, self.y = -1, -1
         self.color = color
+        self.shape = shape
 
     def pos(self, x, y):
         self.x, self.y = x, y
@@ -117,8 +134,10 @@ class Crosshair:
     def draw(self, w, h, painter: Qt.QPainter):
         pen = Qt.QPen(self.color, 1)
         painter.setPen(pen)
-        painter.drawLine(0, self.y, w, self.y)
-        painter.drawLine(self.x, 0, self.x, h)
+        if self.shape[1]:
+            painter.drawLine(0, self.y, w, self.y)
+        if self.shape[0]:
+            painter.drawLine(self.x, 0, self.x, h)
 
 
 class ImageWidget(QtGui.QLabel):
@@ -152,7 +171,9 @@ class ImageWidget(QtGui.QLabel):
 
 class ParametrizedImageWidget(Qt.QWidget):
 
-    def __init__(self, bounds, names, crosshair_color=QtCore.Qt.red, custom_mouse_move=lambda *args:None, parent=None):
+    selectionChanged = Qt.pyqtSignal(float, float)
+
+    def __init__(self, bounds, names=("x", "y"), shape=(True, True), crosshair_color=QtCore.Qt.red, custom_mouse_move=lambda *args:None, parent=None):
         super(ParametrizedImageWidget, self).__init__(parent)
         self.bounds = bounds
         self.x_name, self.y_name = names
@@ -160,14 +181,22 @@ class ParametrizedImageWidget(Qt.QWidget):
         self.position_label = Qt.QLabel()
 
         def _custom_mouse_move(x, y, lmb, rmb):
-            self.position_label.setText("%s = %f; %s = %f | [ %s ]" % (
-                self.x_name, self.bounds.from_integer(x, self.image_widget.w),
-                self.y_name, self.bounds.from_integer(self.image_widget.h - y, self.image_widget.h),
-                "selecting" if lmb else "looking"
-            ))
+            h_val = self.bounds.clamp_x(
+                self.bounds.from_integer_x(x, self.image_widget.w)
+            ) if shape[0] else 0.0
+            h_comp = ("%s = %f " % (self.x_name, h_val)) if shape[0] else ""
+            v_val = self.bounds.clamp_y(
+                self.bounds.from_integer_y(y, self.image_widget.h, invert=True)
+            ) if shape[1] else 0.0
+            v_comp = ("%s = %f" % (self.y_name, v_val)) if shape[1] else ""
+            if any(shape):
+                self.position_label.setText("%s%s | [ %s ]" % (h_comp, v_comp, "selecting" if lmb else "looking"))
+            if lmb:
+                self.selectionChanged.emit(h_val, v_val)
             custom_mouse_move(x, y, lmb, rmb)  # call next user-defined function
 
-        self.image_widget = ImageWidget(custom_mouse_move=_custom_mouse_move, crosshair=Crosshair(crosshair_color))
+        self.image_widget = ImageWidget(custom_mouse_move=_custom_mouse_move,
+                                        crosshair=Crosshair(crosshair_color, shape=shape))
 
         self.setLayout(qt_vstack(self.image_widget, self.position_label))
 
@@ -187,14 +216,26 @@ class RealSlider(QtGui.QSlider):
         super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
         super().setMinimum(0)
         super().setMaximum(self.steps)
-        super().valueChanged.connect(self._valueChanged)
+        super().valueChanged.connect(self._value_changed)
 
     @QtCore.pyqtSlot(int)
-    def _valueChanged(self, int_val):
+    def _value_changed(self, int_val):
         self.valueChanged.emit(self.value())
+
+    def set_value(self, v):
+        super().setValue( int( (v - self.min_val) / (self.max_val - self.min_val) * self.steps ) )
 
     def value(self):
         return float(super().value()) / self.steps * (self.max_val - self.min_val) + self.min_val
+
+    @staticmethod
+    def makeAndConnect(min_val, max_val, current_val=None, steps=10000,
+                       horizontal=True, connect_to=None):
+        s = RealSlider(min_val, max_val, steps=steps, horizontal=horizontal)
+        if connect_to is not None:
+            s.valueChanged.connect(connect_to)
+        s.set_value(current_val if current_val is not None else min_val)
+        return s
 
 
 class IntegerSlider(QtGui.QSlider):
@@ -204,6 +245,14 @@ class IntegerSlider(QtGui.QSlider):
         super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
         super().setMinimum(min_val)
         super().setMaximum(max_val)
+
+    @staticmethod
+    def makeAndConnect(min_val, max_val, current_val=None, horizontal=True, connect_to=None):
+        s = IntegerSlider(min_val, max_val, horizontal=horizontal)
+        if connect_to is not None:
+            s.valueChanged.connect(connect_to)
+        s.setValue(current_val if current_val is not None else min_val)
+        return s
 
 
 class ComputedImage:
@@ -216,3 +265,31 @@ class ComputedImage:
         self.program = cl.Program(ctx, make_cl_source(
             *sources, type_config=type_config
         )).build()
+
+    def clear(self, read_back=False, color=(1.0, 1.0, 1.0, 1.0)):
+        cl.enqueue_fill_image(self.queue, self.image_device, color, origin=(0, 0), region=(self.width, self.height))
+        if read_back:
+            cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
+
+
+class ObservableValue(Qt.QObject):
+
+    valueChanged = Qt.pyqtSignal(object)
+
+    def __init__(self, initial):
+        super().__init__()
+        self._value = initial
+
+    def value(self):
+        return self._value
+
+    def setValue(self, v):
+        self._value = v
+        self.valueChanged.emit( v )
+
+    @staticmethod
+    def makeAndConnect(initial, connect_to=None):
+        o = ObservableValue(initial)
+        if connect_to is not None:
+            o.valueChanged.connect(connect_to)
+        return o
