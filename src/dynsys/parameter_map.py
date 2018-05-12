@@ -170,6 +170,4 @@ class ParameterMap(ComputedImage):
                                  np.int32(samples_count), np.int32(skip),
                                  samples_device, self.image_device)
 
-        cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
-
-        return self.image
+        return self.read_from_device()

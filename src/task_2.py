@@ -8,8 +8,6 @@ real map_function(real x, real lam) {
 }
 """
 
-type_config = double_config
-
 
 class Task2(SimpleApp):
     def __init__(self):
@@ -22,16 +20,14 @@ class Task2(SimpleApp):
 
         self.info_label = QtGui.QLabel()
 
-        self.diag = cbd.CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.bounds,
-                                      map_function, type_config=type_config)
-        self.tree = bif.BifurcationTree(self.ctx, self.queue, self.w, self.h,
-                                        map_function, type_config=type_config)
+        self.diag = cbd.CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.bounds, map_function)
+        self.tree = bif.BifurcationTree(self.ctx, self.queue, self.w, self.h, map_function)
 
         self.diag_image = ParametrizedImageWidget(self.bounds, shape=(False, False), parent=self)
         self.tree_image = ParametrizedImageWidget(self.lambda_bounds, names=("lambda", ""), shape=(True, False),
                                                   parent=self)
 
-        self.lam = ObservableValue.makeAndConnect(1.9, connect_to=self.draw_diag)
+        self.lam = ObservableValue.makeAndConnect(2.46, connect_to=self.draw_diag)
         self.iter_count = ObservableValue.makeAndConnect(500, connect_to=self.draw_diag)
         self.x0 = ObservableValue.makeAndConnect(0.1, connect_to=lambda *args: (self.draw_tree(), self.draw_diag()))
 

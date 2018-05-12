@@ -1,2 +1,0 @@
-
-from .cobweb_diagram import cobweb_diagram_source

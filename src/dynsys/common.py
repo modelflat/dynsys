@@ -296,6 +296,10 @@ class ComputedImage:
         if read_back:
             cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
 
+    def read_from_device(self, queue=None):
+        cl.enqueue_copy(queue if queue is not None else self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
+        return self.image
+
 
 class ObservableValue(Qt.QObject):
 
