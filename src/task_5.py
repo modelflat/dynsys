@@ -15,7 +15,7 @@ ATT_BOUNDS = (
 )
 
 def create_context():
-    c = cl.create_some_context(answers=[1, 0])
+    c = cl.create_some_context(answers=[0, 0])
     print(c.get_info(cl.context_info.DEVICES))
     return c
 

@@ -52,12 +52,12 @@ class Task2(SimpleApp):
 
     def draw_diag(self, *args):
         self.update_info()
-        self.diag(self.x0.value(), self.lam.value(), self.iter_count.value(), skip_first=self.skip_count, bounds=self.bounds)
+        self.diag(self.x0.value(), self.iter_count.value(), self.lam.value(), skip_first=self.skip_count, bounds=self.bounds)
         self.diag_image.set_image(self.diag.image)
 
     def draw_tree(self, *args):
         self.update_info()
-        self.tree(self.x0.value(), self.lambda_bounds.x_min, self.lambda_bounds.x_max, samples_count=512, skip=256,
+        self.tree(self.x0.value(), 512, self.lambda_bounds.x_min, self.lambda_bounds.x_max, skip=256,
                   max_allowed_value=10)
         self.tree_image.set_image(self.tree.image)
 

@@ -108,6 +108,30 @@ float_config = TypeConfig(np.float32)
 double_config = TypeConfig(np.float64)
 
 
+def generate_param_name(idx):
+    return "_parameter__%02d" % (idx,)
+
+
+def generate_param_code(param_count):
+    names = [generate_param_name(i) for i in range(param_count)]
+    signatures = "#define PARAM_SIGNATURES " + ", ".join(["real " + name for name in names])
+    values = "#define PARAM_VALUES " + ", ".join(names)
+    set_param = "#define SET_PARAM_VALUE(idx, value) {\\\n\t" + "; \\\n\t".join([
+        "if ((idx) == %d) %s = (value)" % (i, name) for i, name in enumerate(names)
+    ]) + "; }"
+    return "\n".join([signatures, values, set_param])
+
+
+def make_param_list(total_params, params, type, active_idx=None):
+    if total_params < len(params):
+        params = params[:total_params] # todo raise warning?
+    if total_params == len(params):
+        return list(map(type, params))
+    if total_params - 1 == len(params) and active_idx is not None:
+        return list(map(type, params[:active_idx])) + [type(0.0),] + list(map(type, params[active_idx+1:]))
+    raise ValueError("Out of %d arguments, only %d were provided." % (total_params, len(params)))
+
+
 class SimpleApp(QtGui.QWidget):
 
     def __init__(self, title):
@@ -149,6 +173,7 @@ class ImageWidget(QtGui.QLabel):
         self.custom_paint = custom_paint
         self.custom_mouse_move = custom_mouse_move
         self.image = None
+        self.w, self.h = 1, 1
 
     def mouseMoveEvent(self, QMouseEvent):
         super(ImageWidget, self).mouseMoveEvent(QMouseEvent)

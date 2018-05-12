@@ -1,4 +1,4 @@
-from dynsys.common import ComputedImage, float_config
+from dynsys.common import ComputedImage, float_config, generate_param_code, make_param_list
 import pyopencl as cl
 import numpy as np
 
@@ -6,6 +6,7 @@ bifurcation_tree_source = """
 
 kernel void compute_bifurcation_tree(
     const real x0,
+    PARAM_SIGNATURES, const int active_param,
     const real start, const real stop,
     const real max_allowed_value,
     const int skip, const int samples_count,
@@ -16,16 +17,18 @@ kernel void compute_bifurcation_tree(
     const real param = TRANSLATE(id, get_global_size(0), start, stop);
 
     result += id * samples_count;
+    
+    SET_PARAM_VALUE(active_param, param);
 
     real x    = x0;
     real min_ = x0;
     real max_ = x0;
     for (int i = 0; i < skip; ++i) {
-        x = map_function(x, param);
+        x = map_function(x, PARAM_VALUES);
     }
 
     for (int i = 0; i < samples_count; ++i) {
-        x = map_function(x, param);
+        x = map_function(x, PARAM_VALUES);
         if (x < min_ && x > -max_allowed_value) min_ = x;
         if (x > max_ && x < max_allowed_value) max_ = x;
         result[i] = clamp(x, -max_allowed_value, max_allowed_value);
@@ -56,20 +59,25 @@ kernel void draw_bifurcation_tree(
 
 class BifurcationTree(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, map_function_source, type_config=float_config):
+    def __init__(self, ctx, queue, width, height, map_function_source, param_count=1, type_config=float_config):
         ComputedImage.__init__(self, ctx, queue, width, height, None,
-                               map_function_source, bifurcation_tree_source,
+                               map_function_source, generate_param_code(param_count), bifurcation_tree_source,
                                type_config=type_config)
+        self.param_count = param_count
 
-    def __call__(self, x0, param_start, param_stop, samples_count, skip=0, max_allowed_value=1000):
+    def __call__(self, x0, samples_count, param_start, param_stop, *params, active_idx=0, skip=0, max_allowed_value=1000):
         real, real_size = self.tc()
 
         result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=samples_count*self.width * real_size)
         result_minmax_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=self.width * 2 * real_size)
 
+        param_list = make_param_list(self.param_count, params, real, active_idx=active_idx)
+
         self.program.compute_bifurcation_tree(
             self.queue, (self.width, ), None,
-            real(x0), real(param_start), real(param_stop),
+            real(x0),
+            *param_list, np.int32(active_idx),
+            real(param_start), real(param_stop),
             real(max_allowed_value),
             np.int32(skip), np.int32(samples_count),
             result_device, result_minmax_device
