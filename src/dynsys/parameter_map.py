@@ -37,26 +37,6 @@ void heapSort(global real* data, int n)
     }
 }
 
-float3 hsv2rgb(float3 hsv) {
-    const float c = hsv.y * hsv.z;
-    const float x = c * (1 - fabs(fmod( hsv.x / 60, 2 ) - 1));
-    float3 rgb;
-    if      (0 <= hsv.x && hsv.x < 60) {
-        rgb = (float3)(c, x, 0);
-    } else if (60 <= hsv.x && hsv.x < 120) {
-        rgb = (float3)(x, c, 0);
-    } else if (120 <= hsv.x && hsv.x < 180) {
-        rgb = (float3)(0, c, x);
-    } else if (180 <= hsv.x && hsv.x < 240) {
-        rgb = (float3)(0, x, c);
-    } else if (240 <= hsv.x && hsv.x < 300) {
-        rgb = (float3)(x, 0, c);
-    } else {
-        rgb = (float3)(c, 0, x);
-    }
-    return (rgb + (hsv.z - c));
-}
-
 #define VALUE_DETECTION_PRECISION 1e-3
 
 //#define GENERATE_COLORS
