@@ -19,6 +19,9 @@ real2 map_function(real2 v, real lam1, real lam2) {
 
 #define DIVERGENCE_THRESHOLD 1e2
 
+#define DETECTION_PRECISION 1e-2
+#define DETECTION_PRECISION_EXPONENT 2
+
 """
 
 
@@ -36,7 +39,7 @@ class Task6(SimpleApp):
         self.map = self.makeParameterMap(self.bounds, map_function_source, var_count=2)
         self.map_image = ParametrizedImageWidget(self.bounds, names=("lam1", "lam2"), crosshair_color=QtCore.Qt.white)
 
-        sub_w, sub_h = 384, 384
+        sub_w, sub_h = 512, 512
 
         self.phas = self.makePhasePortrait(self.attr_bounds,map_function_source, width=sub_w, height=sub_h)
         self.phas_image = ParametrizedImageWidget(self.attr_bounds)
@@ -54,7 +57,7 @@ class Task6(SimpleApp):
             else:
                 self.phas_image.set_crosshair_pos(
                     *self.attr_bounds.to_integer(x_attr, y_attr,
-                                                 sub_w, sub_h, invert_y=False))
+                                                 sub_w, sub_h, invert_y=True))
 
         self.attr_image.selectionChanged.connect(attr_to_phase)
 
@@ -63,16 +66,15 @@ class Task6(SimpleApp):
         self.setLayout(
             qt_hstack(
                 qt_vstack(
-                    self.phas_image,
-                    self.attr_image
-                ),
-                qt_vstack(
                     self.map_image,
                     self.basins_label
+                ),
+                qt_hstack(
+                    self.phas_image,
+                    self.attr_image
                 )
             )
         )
-
         self.draw_map()
 
     def draw_attr(self, a, b):
