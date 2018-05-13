@@ -2,8 +2,6 @@ from dynsys import *
 
 from math import isnan
 
-from dynsys.basins_of_attraction import BasinsOfAttraction
-
 map_function_source = """
 
 #define EPSILON 0.2
@@ -43,7 +41,7 @@ class Task6(SimpleApp):
         self.phas = self.makePhasePortrait(self.attr_bounds,map_function_source, width=sub_w, height=sub_h)
         self.phas_image = ParametrizedImageWidget(self.attr_bounds)
 
-        self.attr = BasinsOfAttraction(self.ctx, self.queue, sub_w, sub_h, self.attr_bounds, map_function_source)
+        self.attr = self.makeBasinsOfAttraction(self.attr_bounds, map_function_source, width=sub_w, height=sub_h)
         self.attr_image = ParametrizedImageWidget(self.attr_bounds, crosshair_color=QtCore.Qt.gray)
 
         self.basins_label = Qt.QLabel()

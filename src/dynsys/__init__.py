@@ -8,6 +8,7 @@ from .parameter_surface import ParameterSurface
 from .cobweb_diagram import CobwebDiagram
 from .parameter_map import ParameterMap
 from .bifurcation_tree import BifurcationTree
+from .basins_of_attraction import BasinsOfAttraction
 
 
 class SimpleApp(QtGui.QWidget):
@@ -49,6 +50,10 @@ class SimpleApp(QtGui.QWidget):
     def makeBifurcationTree(self, bounds, map_function_source, param_count=1, width=512, height=512, type_config=float_config):
         return BifurcationTree(self.ctx, self.queue, width, height, map_function_source,
                                param_count=param_count, type_config=type_config)
+
+    def makeBasinsOfAttraction(self, bounds, system_function_source, width=512, height=512, param_count=2, type_config=float_config):
+        return BasinsOfAttraction(self.ctx, self.queue, width, height, bounds, system_function_source,
+                                  param_count=param_count, type_config=type_config)
 
     def run(self):
         self.show()
