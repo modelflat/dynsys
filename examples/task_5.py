@@ -13,6 +13,8 @@ real2 map_function(real2 v, real b, real lam) {
 //#define DYNAMIC_COLOR
 //#define GENERATE_COLORS
 
+#define DIVERGENCE_THRESHOLD 1e3
+
 """
 
 

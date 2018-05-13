@@ -51,17 +51,24 @@ class Bounds:
         self.y_min = y_min
         self.y_max = y_max
 
-    def from_integer_x(self, v, v_max):
-        return self.x_min + v / v_max * (self.x_max - self.x_min)
-
     def clamp_x(self, v):
         return np.clip(v, self.x_min, self.x_max)
+
+    def from_integer_x(self, v, v_max):
+        return self.x_min + v / v_max * (self.x_max - self.x_min)
 
     def clamp_y(self, v):
         return np.clip(v, self.y_min, self.y_max)
 
     def from_integer_y(self, v, v_max, invert=True):
         return self.y_min + ((v_max - v) if invert else v)/ v_max * (self.y_max - self.y_min)
+
+    def to_integer(self, x, y, w, h, invert_y=True):
+        y_val = int((y - self.y_min) / (self.y_max - self.y_min) * h)
+        return (
+            int((x - self.x_min) / (self.x_max - self.x_min) * w),
+            y_val if not invert_y else h - y_val
+        )
 
     @staticmethod
     def x(x_min, x_max):
@@ -95,7 +102,12 @@ class TypeConfig:
         #define real2 {}2
         #define real3 {}3
         #define real4 {}4
-        """.format(*[TYPES[self.real_type], ] * 4)
+        
+        #define convert_real convert_{}
+        #define convert_real2 convert_{}2
+        #define convert_real3 convert_{}3
+        #define convert_real4 convert_{}4
+        """.format(*[TYPES[self.real_type], ] * 8)
 
     def __call__(self):
         return self.real_type, self.real_size()
@@ -133,15 +145,19 @@ def generate_var_code(param_count):
     if param_count == 1:
         var_type = "real"
         compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) (fabs(v1 - v2) < val)"
+        compare_greater = "#define VARIABLE_VECTOR_ANY_ABS_GREATER(v, val) (fabs(v) > val)"
     else:
         var_type = "real" + str(param_count)
         compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) \\\n\t(" + "&&".join([
             "(fabs(v1.s%01d - v2.s%01d) < val)" % (i, i) for i in range(param_count)
         ]) + ")"
+        compare_greater = "#define VARIABLE_VECTOR_ANY_ABS_GREATER(v, val) \\\n\t(" + "||".join([
+            "(fabs(v.s%01d) > val)" % (i,) for i in range(param_count)
+        ]) + ")"
 
     gather = "#define GATHER_VARIABLES (%s)(VARIABLE_VALUES)" % (var_type,)
     acceptor = "#define VARIABLE_ACCEPTOR_TYPE " + var_type
-    return "\n".join([signatures, values, gather, compare, acceptor])
+    return "\n".join([signatures, values, gather, compare, compare_greater, acceptor])
 
 
 def make_param_list(total_params, params, type, active_idx=None):
@@ -214,6 +230,8 @@ class ParametrizedImageWidget(Qt.QWidget):
 
         self.position_label = Qt.QLabel()
 
+        self.current_selection = None, None
+
         def _custom_mouse_move(x, y, lmb, rmb):
             h_val = self.bounds.clamp_x(
                 self.bounds.from_integer_x(x, self.image_widget.w)
@@ -226,6 +244,7 @@ class ParametrizedImageWidget(Qt.QWidget):
             if any(shape):
                 self.position_label.setText("%s%s | [ %s ]" % (h_comp, v_comp, "selecting" if lmb else "looking"))
             if lmb:
+                self.current_selection = h_val, v_val
                 self.selectionChanged.emit(h_val, v_val)
             custom_mouse_move(x, y, lmb, rmb)  # call next user-defined function
 
@@ -237,6 +256,12 @@ class ParametrizedImageWidget(Qt.QWidget):
     def set_image(self, image):
         self.image_widget.set_numpy_image(image)
 
+    def set_crosshair_pos(self, x, y):
+        self.image_widget.crosshair.pos(x, y)
+        self.image_widget.repaint()
+
+    def get_selection(self):
+        return self.current_selection
 
 class RealSlider(QtGui.QSlider):
 

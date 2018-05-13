@@ -2,6 +2,18 @@ from .common import *
 
 parameter_map_source = """
 
+#ifndef DIVERGENCE_THRESHOLD
+#define DIVERGENCE_THRESHOLD 1e100
+#endif
+
+#ifndef VALUE_DETECTION_PRECISION 
+#define VALUE_DETECTION_PRECISION 1e-3
+#endif
+
+#ifndef DIVERGENCE_COLOR
+#define DIVERGENCE_COLOR (float4)(1.0)
+#endif
+
 void makeHeap(global real* data, int n, int i) {
     while (true) {
         int smallest = i;
@@ -34,10 +46,6 @@ void heapSort(global real* data, int n)
     }
 }
 
-#define VALUE_DETECTION_PRECISION 1e-3
-
-//#define GENERATE_COLORS
-
 float3 color_for_count(int count, int total) {
     if (count == total) {
         return 0.0;
@@ -61,9 +69,9 @@ float3 color_for_count(int count, int total) {
         case 6:
             return (float3)(0.0, 1.0, 1.0)*d;
         case 7:
-            return (float3)(0.5, 0.5, 1.0)*d;
+            return (float3)(0.5, 0.0, 0.0)*d;
         default:
-            return count == 8 ? 1 : 0;
+            return count == 8 ? .5 : 0;
     }
 #endif
 }
@@ -92,24 +100,23 @@ kernel void compute_map(
         x = map_function(x, v.x, v.y);
         samples[i] = x;
         
-        //if (fabs(x) > 1e2) {
-        //    write_imageui(map, id, (uint4)(255));
-        //    return;
-        //}
+        if (VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
+            write_imagef(map, id, DIVERGENCE_COLOR);
+            return;
+        }
         
-        //if (samples_count <= 16) {
-            int found = 0;
-            for (int j = 0; j < i; ++j) {
-                //if (fabs(x - samples[j]) < VALUE_DETECTION_PRECISION) {
-                const VARIABLE_ACCEPTOR_TYPE t = samples[j];
-                if (VARIABLE_VECTOR_NEAR(x, t, VALUE_DETECTION_PRECISION)) {
-                    found = 1;
-                    break;
-                }
+        int found = 0;
+        for (int j = 0; j < i; ++j) {
+            const VARIABLE_ACCEPTOR_TYPE t = samples[j];
+            if (VARIABLE_VECTOR_NEAR(x, t, VALUE_DETECTION_PRECISION)) {
+                found = 1;
+                break;
             }
-            if (!found) ++uniques;
-    //    }
+        }
+        if (!found) ++uniques;
     }
+    
+    // TODO: make heapSort work with vector values ???
     
 //    if (samples_count > 16) {
 //        heapSort(samples, samples_count);
