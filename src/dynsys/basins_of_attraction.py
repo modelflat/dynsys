@@ -2,10 +2,17 @@ from .common import *
 
 basins_of_attraction_source = """
 
+#ifndef FALLBACK_COLOR 
 #define FALLBACK_COLOR (float4)(0, 0, 0, 1)
-#define DETECTION_PRECISION 1e-4
+#endif
 
+#ifndef DETECTION_PRECISION 
+#define DETECTION_PRECISION 1e-4
+#endif
+
+#ifndef DETECTION_PRECISION_EXPONENT 
 #define DETECTION_PRECISION_EXPONENT 4
+#endif
 
 long2 round_and_compress(real2 point, real to_sign) {
     return convert_long2_rtz(point / to_sign);
@@ -48,7 +55,6 @@ int pair_lt(const real2 p1, const real2 p2) {
     } else {
         return 0;
     }
-//    return p1.x < p2.x && p1.y < p2.y;
 }
 
 int pair_gt(const real2 p1, const real2 p2) {
@@ -58,10 +64,6 @@ int pair_gt(const real2 p1, const real2 p2) {
 int binary_search(const int size, const global real2* arr, const real2 value) {
     int l = 0, r = size;
     
-//    if (pair_lt(arr[0], value) || pair_gt(arr[size - 1], value)) {
-//        return -1;
-//    }
-//    
     while (l < r) {
         const int mid = (r + l) / 2;
         if (pair_eq(arr[mid], value)) {
@@ -91,7 +93,7 @@ kernel void draw_attraction_map(
     const real2 val = result[id.x * get_global_size(1) + id.y];
     const int color_idx = binary_search(attraction_points_count, attraction_points, val);
     
-    if (color_idx == -1 || length(val) < DETECTION_PRECISION) { // in case we found trivial solution, we want fallback too
+    if (color_idx == -1 || length(val) < DETECTION_PRECISION) { // in case of trivial solution (0, 0), we want to fallback too
         write_imagef(map, id, FALLBACK_COLOR);
         return;
     }
@@ -170,7 +172,7 @@ class BasinsOfAttraction(ComputedImage):
 
         result_unique = np.unique(result, axis=0)
 
-        self.num_basins = len(result_unique)
+        self.num_basins = len(result_unique) - 1 # except trivial solution
 
         result_unique_device = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=result_unique.itemsize*result_unique.size)
 

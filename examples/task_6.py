@@ -44,7 +44,9 @@ class Task6(SimpleApp):
         self.phas_image = ParametrizedImageWidget(self.attr_bounds)
 
         self.attr = BasinsOfAttraction(self.ctx, self.queue, sub_w, sub_h, self.attr_bounds, map_function_source)
-        self.attr_image = ParametrizedImageWidget(self.attr_bounds, crosshair_color=QtCore.Qt.black)
+        self.attr_image = ParametrizedImageWidget(self.attr_bounds, crosshair_color=QtCore.Qt.gray)
+
+        self.basins_label = Qt.QLabel()
 
         def attr_to_phase(x, y):
             a, b =  self.map_image.get_selection()
@@ -63,8 +65,13 @@ class Task6(SimpleApp):
         self.setLayout(
             qt_hstack(
                 qt_vstack(
-                    self.phas_image, self.attr_image
-                ), self.map_image
+                    self.phas_image,
+                    self.attr_image
+                ),
+                qt_vstack(
+                    self.map_image,
+                    self.basins_label
+                )
             )
         )
 
@@ -73,6 +80,7 @@ class Task6(SimpleApp):
     def draw_attr(self, a, b):
         img, count = self.attr(self.iter_count, a, b)
         self.attr_image.set_image(img)
+        self.basins_label.setText("Attractors found: " + str(count))
 
     def draw_phase(self, a, b):
         self.phas_image.set_image(self.phas(

@@ -229,23 +229,16 @@ class ParametrizedImageWidget(Qt.QWidget):
         self.x_name, self.y_name = names
 
         self.position_label = Qt.QLabel()
+        self.shape = shape
 
         self.current_selection = None, None
 
         def _custom_mouse_move(x, y, lmb, rmb):
-            h_val = self.bounds.clamp_x(
-                self.bounds.from_integer_x(x, self.image_widget.w)
-            ) if shape[0] else 0.0
-            h_comp = ("%s = %f " % (self.x_name, h_val)) if shape[0] else ""
-            v_val = self.bounds.clamp_y(
-                self.bounds.from_integer_y(y, self.image_widget.h, invert=True)
-            ) if shape[1] else 0.0
-            v_comp = ("%s = %f" % (self.y_name, v_val)) if shape[1] else ""
-            if any(shape):
-                self.position_label.setText("%s%s | [ %s ]" % (h_comp, v_comp, "selecting" if lmb else "looking"))
-            if lmb:
+            h_val, v_val = self._convert(x, y)
+            self.print_current(x, y)
+            if lmb and any((h_val, v_val)):
                 self.current_selection = h_val, v_val
-                self.selectionChanged.emit(h_val, v_val)
+                self.selectionChanged.emit(h_val or 0, v_val or 0)
             custom_mouse_move(x, y, lmb, rmb)  # call next user-defined function
 
         self.image_widget = ImageWidget(custom_mouse_move=_custom_mouse_move,
@@ -253,11 +246,43 @@ class ParametrizedImageWidget(Qt.QWidget):
 
         self.setLayout(qt_vstack(self.image_widget, self.position_label))
 
+    def print_current(self, x=None, y=None):
+        cur = ""
+        if x is not None and y is not None and any(self.shape):
+            # print x and y:
+            h_val, v_val = self._convert(x, y)
+            h_comp = ("%s = %f " % (self.x_name, h_val)) if self.shape[0] else ""
+            v_comp = ("%s = %f" % (self.y_name, v_val)) if self.shape[1] else ""
+            sep = "; " if h_comp and v_comp else ""
+            cur = h_comp + sep + v_comp
+
+        sel = ""
+        xs, ys = self.current_selection
+        if xs is not None and ys is not None and any(self.shape):
+            # print selection
+            h_selected = ("%s = %f " % (self.x_name, self.current_selection[0])) \
+                if self.shape[0] and self.current_selection[0] is not None else ""
+            v_selected = ("%s = %f " % (self.y_name, self.current_selection[1])) \
+                if self.shape[1] and self.current_selection[1] is not None else ""
+            sep = "; " if h_selected and v_selected else ""
+            sel = h_selected + sep + v_selected
+
+        if any((cur, sel)):
+            sep = "  |  " if all((cur, sel)) else ""
+            self.position_label.setText(cur + sep + sel)
+
+    def _convert(self, x, y):
+        return self.bounds.clamp_x(self.bounds.from_integer_x(x, self.image_widget.w)) if self.shape[0] else None, \
+               self.bounds.clamp_y(self.bounds.from_integer_y(y, self.image_widget.h, invert=True)) if self.shape[1] else None
+
     def set_image(self, image):
         self.image_widget.set_numpy_image(image)
 
     def set_crosshair_pos(self, x, y):
         self.image_widget.crosshair.pos(x, y)
+        self.current_selection = self.bounds.from_integer_x(x, self.image_widget.w),\
+                                 self.bounds.from_integer_y(y, self.image_widget.h, invert=False)
+        self.print_current(x, y)
         self.image_widget.repaint()
 
     def get_selection(self):
