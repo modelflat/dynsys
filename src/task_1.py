@@ -1,114 +1,71 @@
-import numpy as np
-import matplotlib.pyplot as pp
-from matplotlib.animation import FuncAnimation
-from sys import argv
+from dynsys import *
 
+system_function_source = """
 
-COLOR = "r"
+#define STEP (real)(1e-4)
 
-
-class Grid:
-    def __init__(self, xrange, yrange):
-        fn = lambda x, y: (x, y)
-        self.nodes = np.ndarray((len(xrange)*len(yrange), 2), dtype=np.float64)
-        i = 0
-        for x in xrange:
-            for y in yrange:
-                self.nodes[i][0], self.nodes[i][1] = fn(x, y)
-                i += 1
-
-    def inplace_map(self, fn):
-        for i, node in enumerate(self.nodes):
-            self.nodes[i] = fn(*node)
-
-
-class PointsWithTrajectory:
-
-    def __init__(self, lines, points):
-        assert len(lines) == len(points)
-        self.lines = lines
-        self.points = points
-
-    def update(self, i, x, y):
-        self.lines[i].set_xdata(np.append(self.lines[i].get_xdata(), x))
-        self.lines[i].set_ydata(np.append(self.lines[i].get_ydata(), y))
-        self.points[i].set_xdata(x)
-        self.points[i].set_ydata(y)
-
-    def __iter__(self):
-        self.i = 0
-        return self
-
-    def __next__(self):
-        if self.i < len(self.lines):
-            r = self.lines[self.i]
-        elif self.i - len(self.lines) < len(self.points):
-            r = self.points[self.i - len(self.lines)]
-        else:
-            raise StopIteration
-        self.i += 1
-        return r
-
-
-def make_series_from_grid(grid: Grid):
-    return PointsWithTrajectory( [pp.plot(x, y, COLOR + "-")[0] for x, y in grid.nodes],
-                                 [pp.plot(x, y, COLOR + ".")[0] for x, y in grid.nodes] )
-
-
-def compute_step(step_no, series_pack, grid, fn):
-    for i, node in enumerate(grid.nodes):
-        series_pack.update(i, *fn(node[0], node[1]))
-    grid.inplace_map(fn)
-    return series_pack
-
-
-def animate(grid, f, step_count, xlim=(-12,12), ylim=(-12,12)):
-    figure = pp.subplots()[0]
-    pp.xlim(xlim[0], xlim[1])
-    pp.ylim(ylim[0], ylim[1])
-    series_pack = make_series_from_grid(grid)
-    anim = FuncAnimation(figure, func=compute_step, init_func=lambda: series_pack, fargs=(series_pack, grid, f), frames=step_count, repeat=True, interval=1000/30)
-    pp.grid()
-    pp.show()
-
-
-def make_evolving_system(f, g, step):
-    return lambda x, y: (x + step*f(x, y), y + step*g(x, y))
-
-
-# noinspection NonAsciiCharacters
-def task_1г(*argv):
-    lam = 1
-    k = .5
-    h = 0.001
-    N = 10000
-
-    f = lambda x, y: y
-    g = lambda x, y: (lam + k*x**2 - x**4)*y - x
-
-    grid = Grid(np.arange(-10, 10, 1), np.arange(-10, 10, 1))
-    animate(grid, make_evolving_system(f, g, h), N)
-
-
-# noinspection NonAsciiCharacters
-def task_1в(*argv):
-    lam = .5
-    h = 0.01
-    N = 10000
-
-    f = lambda x, y: y
-    g = lambda x, y: (lam + y**2)*y - x
-
-    grid = Grid(np.arange(-10, 10, 1), np.arange(-10, 10, 1))
-    animate(grid, make_evolving_system(f, g, h), N)
-
-
-tasks = {
-    "в": task_1в,
-    "г": task_1г
+real2 system(real2 v, real lam, real k) {
+    real2 p = (real2)(
+        (lam + k*v.x*v.x - v.x*v.x*v.x*v.x)*v.y - v.x,
+        v.x
+    );
+    return v + STEP*p;
 }
 
+#define DYNAMIC_COLOR
 
-if __name__ == '__main__' :
-    if len(argv) > 1:
-        tasks[argv[1]](*argv[2:])
+"""
+
+parameter_surface_source = """
+
+#define D 1e-4
+
+float3 color_for_point(real2 p) {
+    if (fabs( p.x ) < D || fabs(p.y) < D) {
+        return (float3)(0, .5, 0);
+    }
+    return 1.0;
+}
+
+"""
+
+
+class Task1(SimpleApp):
+
+    def __init__(self):
+        super().__init__("Task 1")
+
+        self.bounds = Bounds(-3, 3, -3, 3)
+        self.attr_bounds = Bounds(-4, 4, -4, 4)
+
+        self.iter_count = 2**15
+        self.draw_last = self.iter_count
+
+        self.param_surface = self.makeParameterSurface(self.bounds, parameter_surface_source )
+        self.param_surface_image = ParametrizedImageWidget(self.bounds, names=("lam", "k"), crosshair_color=QtCore.Qt.black)
+
+        self.attr = self.makePhasePortrait(self.attr_bounds, system_function_source)
+        self.attr_image = ParametrizedImageWidget(self.attr_bounds, shape=(False, False))
+
+        self.param_surface_image.selectionChanged.connect(self.draw_attr)
+
+        self.setLayout(
+            qt_hstack(
+                self.param_surface_image, self.attr_image,
+            )
+        )
+
+        self.draw_param_surface()
+        self.draw_attr(1., 1.)
+
+    def draw_param_surface(self):
+        self.param_surface_image.set_image(self.param_surface())
+
+    def draw_attr(self, lam, k):
+        self.attr_image.set_image(self.attr(
+            self.iter_count, lam, k, draw_last_points=self.draw_last
+        ))
+
+
+if __name__ == '__main__':
+    Task1().run()

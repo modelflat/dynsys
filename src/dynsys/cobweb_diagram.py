@@ -1,7 +1,4 @@
-import numpy as np
-import pyopencl as cl
-
-from .common import ComputedImage, float_config, generate_param_code, make_param_list
+from .common import *
 
 cobweb_diagram_source = """
 

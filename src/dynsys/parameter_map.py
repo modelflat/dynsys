@@ -1,7 +1,4 @@
-import numpy as np
-import pyopencl as cl
-
-from dynsys.common import ComputedImage, float_config
+from .common import *
 
 parameter_map_source = """
 
