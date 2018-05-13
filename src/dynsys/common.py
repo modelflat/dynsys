@@ -3,6 +3,9 @@ import pyopencl as cl
 from PyQt4 import Qt, QtGui, QtCore
 
 
+DEBUG_CL = (False, 0, 1)
+
+
 def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
     fmt = cl.ImageFormat(cl.channel_order.BGRA, cl.channel_type.UNORM_INT8)
     return np.empty((w, h, 4), dtype=np.uint8), cl.Image(ctx, flags, fmt, shape=(w, h))
@@ -10,9 +13,14 @@ def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
 
 def create_context_and_queue(config=None):
     if config is None or config.get("autodetect"):
-        ctx = cl.create_some_context()
+        ctx = cl.create_some_context(interactive=False)
+        print("Using auto-detected device:", ctx.get_info(cl.context_info.DEVICES))
     else:
-        ctx = cl.create_some_context(answers=[config.get("pid", 0), config.get("did", 0)])
+        pl = cl.get_platforms()[config.get("pid", 0)]
+        dev = pl.get_devices()[config.get("did", 0)]
+        print("Using specified device:", dev)
+        ctx = cl.Context([dev])
+
     return ctx, cl.CommandQueue(ctx)
 
 
@@ -287,6 +295,7 @@ class ParametrizedImageWidget(Qt.QWidget):
 
     def get_selection(self):
         return self.current_selection
+
 
 class RealSlider(QtGui.QSlider):
 

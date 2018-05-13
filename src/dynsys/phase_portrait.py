@@ -19,10 +19,15 @@ kernel void draw_phase_portrait(
     for (int i = 0; i < step_count; ++i) {
         point = system(point, a, b);
         if (step_count - i <= draw_last_points) {
-            int2 coord = TRANSLATE_BACK_2D( point, x_min, x_max, y_min, y_max, (int2)(w, h));
+            int2 coord = TRANSLATE_BACK_2D_INV_Y( point, x_min, x_max, y_min, y_max, (int2)(w, h));
+            
+            if (coord.x < 0 || coord.x >= w || coord.y < 0 || coord.y >= h) {
+                continue;
+            }
+            
 #ifdef DYNAMIC_COLOR
             const float ratio = (float)(i) / (float)(step_count);
-            write_imagef (result, coord, (float4)(hsv2rgb( (float3)( 240.0 * (1.0 - ratio), 1.0, 1.0 )), 1.0) );
+            write_imagef(result, coord, (float4)(hsv2rgb( (float3)( 240.0 * (1.0 - ratio), 1.0, 1.0 )), 1.0) );
 #else
             write_imagef(result, coord, MAIN_COLOR);
 #endif
