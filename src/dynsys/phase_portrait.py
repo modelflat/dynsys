@@ -2,7 +2,7 @@ from .common import *
 
 phase_portrait_source = """
 
-#define MAIN_COLOR (uint4)(0, 0, 0, 255)
+#define MAIN_COLOR (float4)(0, 0, 0, 1)
 
 kernel void draw_phase_portrait(
     const real a, const real b,
@@ -24,7 +24,7 @@ kernel void draw_phase_portrait(
             const float ratio = (float)(i) / (float)(step_count);
             write_imagef (result, coord, (float4)(hsv2rgb( (float3)( 240.0 * (1.0 - ratio), 1.0, 1.0 )), 1.0) );
 #else
-            write_imageui(result, coord, MAIN_COLOR);
+            write_imagef(result, coord, MAIN_COLOR);
 #endif
         }
     }

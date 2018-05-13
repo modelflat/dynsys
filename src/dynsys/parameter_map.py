@@ -43,8 +43,8 @@ float3 color_for_count(int count, int total) {
         return 0.0;
     }
 #ifdef GENERATE_COLORS
-    const float d = (float)total / (float)count;
-    return hsv2rgb((float3)(d * 360.0, 1.0, 1.0));
+    const float ratio = (float)count / (float)total;
+    return hsv2rgb((float3)(ratio * 240.0, 1.0, 1.0));
 #else
     const float d = count < 8? 1.0 : .5;
     switch(count % 8) {
@@ -71,17 +71,17 @@ float3 color_for_count(int count, int total) {
 kernel void compute_map(
     const real x_min, const real x_max,
     const real y_min, const real y_max,
-    const real x0,
+    VARIABLE_SIGNATURES,
     const int samples_count,
     const int skip,
-    global real* samples,
+    global VARIABLE_ACCEPTOR_TYPE* samples,
     write_only image2d_t map
 ) {
     const int2 id = ID_2D;
     samples += (id.x * get_global_size(1) + id.y)*samples_count;
     const real2 v = TRANSLATE_2D_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
     
-    real x = x0;
+    VARIABLE_ACCEPTOR_TYPE x = GATHER_VARIABLES;
 
     for (int i = 0; i < skip; ++i) {
         x = map_function(x, v.x, v.y);
@@ -92,35 +92,37 @@ kernel void compute_map(
         x = map_function(x, v.x, v.y);
         samples[i] = x;
         
-        if (fabs(x) > 1e2) {
-            write_imageui(map, id, (uint4)(255));
-            return;
-        }
+        //if (fabs(x) > 1e2) {
+        //    write_imageui(map, id, (uint4)(255));
+        //    return;
+        //}
         
-        if (samples_count <= 16) {
+        //if (samples_count <= 16) {
             int found = 0;
             for (int j = 0; j < i; ++j) {
-                if (fabs(x - samples[j]) < VALUE_DETECTION_PRECISION) {
+                //if (fabs(x - samples[j]) < VALUE_DETECTION_PRECISION) {
+                const VARIABLE_ACCEPTOR_TYPE t = samples[j];
+                if (VARIABLE_VECTOR_NEAR(x, t, VALUE_DETECTION_PRECISION)) {
                     found = 1;
                     break;
                 }
             }
             if (!found) ++uniques;
-        }
+    //    }
     }
     
-    if (samples_count > 16) {
-        heapSort(samples, samples_count);
-        real prev = samples[0]; 
-        for (int i = 1; i < samples_count; ++i) {
-            if (fabs(samples[i] - prev) > VALUE_DETECTION_PRECISION) {
-                prev = samples[i];
-                ++uniques;
-            }
-        }
-    }
+//    if (samples_count > 16) {
+//        heapSort(samples, samples_count);
+//        real prev = samples[0]; 
+//        for (int i = 1; i < samples_count; ++i) {
+//            if (fabs(samples[i] - prev) > VALUE_DETECTION_PRECISION) {
+//                prev = samples[i];
+//                ++uniques;
+//            }
+//        }
+//    }
 
-    write_imageui(map, id, convert_uint4_rtz(255*(float4)(color_for_count(uniques, samples_count), 1.0)).zyxw);
+    write_imagef(map, id, (float4)(color_for_count(uniques, samples_count), 1.0));
 }
 
 """
@@ -128,22 +130,26 @@ kernel void compute_map(
 
 class ParameterMap(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, map_function_source, type_config=float_config):
-        super().__init__(ctx, queue, width, height, bounds, map_function_source, parameter_map_source, type_config=type_config)
+    def __init__(self, ctx, queue, width, height, bounds, map_function_source, var_count=1, type_config=float_config):
+        super().__init__(ctx, queue, width, height, bounds, map_function_source, generate_var_code(var_count),
+                         parameter_map_source, type_config=type_config)
+        self.var_count = var_count
 
-    def __call__(self, x0, samples_count, skip, bounds=None):
+    def __call__(self, samples_count, skip, *vars, bounds=None):
         if bounds is None:
             bounds = self.bounds
 
         real, real_size = self.tc()
 
+        vl = make_param_list(self.var_count, vars, real)
+
         samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
-                                   size=self.width * self.height * samples_count * real_size)
+                                   size=self.width * self.height * samples_count * real_size * self.var_count)
 
         self.program.compute_map(self.queue, (self.width, self.height), None,
                                  real(bounds.x_min), real(bounds.x_max),
                                  real(bounds.y_min), real(bounds.y_max),
-                                 real(x0),
+                                 *vl,
                                  np.int32(samples_count), np.int32(skip),
                                  samples_device, self.image_device)
 

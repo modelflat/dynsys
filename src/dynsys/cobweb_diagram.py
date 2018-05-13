@@ -29,9 +29,9 @@ kernel void compute_samples(
 
 #define ABS_ERROR 2e-3
 
-#define CROSSING_COLOR (uint4)(255, 0, 0, 255)
-#define CARRY_COLOR    (uint4)(128, 255, 0, 255)
-#define FILL_COLOR     (uint4)(255)
+#define CROSSING_COLOR (float4)(1, 0, 0, 1)
+#define CARRY_COLOR    (float4)(.5, 1, 0, 1)
+#define FILL_COLOR     (float4)(1.0)
 
 // draw background (secant line and carrying function) for this cobweb diagram
 kernel void draw_background(
@@ -43,15 +43,15 @@ kernel void draw_background(
     const real2 v = TRANSLATE_2D_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
     
     if (NEAR(v.y, v.x, ABS_ERROR)) {
-        write_imageui(result, id, CROSSING_COLOR);
+        write_imagef(result, id, CROSSING_COLOR);
     } else if (NEAR(v.y, carrying_function(v.x, PARAM_VALUES), ABS_ERROR * 5)) {
-        write_imageui(result, id, CARRY_COLOR);
+        write_imagef(result, id, CARRY_COLOR);
     } else {
-        write_imageui(result, id, FILL_COLOR);
+        write_imagef(result, id, FILL_COLOR);
     }
 }
 
-#define ITER_COLOR (uint4)(0, 0, 0, 255)
+#define ITER_COLOR (float4)(0, 0, 0, 1)
 
 kernel void draw_cobweb_diagram(
     const global real* samples,
@@ -79,7 +79,7 @@ kernel void draw_cobweb_diagram(
     if (p1.y < height && p1.y >= 0) {
         for (int i = clamp(line.s0, 0, width); i <= line.s1; ++i) {
             if (i < width && i >= 0) {
-                write_imageui(result, (int2)(i, p1.y), ITER_COLOR);
+                write_imagef(result, (int2)(i, p1.y), ITER_COLOR);
             }
         }
     }
@@ -88,7 +88,7 @@ kernel void draw_cobweb_diagram(
     if (p2.x < width && p2.x >= 0) {
         for (int i = clamp(line.s0, 0, height); i <= line.s1; ++i) {
             if (i < height && i >= 0) {
-                write_imageui(result, (int2)(p2.x, i), ITER_COLOR);
+                write_imagef(result, (int2)(p2.x, i), ITER_COLOR);
             }
         }
     }

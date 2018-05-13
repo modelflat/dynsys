@@ -35,7 +35,7 @@ kernel void compute_bifurcation_tree(
     result_minmax[id] = (real2)(min_, max_); // save minmax
 }
 
-#define TREE_COLOR (uint4)((uint3)(0), 255)
+#define TREE_COLOR (float4)(0, 0, 0, 1.0)
 
 kernel void draw_bifurcation_tree(
     const global real* samples,
@@ -48,7 +48,7 @@ kernel void draw_bifurcation_tree(
     samples += id * samples_count;
     for (int i = 0; i < samples_count; ++i) {
         int2 coord = (int2)(id, TRANSLATE_BACK_INV(samples[i], min_, max_, height));
-        write_imageui(result, coord, TREE_COLOR);
+        write_imagef(result, coord, TREE_COLOR);
     }
 }
 

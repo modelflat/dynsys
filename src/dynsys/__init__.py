@@ -42,8 +42,9 @@ class SimpleApp(QtGui.QWidget):
         return CobwebDiagram(self.ctx, self.queue, width, height, bounds, carrying_function_source,
                              param_count=param_count, type_config=type_config)
 
-    def makeParameterMap(self, bounds, map_function_source, width=512, height=512, type_config=float_config):
-        return ParameterMap(self.ctx, self.queue, width, height, bounds, map_function_source, type_config=type_config)
+    def makeParameterMap(self, bounds, map_function_source, var_count=1, width=512, height=512, type_config=float_config):
+        return ParameterMap(self.ctx, self.queue, width, height, bounds, map_function_source, var_count=var_count,
+                            type_config=type_config)
 
     def makeBifurcationTree(self, bounds, map_function_source, param_count=1, width=512, height=512, type_config=float_config):
         return BifurcationTree(self.ctx, self.queue, width, height, map_function_source,

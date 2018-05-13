@@ -119,6 +119,31 @@ def generate_param_code(param_count):
     return "\n".join([signatures, values, set_param])
 
 
+def generate_variable_name(idx):
+    return "_variable__%02d" % (idx,)
+
+
+def generate_var_code(param_count):
+    if param_count > 4:
+        raise ValueError("Supported dimensonalities are 1-4 (%d requested)" % (param_count,))
+
+    names = [generate_param_name(i) for i in range(param_count)]
+    signatures = "#define VARIABLE_SIGNATURES " + ", ".join(["real " + name for name in names])
+    values = "#define VARIABLE_VALUES " + ", ".join(names)
+    if param_count == 1:
+        var_type = "real"
+        compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) (fabs(v1 - v2) < val)"
+    else:
+        var_type = "real" + str(param_count)
+        compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) \\\n\t(" + "&&".join([
+            "(fabs(v1.s%01d - v2.s%01d) < val)" % (i, i) for i in range(param_count)
+        ]) + ")"
+
+    gather = "#define GATHER_VARIABLES (%s)(VARIABLE_VALUES)" % (var_type,)
+    acceptor = "#define VARIABLE_ACCEPTOR_TYPE " + var_type
+    return "\n".join([signatures, values, gather, compare, acceptor])
+
+
 def make_param_list(total_params, params, type, active_idx=None):
     if total_params < len(params):
         params = params[:total_params] # todo raise warning?

@@ -1,6 +1,4 @@
-from dynsys.common import *
-from dynsys.cobweb_diagram import CobwebDiagram
-from dynsys.parameter_map import ParameterMap
+from dynsys import *
 
 
 map_function_source = """
@@ -20,9 +18,10 @@ class Task3(SimpleApp):
         self.iter_bounds = Bounds(-2, 2, -2, 2)
 
         self.map = ParameterMap(self.ctx, self.queue, self.w, self.h, self.bounds, map_function_source)
-        self.map_image = ParametrizedImageWidget(self.bounds, names=("a", "b"), crosshair_color=QtCore.Qt.white, parent=self)
+        self.map_image = ParametrizedImageWidget(self.bounds, names=("a", "b"), crosshair_color=QtCore.Qt.white)
 
-        self.iter = CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.iter_bounds, map_function_source, param_count=2)
+        self.iter = CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.iter_bounds, map_function_source,
+                                  param_count=2)
         self.iter_image = ParametrizedImageWidget(self.bounds, shape=(False, False), parent=self)
 
         self.x0 = ObservableValue.makeAndConnect(0)
@@ -39,7 +38,7 @@ class Task3(SimpleApp):
         self.iter_image.set_image(self.iter.image)
 
     def draw_map(self):
-        self.map(self.x0.value(), 16, 512)
+        self.map(16, 512, self.x0.value())
         self.map_image.set_image(self.map.image)
 
 

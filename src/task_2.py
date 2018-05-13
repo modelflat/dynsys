@@ -1,6 +1,4 @@
-import dynsys.bifurcation_tree as bif
-import dynsys.cobweb_diagram as cbd
-from dynsys.common import *
+from dynsys import *
 
 map_function = """
 real map_function(real x, real lam) {
@@ -20,8 +18,8 @@ class Task2(SimpleApp):
 
         self.info_label = QtGui.QLabel()
 
-        self.diag = cbd.CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.bounds, map_function)
-        self.tree = bif.BifurcationTree(self.ctx, self.queue, self.w, self.h, map_function)
+        self.diag = CobwebDiagram(self.ctx, self.queue, self.w, self.h, self.bounds, map_function)
+        self.tree = BifurcationTree(self.ctx, self.queue, self.w, self.h, map_function)
 
         self.diag_image = ParametrizedImageWidget(self.bounds, shape=(False, False), parent=self)
         self.tree_image = ParametrizedImageWidget(self.lambda_bounds, names=("lambda", ""), shape=(True, False),
