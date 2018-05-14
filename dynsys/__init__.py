@@ -47,7 +47,7 @@ class SimpleApp(QtGui.QWidget):
         return ParameterMap(self.ctx, self.queue, width, height, bounds, map_function_source, var_count=var_count,
                             type_config=type_config)
 
-    def makeBifurcationTree(self, bounds, map_function_source, param_count=1, width=512, height=512, type_config=float_config):
+    def makeBifurcationTree(self, map_function_source, param_count=1, width=512, height=512, type_config=float_config):
         return BifurcationTree(self.ctx, self.queue, width, height, map_function_source,
                                param_count=param_count, type_config=type_config)
 

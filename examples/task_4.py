@@ -1,8 +1,20 @@
 from dynsys import *
+
+parameter_map_bounds = Bounds(
+    0, 3,
+    0, 3
+)
+
+attractor_bounds = Bounds(
+    -3, 3,
+    -3, 3
+)
+
+iter_count = 2 ** 15
+draw_count = iter_count  # 16
+
 system_function_source = """
-
 #define STEP (real)(4e-4)
-
 real2 system(real2 v, real m, real b) {
     real2 p = (real2)(
         (1 + b*v.x - v.x*v.x)*v.x - v.x*v.y,
@@ -10,15 +22,11 @@ real2 system(real2 v, real m, real b) {
     );
     return v + STEP*p;
 }
-
 #define DYNAMIC_COLOR
-
 """
 
 parameter_surface_color_function = """
-
 #define D 5e-3
-
 float3 color_for_point(real2 p) {
     if (fabs(p.y - (1 - sqrt(p.x))) < D) {
         return (float3)(0, 0, 1);
@@ -31,7 +39,6 @@ float3 color_for_point(real2 p) {
     }
     return 0;
 }
-
 """
 
 
@@ -40,38 +47,31 @@ class Task4(SimpleApp):
     def __init__(self):
         super().__init__("Task 4")
 
-        self.w, self.h = 512, 512
-        self.param_map_bounds = Bounds(0, 3, 0, 3)
-        self.attractor_boudns = Bounds(-3, 3, -3, 3)
+        self.parameter_surface = self.makeParameterSurface(parameter_map_bounds, parameter_surface_color_function)
+        self.parameter_surface_image = ParametrizedImageWidget(parameter_map_bounds, names=("b", "m"),
+                                                               crosshair_color=QtCore.Qt.white)
 
-        self.iter_count = 2**15
-        self.draw_last = self.iter_count # 16
+        self.attractor = self.makePhasePortrait(attractor_bounds, system_function_source)
+        self.attractor_image = ParametrizedImageWidget(attractor_bounds, shape=(False, False))
 
-        self.param_surface = self.makeParameterSurface(self.param_map_bounds, parameter_surface_color_function)
-        self.param_surface_image = ParametrizedImageWidget(self.param_map_bounds, names=("b", "m"),
-                                                           crosshair_color=QtCore.Qt.white)
-
-        self.attractor = self.makePhasePortrait(self.attractor_boudns, system_function_source)
-        self.attractor_image = ParametrizedImageWidget(self.attractor_boudns, shape=(False, False))
-
-        self.param_surface_image.selectionChanged.connect(self.draw_attr)
+        self.parameter_surface_image.selectionChanged.connect(self.draw_attractor)
 
         self.setLayout(
             qt_hstack(
-                self.param_surface_image, self.attractor_image
+                self.parameter_surface_image, self.attractor_image
             )
         )
 
-        self.draw_pars()
-        self.draw_attr(1., 1.)
+        self.draw_pararameter_surface()
+        self.draw_attractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
 
-    def draw_attr(self, a, b):
+    def draw_attractor(self, a, b):
         self.attractor_image.set_image(self.attractor(
-            self.iter_count, a, b, draw_last_points=self.draw_last
+            iter_count, a, b, draw_last_points=draw_count
         ))
 
-    def draw_pars(self):
-        self.param_surface_image.set_image( self.param_surface() )
+    def draw_pararameter_surface(self):
+        self.parameter_surface_image.set_image(self.parameter_surface())
 
 
 

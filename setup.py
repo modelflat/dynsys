@@ -22,8 +22,6 @@ setup(
     classifiers=[
         "Development Status :: 3 - Alpha",
 
-        "Topic :: Software Development :: Build Tools",
-
         "Intended Audience :: Science/Research",
 
          "License :: OSI Approved :: MIT License",
@@ -38,7 +36,6 @@ setup(
     keywords="opencl research nonlinear dynamical-systems",
 
     project_urls={
-        "Source": "https://bitbucket.org/modelflat/dynsys/src",
         "Issues": "https://bitbucket.org/modelflat/dynsys/issues",
     },
 

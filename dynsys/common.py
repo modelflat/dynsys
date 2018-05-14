@@ -3,9 +3,6 @@ import pyopencl as cl
 from PyQt4 import Qt, QtGui, QtCore
 
 
-DEBUG_CL = (False, 0, 1)
-
-
 def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
     fmt = cl.ImageFormat(cl.channel_order.BGRA, cl.channel_type.UNORM_INT8)
     return np.empty((w, h, 4), dtype=np.uint8), cl.Image(ctx, flags, fmt, shape=(w, h))
