@@ -5,7 +5,7 @@ basic dynamical system modeling tasks (such as computing a parameter
 maps, cobweb (aka Verhulst) diagrams or basins of attraction).
 
 Computations are accelerated using
-`OpenCL <https://www.khronos.org/opencl>`__. PyQt4-based UI elements are
+`OpenCL <https://www.khronos.org/opencl>`__. PyQt-based UI elements are
 provided for displaying and interacting with data.
 
 Warning for potential users! Only kind of “documentation” currently
@@ -17,7 +17,7 @@ project, but these are in the not-so-near-future.
 
 1. `PyOpenCL <https://github.com/inducer/pyopencl>`__ – OpenCL
    integration for Python
-2. `PyQt4 <https://pypi.org/project/PyQt4/>`__ – Python bindings for Qt
+2. `PyQt5 <https://pypi.org/project/PyQt5/>`__ – Python bindings for Qt
    platform toolkit
 3. `Pre-built Python packages repo by Christoph
    Gohlke <https://www.lfd.uci.edu/~gohlke/pythonlibs/>`__ – for those

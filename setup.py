@@ -5,7 +5,7 @@ with open("README.rst", encoding="utf-8") as f:
 
 setup(
     name="dynsys",
-    version="0.1.1",
+    version="0.1.2",
 
     description="Small collection of tools to perform basic modeling of dynamical systems",
 
@@ -41,7 +41,7 @@ setup(
 
     packages=find_packages(exclude=["examples"]),
 
-    install_requires=["numpy", "pyopencl", "PyQt4"],
+    install_requires=["numpy", "pyopencl", "PyQt5"],
 
     python_requires=">=3",
 

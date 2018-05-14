@@ -11,10 +11,10 @@ from .bifurcation_tree import BifurcationTree
 from .basins_of_attraction import BasinsOfAttraction
 
 
-class SimpleApp(QtGui.QWidget):
+class SimpleApp(Qt.QWidget):
 
     def __init__(self, title):
-        self.app = QtGui.QApplication(sys.argv)
+        self.app = Qt.QApplication(sys.argv)
         super(SimpleApp, self).__init__(None)
         self.setWindowTitle(title)
         self.configFile = None

@@ -1,6 +1,6 @@
 import numpy as np
 import pyopencl as cl
-from PyQt4 import Qt, QtGui, QtCore
+from PyQt5 import Qt, QtCore
 
 
 def allocate_image(ctx, w, h, flags=cl.mem_flags.WRITE_ONLY) :
@@ -22,14 +22,14 @@ def create_context_and_queue(config=None):
 
 
 def to_pixmap(img):
-    image = QtGui.QImage(img.data, img.shape[0], img.shape[1], QtGui.QImage.Format_ARGB32)
-    pixmap = QtGui.QPixmap()
+    image = Qt.QImage(img.data, img.shape[0], img.shape[1], Qt.QImage.Format_ARGB32)
+    pixmap = Qt.QPixmap()
     pixmap.convertFromImage(image)
     return pixmap
 
 
 def qt_vstack(*args):
-    l = QtGui.QVBoxLayout()
+    l = Qt.QVBoxLayout()
     for a in args:
         if isinstance(a, Qt.QLayout):
             l.addLayout(a)
@@ -39,7 +39,7 @@ def qt_vstack(*args):
 
 
 def qt_hstack(*args):
-    l = QtGui.QHBoxLayout()
+    l = Qt.QHBoxLayout()
     for a in args:
         if isinstance(a, Qt.QLayout):
             l.addLayout(a)
@@ -194,7 +194,7 @@ class Crosshair:
             painter.drawLine(self.x, 0, self.x, h)
 
 
-class ImageWidget(QtGui.QLabel):
+class ImageWidget(Qt.QLabel):
 
     def __init__(self, crosshair=Crosshair(), custom_paint=lambda *args: None, custom_mouse_move=lambda *args: None):
         super(ImageWidget, self).__init__()
@@ -294,12 +294,12 @@ class ParametrizedImageWidget(Qt.QWidget):
         return self.current_selection
 
 
-class RealSlider(QtGui.QSlider):
+class RealSlider(Qt.QSlider):
 
     valueChanged = Qt.pyqtSignal(float)
 
     def __init__(self, min_val, max_val, steps=10000, horizontal=True):
-        QtGui.QSlider.__init__(self)
+        Qt.QSlider.__init__(self)
         self.steps = steps
         self.min_val = min_val
         self.max_val = max_val
@@ -328,10 +328,10 @@ class RealSlider(QtGui.QSlider):
         return s
 
 
-class IntegerSlider(QtGui.QSlider):
+class IntegerSlider(Qt.QSlider):
 
     def __init__(self, min_val, max_val, horizontal=True):
-        QtGui.QSlider.__init__(self)
+        Qt.QSlider.__init__(self)
         super().setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
         super().setMinimum(min_val)
         super().setMaximum(max_val)
