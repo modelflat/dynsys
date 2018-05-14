@@ -1,16 +1,16 @@
 from setuptools import setup, find_packages
 
-with open("README.md") as f:
+with open("README.rst", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
     name="dynsys",
-    version="0.1.0",
+    version="0.1.1",
 
     description="Small collection of tools to perform basic modeling of dynamical systems",
 
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type="text/x-rst",
 
     url="https://bitbucket.org/modelflat/dynsys",
 
