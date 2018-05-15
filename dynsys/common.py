@@ -151,6 +151,7 @@ def generate_var_code(param_count):
         var_type = "real"
         compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) (fabs(v1 - v2) < val)"
         compare_greater = "#define VARIABLE_VECTOR_ANY_ABS_GREATER(v, val) (fabs(v) > val)"
+        is_nan = "#define VARIABLE_VECTOR_ANY_ISNAN(v) isnan(v)"
     else:
         var_type = "real" + str(param_count)
         compare = "#define VARIABLE_VECTOR_NEAR(v1, v2, val) \\\n\t(" + "&&".join([
@@ -159,10 +160,13 @@ def generate_var_code(param_count):
         compare_greater = "#define VARIABLE_VECTOR_ANY_ABS_GREATER(v, val) \\\n\t(" + "||".join([
             "(fabs(v.s%01d) > val)" % (i,) for i in range(param_count)
         ]) + ")"
+        is_nan = "#define VARIABLE_VECTOR_ANY_ISNAN(v) \\\n\t(" + "||".join([
+            "isnan(v.s%01d)" % (i,) for i in range(param_count)
+        ]) + ")"
 
     gather = "#define GATHER_VARIABLES (%s)(VARIABLE_VALUES)" % (var_type,)
     acceptor = "#define VARIABLE_ACCEPTOR_TYPE " + var_type
-    return "\n".join([signatures, values, gather, compare, compare_greater, acceptor])
+    return "\n".join([signatures, values, gather, compare, compare_greater, is_nan, acceptor])
 
 
 def make_param_list(total_params, params, type, active_idx=None):

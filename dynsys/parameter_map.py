@@ -100,7 +100,7 @@ kernel void compute_map(
         x = map_function(x, v.x, v.y);
         samples[i] = x;
         
-        if (VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
+        if (VARIABLE_VECTOR_ANY_ISNAN(x) || VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
             write_imagef(map, id, DIVERGENCE_COLOR);
             return;
         }
