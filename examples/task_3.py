@@ -22,7 +22,8 @@ class Task3(SimpleApp):
     def __init__(self):
         super().__init__("Task 3")
 
-        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source)
+        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source,
+                                                   width=768, height=768)
         self.parameter_map_image = ParametrizedImageWidget(parameter_map_bounds, names=("a", "b"),
                                                            crosshair_color=QtCore.Qt.white)
 
@@ -45,7 +46,7 @@ class Task3(SimpleApp):
 
     def draw_parameter_map(self):
         self.parameter_map_image.set_image(self.parameter_map(
-            16, 512, x0
+            80, 512, x0
         ))
 
 

@@ -13,7 +13,7 @@ attractor_bounds = Bounds(
 )
 
 iter_count = 2 ** 10
-draw_count = 1  # 2**15
+draw_count = 2 ** 10
 
 x0, y0 = 0, 0
 
@@ -28,9 +28,10 @@ real2 map_function(real2 v, real lam1, real lam2) {
     return (real2)(xp, yp);
 }
 #define system map_function
-//#define DYNAMIC_COLOR
-#define GENERATE_COLORS
+#define DYNAMIC_COLOR
+//#define GENERATE_COLORS
 #define DIVERGENCE_THRESHOLD 1e2
+#define DIVERGENCE_COLOR (float4)(.5)
 #define DETECTION_PRECISION 1e-2
 #define DETECTION_PRECISION_EXPONENT 2
 
@@ -93,7 +94,7 @@ class Task6(SimpleApp):
 
     def draw_parameter_map(self):
         self.parameter_map_image.set_image(self.parameter_map(
-            16, 512, x0, y0
+            80, 512, x0, y0
         ))
 
 
