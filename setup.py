@@ -12,7 +12,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
 
-    url="https://bitbucket.org/modelflat/dynsys",
+    url="https://github.com/modelflat/dynsys",
 
     author="Andrew Elistratov",
     author_email="zhykreg@gmail.com",
@@ -36,7 +36,7 @@ setup(
     keywords="opencl research nonlinear dynamical-systems",
 
     project_urls={
-        "Issues": "https://bitbucket.org/modelflat/dynsys/issues",
+        "Issues": "https://github.com/modelflat/dynsys/issues",
     },
 
     packages=find_packages(exclude=["examples"]),
@@ -44,6 +44,4 @@ setup(
     install_requires=["numpy", "pyopencl", "PyQt5"],
 
     python_requires=">=3",
-
-
 )
