@@ -1,4 +1,4 @@
-#dynsys
+# dynsys
 
 This library contains a collection of utility classes and functions for basic dynamical system 
 modeling tasks (such as computing a parameter maps, cobweb (aka Verhulst) diagrams or basins of attraction).
@@ -10,7 +10,7 @@ Warning for potential users! Only kind of "documentation" currently available is
 located under the "examples/" directory. There are plans on writing full-featured documentation across project,
 but these are in the not-so-near-future.
 
- ###Probably useful links
+### Probably useful links
  
  1. [PyOpenCL](https://github.com/inducer/pyopencl) -- OpenCL integration for Python
  2. [PyQt5](https://pypi.org/project/PyQt5/) -- Python bindings for Qt platform toolkit
