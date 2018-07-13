@@ -1,4 +1,6 @@
 # dynsys
+[![GitHub version](https://badge.fury.io/gh/modelflat%2Fdynsys.svg)](https://badge.fury.io/gh/modelflat%2Fdynsys)
+[![PyPi version](https://pypip.in/v/dynsys/badge.png)](https://crate.io/packages/dynsys/)
 
 This library contains a collection of utility classes and functions for basic dynamical system 
 modeling tasks (such as computing a parameter maps, cobweb (aka Verhulst) diagrams or basins of attraction).
