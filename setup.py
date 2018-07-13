@@ -1,16 +1,16 @@
 from setuptools import setup, find_packages
 
-with open("README.rst", encoding="utf-8") as f:
+with open("README.md", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
     name="dynsys",
-    version="0.1.3",
+    version="0.1.4",
 
     description="Small collection of tools to perform basic modeling of dynamical systems",
 
     long_description=long_description,
-    long_description_content_type="text/x-rst",
+    long_description_content_type="text/markdown",
 
     url="https://github.com/modelflat/dynsys",
 
@@ -41,7 +41,7 @@ setup(
 
     packages=find_packages(exclude=["examples"]),
 
-    install_requires=["numpy", "pyopencl", "PyQt5"],
+    install_requires=["pyopencl", "PyQt5"],
 
     python_requires=">=3",
 )
