@@ -3,7 +3,7 @@ from .common import *
 bifurcation_tree_source = """
 
 kernel void compute_bifurcation_tree(
-    const real x0,
+    VARIABLE_SIGNATURES,
     PARAM_SIGNATURES, const int active_param,
     const real start, const real stop,
     const real max_allowed_value,
