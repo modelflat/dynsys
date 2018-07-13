@@ -5,7 +5,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="dynsys",
-    version="0.1.4",
+    version="0.2.0",
 
     description="Small collection of tools to perform basic modeling of dynamical systems",
 
@@ -14,7 +14,7 @@ setup(
 
     url="https://github.com/modelflat/dynsys",
 
-    author="Andrew Elistratov",
+    author="Andrey Elistratov",
     author_email="zhykreg@gmail.com",
 
     license="MIT",
