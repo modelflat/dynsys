@@ -120,11 +120,10 @@ class CobwebDiagram(ComputedImage):
 
         param_list = make_param_list(self.param_count, params, real)
 
-        self.compute_samples.set_args(real(x0), *param_list,
-                                      np.int32(skip_first),
-                                      np.int32(iter_count), samples_device)
-
-        cl.enqueue_task(queue, self.compute_samples)
+        self.program.compute_samples(queue, (1,), None,
+                real(x0), *param_list,
+                np.int32(skip_first),
+                np.int32(iter_count), samples_device)
 
         self.program.draw_background(queue, (self.width, self.height), None,
                                      *param_list,

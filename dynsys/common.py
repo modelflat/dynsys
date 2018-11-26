@@ -361,7 +361,7 @@ class ComputedImage:
         )).build()
 
     def clear(self, read_back=False, color=(1.0, 1.0, 1.0, 1.0)):
-        cl.enqueue_fill_image(self.queue, self.image_device, color, origin=(0, 0), region=(self.width, self.height))
+        cl.enqueue_fill_image(self.queue, self.image_device, np.array(color), origin=(0, 0), region=(self.width, self.height))
         if read_back:
             cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
 
@@ -424,6 +424,8 @@ COMMON_SOURCE = """
                                 (size).y - ((v).y - (y_min))/((y_max) - (y_min))*(size).y ))
 
 #define NEAR(a, b, abs_error) (fabs((a) - (b)) < (abs_error))
+
+float3 hsv2rgb(float3);
 
 float3 hsv2rgb(float3 hsv) {
     const float c = hsv.y * hsv.z;
