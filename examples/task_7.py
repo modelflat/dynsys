@@ -15,8 +15,8 @@ attractor_bounds = Bounds(
     -1, 1.5
 )
 
-iter_count = 2 ** 16
-draw_last = 2 ** 14
+iter_count = 2 ** 12 
+draw_last = 2 ** 10
 
 x0, y0 = .0005, .0005
 
@@ -46,7 +46,7 @@ class Task7(SimpleApp):
                                                            crosshair_color=QtCore.Qt.white)
 
         self.parameter_map_zoomed = self.makeParameterMap(parameter_map_bounds_zoomed, map_function_source,
-                                                          width=1000, height=1000,
+                                                          width=512, height=512,
                                                           var_count=2)
         self.parameter_map_zoomed_image = ParametrizedImageWidget(parameter_map_bounds_zoomed, names=["lam", "A"],
                                                                   crosshair_color=QtCore.Qt.white)

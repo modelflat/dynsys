@@ -1,0 +1,249 @@
+import abc
+import numpy
+
+from PyQt5 import Qt, QtCore
+from PyQt5.Qt import QVector3D, QImage, QPixmap, QColor, QPainter, QPen
+from PyQt5.QtWidgets import QWidget, QLayout, QHBoxLayout, QLabel
+from PyQt5.QtDataVisualization import QCustom3DVolume, Q3DScatter, Q3DTheme, Q3DCamera, QAbstract3DGraph
+
+
+def toPixmap(data: numpy.ndarray):
+    image = QImage(data.data, *data.shape, QImage.Format_ARGB32)
+    pixmap = QPixmap()
+    pixmap.convertFromImage(image)
+    return pixmap
+
+
+def mouseButtonsState(mouseEvent):
+    return bool(QtCore.Qt.LeftButton & mouseEvent.buttons()), bool(QtCore.Qt.RightButton & mouseEvent.buttons())
+
+
+class ImageWidget(QLabel):
+
+    selectionChanged = Qt.pyqtSignal(tuple, tuple)
+
+    @abc.abstractmethod
+    def spaceShape(self) -> tuple: ...
+
+    @abc.abstractmethod
+    def setSpaceShape(self, spaceShape: tuple) -> None: ...
+
+    @abc.abstractmethod
+    def textureShape(self): ...
+
+    @abc.abstractmethod
+    def setTexture(self, data: numpy.ndarray) -> None: ...
+
+    @abc.abstractmethod
+    def targetPx(self) -> tuple: ...
+
+    @abc.abstractmethod
+    def targetReal(self) -> tuple: ...
+
+    @abc.abstractmethod
+    def setTargetReal(self, targetLocation: tuple) -> None: ...
+
+    @abc.abstractmethod
+    def putToLayout(self, layout: QLayout) -> None: ...
+
+
+class Target2D:
+
+    def __init__(self, color: QColor, shape: tuple = (True, True)):
+        self._color = color
+        self._shape = shape
+        self._pos = (-1, -1)
+        self._setPosCalled = False
+
+    def setPosCalled(self):
+        return self._setPosCalled
+
+    def shape(self):
+        return self._shape
+
+    def pos(self):
+        return self._pos
+
+    def setPos(self, pos: tuple):
+        self._setPosCalled = True
+        self._pos = pos
+
+    def draw(self, w: int, h: int, painter: QPainter):
+        pen = QPen(self._color, 1)
+        painter.setPen(pen)
+        if self._shape[1]:
+            painter.drawLine(0, self._pos[1], w, self._pos[1])
+        if self._shape[0]:
+            painter.drawLine(self._pos[0], 0, self._pos[0], h)
+
+
+class Image2D(ImageWidget):
+
+    def _onMouseEvent(self, QMouseEvent):
+        left, right = mouseButtonsState(QMouseEvent)
+        if left:
+            self._target.setPos((QMouseEvent.x(), QMouseEvent.y()))
+            self.repaint()
+            if self._target.setPosCalled():
+                vals = self.targetReal()
+                self.selectionChanged.emit(
+                    (vals[0] if self._target.shape()[0] else None,
+                     vals[1] if self._target.shape()[1] else None),
+                    (left, right))
+
+    def mousePressEvent(self, QMouseEvent):
+        super(Image2D, self).mousePressEvent(QMouseEvent)
+        self._onMouseEvent(QMouseEvent)
+
+    def mouseMoveEvent(self, QMouseEvent):
+        super(Image2D, self).mouseMoveEvent(QMouseEvent)
+        self._onMouseEvent(QMouseEvent)
+
+    def paintEvent(self, QPaintEvent):
+        super(ImageWidget, self).paintEvent(QPaintEvent)
+        self._target.draw(self.width(), self.height(), QPainter(self))
+
+    def __init__(self, targetColor: QColor = QtCore.Qt.red,
+                 targetShape: tuple = (True, True),
+                 spaceShape: tuple = (-1.0, 1.0, -1.0, 1.0),
+                 invertY: bool = True
+                 ):
+        super().__init__()
+        self.setMouseTracking(True)
+        self._target = Target2D(targetColor, targetShape)
+        self._spaceShape = spaceShape
+        self._selection = (None, None)
+        self._invertY = invertY
+        self._textureShape = (1, 1)
+        self._textureDataReference = None
+
+    def spaceShape(self) -> tuple:
+        return self._spaceShape
+
+    def setSpaceShape(self, spaceShape: tuple) -> None:
+        self._spaceShape = spaceShape
+
+    def textureShape(self) -> tuple:
+        return self._textureShape
+
+    def setTexture(self, data: numpy.ndarray) -> None:
+        self._textureDataReference = data
+        self._textureShape = data.shape[:-1]
+        self.setPixmap(toPixmap(data))
+
+    def targetPx(self) -> tuple:
+        return self._target.pos()
+
+    def targetReal(self) -> tuple:
+        x, y = self._target.pos()
+        x = self._spaceShape[0] + x / self._textureShape[0] * (self._spaceShape[1] - self._spaceShape[0])
+        if self._invertY:
+            y = self._spaceShape[2] + (self._textureShape[1] - y) / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+        else:
+            y = self._spaceShape[2] + y / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+        x = numpy.clip(x, self._spaceShape[0], self._spaceShape[1])
+        y = numpy.clip(y, self._spaceShape[2], self._spaceShape[3])
+        return x, y
+
+    def setTargetReal(self, targetLocation: tuple) -> None:
+        # x = self._spaceShape[0] + targetLocation[0] / self._textureShape[0] * (self._spaceShape[1] - self._spaceShape[0])
+        # if self._invertY:
+        #     y = self._spaceShape[2] + (self._textureShape[1] - targetLocation[1]) / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+        # else:
+        #     y = self._spaceShape[2] + targetLocation[1] / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+        # self._target.setPos((x, y))
+        self.repaint()
+        raise NotImplementedError()
+
+
+class Image3D(ImageWidget):
+
+    def __init__(self,
+                 spaceShape: tuple = (-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+                 segmentShape: tuple = (8, 8, 8)):
+        super().__init__()
+
+        self._graph = Q3DScatter()
+        self._graph.setOrthoProjection(True)
+        self._graph.activeTheme().setType(Q3DTheme.ThemeQt)
+        self._graph.activeTheme().setBackgroundEnabled(False)
+        self._graph.setShadowQuality(QAbstract3DGraph.ShadowQualityNone)
+        self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
+        self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
+        self._graph.axisX().setSegmentCount(segmentShape[0])
+        self._graph.axisY().setSegmentCount(segmentShape[1])
+        self._graph.axisZ().setSegmentCount(segmentShape[2])
+        self._graph.setAspectRatio(1)
+
+        self._volume = QCustom3DVolume()
+        self._volume.setUseHighDefShader(True)
+        self._volume.setAlphaMultiplier(1.0)
+        self._volume.setPreserveOpacity(False)
+        self._volume.setDrawSlices(False)
+        self._volume.setScaling(QVector3D(1.0, 1.0, 1.0))
+
+        self._spaceShape = None
+        self.setSpaceShape(spaceShape)
+
+        self._graph.addCustomItem(self._volume)
+        self.setLayout(QHBoxLayout())
+        self.layout().addWidget(QWidget().createWindowContainer(self._graph))
+
+    def spaceShape(self) -> tuple:
+        return self._spaceShape
+
+    def targetPx(self) -> tuple:
+        raise NotImplementedError()
+
+    def targetReal(self) -> tuple:
+        raise NotImplementedError()
+
+    def setTarget(self, targetLocation: tuple) -> None:
+        raise NotImplementedError()
+
+    def setSpaceShape(self, spaceShape):
+        self._spaceShape = spaceShape
+        boundingBox = min(spaceShape[::2]), max(spaceShape[1::2])
+        self._graph.axisX().setRange(*boundingBox)
+        self._graph.axisY().setRange(*boundingBox)
+        self._graph.axisZ().setRange(*boundingBox)
+        pos = (boundingBox[1] + boundingBox[0]) / 2.0
+        self._volume.setPosition(QVector3D(
+            pos, pos, pos
+        ))
+
+    def setTexture(self, data: numpy.ndarray):
+        if len(data.shape) != 4:
+            raise RuntimeError("textureShape shoud have 4 components and be in form (w, h, d, 4)")
+        self._volume.setTextureFormat(QImage.Format_ARGB32)
+        self._volume.setTextureDimensions(*data.shape[:-1])
+        self._volume.setTextureData(data.tobytes())
+
+
+def testWidget(fn):
+    from PyQt5.Qt import QApplication, QMainWindow, QHBoxLayout
+    app = QApplication([])
+    win = QWidget()
+    win.setFixedSize(512, 512)
+    layout = QHBoxLayout()
+    layout.addWidget(fn())
+    win.setLayout(layout)
+    win.show()
+    exit(app.exec())
+
+
+def test2D():
+    w = Image2D()
+    w.selectionChanged.connect(lambda *args: print(*args))
+    return w
+
+
+def test3D():
+    w = Image3D()
+    w.setTexture(numpy.random.randint(0, 0xFF, size=(2, 2, 2, 4), dtype=numpy.uint8))
+    return w
+
+
+if __name__ == '__main__':
+    testWidget(test2D)
+    # testWidget(test3D)

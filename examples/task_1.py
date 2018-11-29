@@ -1,6 +1,6 @@
 from dynsys import *
 
-iter_count = 2 ** 15
+iter_count = 2 ** 14
 draw_count = iter_count
 
 parameter_surface_bounds = Bounds(
