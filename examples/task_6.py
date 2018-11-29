@@ -69,12 +69,12 @@ class Task6(SimpleApp):
         self.parameter_map_image.selectionChanged.connect(lambda *args: (self.draw_basins(*args), self.draw_phase_plot(*args)))
 
         self.setLayout(
-            qt_hstack(
-                qt_vstack(
+            hStack(
+                vStack(
                     self.parameter_map_image,
                     self.basins_label
                 ),
-                qt_hstack(
+                hStack(
                     self.phase_plot_image,
                     self.basins_of_attraction_image
                 )

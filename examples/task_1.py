@@ -51,7 +51,7 @@ class Task1(SimpleApp):
         self.param_surface_image.selectionChanged.connect(self.draw_phase_plot)
 
         self.setLayout(
-            qt_hstack(
+            hStack(
                 self.param_surface_image, self.attr_image,
             )
         )

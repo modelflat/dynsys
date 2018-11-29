@@ -57,7 +57,7 @@ class Task4(SimpleApp):
         self.parameter_surface_image.selectionChanged.connect(self.draw_attractor)
 
         self.setLayout(
-            qt_hstack(
+            hStack(
                 self.parameter_surface_image, self.attractor_image
             )
         )

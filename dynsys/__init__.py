@@ -2,6 +2,7 @@ import sys
 from json import load
 
 from .common import *
+from .ui import *
 
 from .phase_portrait import PhasePortrait
 from .parameter_surface import ParameterSurface
@@ -10,12 +11,14 @@ from .parameter_map import ParameterMap
 from .bifurcation_tree import BifurcationTree
 from .basins_of_attraction import BasinsOfAttraction
 
+from PyQt5.Qt import QWidget, QApplication
 
-class SimpleApp(Qt.QWidget):
+
+class SimpleApp(QWidget):
 
     def __init__(self, title):
-        self.app = Qt.QApplication(sys.argv)
-        super(SimpleApp, self).__init__(None)
+        self.app = QApplication(sys.argv)
+        super().__init__(parent=None)
         self.setWindowTitle(title)
         self.configFile = None
         self.config = None

@@ -47,9 +47,9 @@ class Task2(SimpleApp):
         self.x0_slider = RealSlider.makeAndConnect(-1.2, 1.2, self.x0.value(), connect_to=self.x0.setValue)
 
         self.setLayout(
-            qt_vstack(
-                qt_hstack(self.bifurcation_tree_image, self.cobweb_diagram_image),
-                qt_vstack(
+            vStack(
+                hStack(self.bifurcation_tree_image, self.cobweb_diagram_image),
+                vStack(
                     self.x0_slider,
                     self.iter_count_slider,
                 )

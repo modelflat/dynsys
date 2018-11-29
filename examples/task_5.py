@@ -43,7 +43,7 @@ class Task5(SimpleApp):
         self.parameter_map_image.selectionChanged.connect(self.draw_attractor)
 
         self.setLayout(
-            qt_hstack(
+            hStack(
                 self.parameter_map_image, self.attractor_image
             )
         )

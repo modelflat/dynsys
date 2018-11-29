@@ -58,8 +58,8 @@ class Task7(SimpleApp):
         self.parameter_map_zoomed_image.selectionChanged.connect(self.draw_attractor)
 
         self.setLayout(
-            qt_hstack(self.parameter_map_zoomed_image,
-                      qt_vstack(
+            hStack(self.parameter_map_zoomed_image,
+                   vStack(
                           self.attractor_image,
                           self.parameter_map_image
                       ))

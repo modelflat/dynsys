@@ -33,7 +33,7 @@ class Task3(SimpleApp):
         self.parameter_map_image.selectionChanged.connect(self.draw_cobweb_diagram)
 
         self.setLayout(
-            qt_hstack(self.parameter_map_image, self.cobweb_diagram_image)
+            hStack(self.parameter_map_image, self.cobweb_diagram_image)
         )
 
         self.draw_parameter_map()
