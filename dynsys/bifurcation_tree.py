@@ -1,4 +1,7 @@
-from .common import *
+from .cl.core import *
+from .cl.codegen import *
+import numpy as np
+
 
 bifurcation_tree_source = """
 
@@ -57,9 +60,9 @@ kernel void draw_bifurcation_tree(
 
 class BifurcationTree(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, map_function_source, param_count=1, type_config=float_config):
+    def __init__(self, ctx, queue, width, height, map_function_source, param_count=1, type_config=FLOAT):
         ComputedImage.__init__(self, ctx, queue, width, height, None,
-                               map_function_source, generate_param_code(param_count), bifurcation_tree_source,
+                               map_function_source, generateParameterCode(param_count), bifurcation_tree_source,
                                type_config=type_config)
         self.param_count = param_count
 
@@ -69,7 +72,7 @@ class BifurcationTree(ComputedImage):
         result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=samples_count*self.width * real_size)
         result_minmax_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=self.width * 2 * real_size)
 
-        param_list = make_param_list(self.param_count, params, real, active_idx=active_idx)
+        param_list = wrapParameterArgs(self.param_count, params, real, active_idx=active_idx)
 
         self.program.compute_bifurcation_tree(
             self.queue, (self.width, ), None,
@@ -95,7 +98,7 @@ class BifurcationTree(ComputedImage):
             np.int32(samples_count),
             real(min_), real(max_),
             real(self.height),
-            self.image_device
+            self.deviceImage
         )
 
-        return self.read_from_device()
+        return self.readFromDevice()

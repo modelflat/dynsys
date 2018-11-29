@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
 
 
 def toPixmap(data: numpy.ndarray):
-    image = QImage(data.data, *data.shape, QImage.Format_ARGB32)
+    image = QImage(data.data, *data.shape[:-1], QImage.Format_ARGB32)
     pixmap = QPixmap()
     pixmap.convertFromImage(image)
     return pixmap

@@ -1,4 +1,8 @@
-from .common import *
+from .cl.core import *
+from .cl.codegen import *
+
+import numpy as np
+
 
 basins_of_attraction_source = """
 
@@ -121,9 +125,9 @@ kernel void find_attraction(
 
 class BasinsOfAttraction(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, system_function_source, param_count=2, type_config=float_config):
+    def __init__(self, ctx, queue, width, height, bounds, system_function_source, param_count=2, type_config=FLOAT):
         super().__init__(ctx, queue, width, height, bounds, system_function_source,
-                         generate_param_code(param_count),
+                         generateParameterCode(param_count),
                          basins_of_attraction_source,
                          type_config=type_config)
         self.param_count = param_count
@@ -135,7 +139,7 @@ class BasinsOfAttraction(ComputedImage):
 
         result_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, real_size*2)
 
-        pl = make_param_list(self.param_count, params, real)
+        pl = wrapParameterArgs(self.param_count, params, real)
 
         self._find_attr_kernel.set_args(
             real(x), real(y), *pl,
@@ -155,7 +159,7 @@ class BasinsOfAttraction(ComputedImage):
         bounds = self.bounds
         real, real_size = self.tc()
 
-        pl = make_param_list(self.param_count, params, real)
+        pl = wrapParameterArgs(self.param_count, params, real)
 
         result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=self.width*self.height*2*real_size)
 
@@ -181,8 +185,8 @@ class BasinsOfAttraction(ComputedImage):
         self.program.draw_attraction_map(
             self.queue, (self.width, self.height), None,
             np.int32(len(result_unique)),
-            result_unique_device, result_device, self.image_device
+            result_unique_device, result_device, self.deviceImage
         )
 
-        return self.read_from_device(), self.num_basins
+        return self.readFromDevice(), self.num_basins
 

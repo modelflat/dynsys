@@ -1,4 +1,7 @@
-from .common import *
+from .cl.core import *
+from .cl.codegen import *
+
+import numpy as np
 
 parameter_map_source = """
 
@@ -137,8 +140,8 @@ kernel void compute_map(
 
 class ParameterMap(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, map_function_source, var_count=1, type_config=float_config):
-        super().__init__(ctx, queue, width, height, bounds, map_function_source, generate_var_code(var_count),
+    def __init__(self, ctx, queue, width, height, bounds, map_function_source, var_count=1, type_config=FLOAT):
+        super().__init__(ctx, queue, width, height, bounds, map_function_source, generateVariableCode(var_count),
                          parameter_map_source, type_config=type_config)
         self.var_count = var_count
 
@@ -148,7 +151,7 @@ class ParameterMap(ComputedImage):
 
         real, real_size = self.tc()
 
-        vl = make_param_list(self.var_count, vars, real)
+        vl = wrapParameterArgs(self.var_count, vars, real)
 
         samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
                                    size=self.width * self.height * samples_count * real_size * self.var_count)
@@ -158,6 +161,6 @@ class ParameterMap(ComputedImage):
                                  real(bounds.y_min), real(bounds.y_max),
                                  *vl,
                                  np.int32(samples_count), np.int32(skip),
-                                 samples_device, self.image_device)
+                                 samples_device, self.deviceImage)
 
-        return self.read_from_device()
+        return self.readFromDevice()

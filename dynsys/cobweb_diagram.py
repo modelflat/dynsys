@@ -1,4 +1,6 @@
-from .common import *
+from .cl.core import *
+from .cl.codegen import *
+import numpy as np
 
 cobweb_diagram_source = """
 
@@ -99,9 +101,9 @@ kernel void draw_cobweb_diagram(
 
 class CobwebDiagram(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, carrying_function_source, param_count=1, type_config=float_config):
+    def __init__(self, ctx, queue, width, height, bounds, carrying_function_source, param_count=1, type_config=FLOAT):
         ComputedImage.__init__(self, ctx, queue, width, height, bounds,
-                               carrying_function_source, generate_param_code(param_count), cobweb_diagram_source,
+                               carrying_function_source, generateParameterCode(param_count), cobweb_diagram_source,
                                type_config=type_config)
         self.param_count = param_count
         self.compute_samples = self.program.compute_samples
@@ -118,7 +120,7 @@ class CobwebDiagram(ComputedImage):
 
         samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, real_size * iter_count)
 
-        param_list = make_param_list(self.param_count, params, real)
+        param_list = wrapParameterArgs(self.param_count, params, real)
 
         self.program.compute_samples(queue, (1,), None,
                 real(x0), *param_list,
@@ -129,7 +131,7 @@ class CobwebDiagram(ComputedImage):
                                      *param_list,
                                      real(bounds.x_min), real(bounds.x_max),
                                      real(bounds.y_min), real(bounds.y_max),
-                                     self.image_device
+                                     self.deviceImage
                                      )
 
         self.program.draw_cobweb_diagram(queue, (iter_count,), None,
@@ -137,7 +139,7 @@ class CobwebDiagram(ComputedImage):
                                          real(bounds.x_min), real(bounds.x_max),
                                          real(bounds.y_min), real(bounds.y_max),
                                          np.int32(self.width), np.int32(self.height),
-                                         self.image_device
+                                         self.deviceImage
                                          )
 
-        return self.read_from_device(queue)
+        return self.readFromDevice(queue)

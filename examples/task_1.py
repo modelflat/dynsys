@@ -1,7 +1,7 @@
 from dynsys import *
 
 iter_count = 2 ** 14
-draw_count = iter_count
+skip = 0
 
 parameter_surface_bounds = Bounds(
     -2, 2,
@@ -46,7 +46,7 @@ class Task1(SimpleApp):
                                                            crosshair_color=QtCore.Qt.black)
 
         self.attr = self.makePhasePortrait(phase_plot_bounds, system_function_source)
-        self.attr_image = ParametrizedImageWidget(phase_plot_bounds, shape=(False, False))
+        self.attr_image = ParametrizedImageWidget(phase_plot_bounds, shape=(True, False))
 
         self.param_surface_image.selectionChanged.connect(self.draw_phase_plot)
 
@@ -63,7 +63,7 @@ class Task1(SimpleApp):
         self.param_surface_image.set_image(self.param_surface())
 
     def draw_phase_plot(self, lam, k):
-        self.attr_image.set_image(self.attr(iter_count, lam, k, draw_last_points=draw_count))
+        self.attr_image.set_image(self.attr(lam, k, iterations=iter_count, skip=skip))
 
 
 if __name__ == '__main__':
