@@ -112,16 +112,20 @@ class SimpleApp(QWidget):
         return ParameterSurface(self.ctx, self.queue, width, height, bounds, colorFunctionSource, typeConfig=typeConfig)
 
     def makeCobwebDiagram(self, bounds, carrying_function_source, param_count=1, width=512, height=512, type_config=FLOAT):
-        return CobwebDiagram(self.ctx, self.queue, width, height, bounds, carrying_function_source,
-                             param_count=param_count, type_config=type_config)
+        return CobwebDiagram(self.ctx, self.queue, (width, height), bounds.asTuple(), carrying_function_source,
+                             paramCount=param_count, typeConfig=type_config)
 
     def makeParameterMap(self, bounds, map_function_source, var_count=1, width=512, height=512, type_config=FLOAT):
-        return ParameterMap(self.ctx, self.queue, width, height, bounds, map_function_source, var_count=var_count,
-                            type_config=type_config)
+        return ParameterMap(
+            self.ctx, self.queue, (width, height), bounds.asTuple(),
+            map_function_source,
+            varCount=var_count,
+            typeConfig=type_config
+        )
 
     def makeBifurcationTree(self, map_function_source, param_count=1, width=512, height=512, type_config=FLOAT):
-        return BifurcationTree(self.ctx, self.queue, width, height, map_function_source,
-                               param_count=param_count, type_config=type_config)
+        return BifurcationTree(self.ctx, self.queue, (width, height), map_function_source,
+                               paramCount=param_count, typeConfig=type_config)
 
     def makeBasinsOfAttraction(self, bounds, system_function_source, width=512, height=512, param_count=2, type_config=FLOAT):
         return BasinsOfAttraction(self.ctx, self.queue, width, height, bounds, system_function_source,

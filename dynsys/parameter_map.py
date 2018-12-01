@@ -17,6 +17,8 @@ parameter_map_source = """
 #define DIVERGENCE_COLOR (float4)(1.0)
 #endif
 
+void makeHeap(global real*, int, int);
+
 void makeHeap(global real* data, int n, int i) {
     while (true) {
         int smallest = i;
@@ -37,6 +39,8 @@ void makeHeap(global real* data, int n, int i) {
     }
 }
 
+void heapSort(global real*, int);
+
 void heapSort(global real* data, int n)
 {
     for (int i = n / 2 - 1; i >= 0; --i) {
@@ -48,6 +52,8 @@ void heapSort(global real* data, int n)
         makeHeap(data, i, 0);
     }
 }
+
+float3 color_for_count(int, int);
 
 float3 color_for_count(int count, int total) {
     if (count == total) {
@@ -80,19 +86,18 @@ float3 color_for_count(int count, int total) {
 }
 
 kernel void compute_map(
-    const real x_min, const real x_max,
-    const real y_min, const real y_max,
+    const BOUNDS,
     VARIABLE_SIGNATURES,
     const int samples_count,
     const int skip,
-    global VARIABLE_ACCEPTOR_TYPE* samples,
+    global VARIABLE_TYPE* samples,
     write_only image2d_t map
 ) {
     const int2 id = ID_2D;
     samples += (id.x * get_global_size(1) + id.y)*samples_count;
     const real2 v = TRANSLATE_2D_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
     
-    VARIABLE_ACCEPTOR_TYPE x = GATHER_VARIABLES;
+    VARIABLE_TYPE x = VARIABLES;
 
     for (int i = 0; i < skip; ++i) {
         x = map_function(x, v.x, v.y);
@@ -140,27 +145,30 @@ kernel void compute_map(
 
 class ParameterMap(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, map_function_source, var_count=1, type_config=FLOAT):
-        super().__init__(ctx, queue, width, height, bounds, map_function_source, generateVariableCode(var_count),
-                         parameter_map_source, type_config=type_config)
-        self.var_count = var_count
+    def __init__(self, ctx, queue, imageShape, spaceShape, mapFunctionSource, varCount, typeConfig):
+        super().__init__(ctx, queue, imageShape, spaceShape,
+                         # source
+                         mapFunctionSource, generateVariableCode(typeConfig, varCount),
+                         parameter_map_source,
+                         #
+                         typeConfig=typeConfig)
+        self.varCount = varCount
 
-    def __call__(self, samples_count, skip, *vars, bounds=None):
-        if bounds is None:
-            bounds = self.bounds
+    def __call__(self, *variables, iterations, skip):
+        real, realSize = self.tc()
 
-        real, real_size = self.tc()
+        samplesDevice = cl.Buffer(
+            self.ctx, cl.mem_flags.READ_WRITE,
+            size=numpy.prod(self.imageShape) * iterations * realSize * self.varCount
+        )
 
-        vl = wrapParameterArgs(self.var_count, vars, real)
-
-        samples_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
-                                   size=self.width * self.height * samples_count * real_size * self.var_count)
-
-        self.program.compute_map(self.queue, (self.width, self.height), None,
-                                 real(bounds.x_min), real(bounds.x_max),
-                                 real(bounds.y_min), real(bounds.y_max),
-                                 *vl,
-                                 np.int32(samples_count), np.int32(skip),
-                                 samples_device, self.deviceImage)
+        self.program.compute_map(
+            self.queue, self.imageShape, None,
+            numpy.array(self.spaceShape, dtype=self.tc.boundsType)
+            *wrapParameterArgs(self.varCount, variables, real),
+            np.int32(iterations), np.int32(skip),
+            samplesDevice,
+            self.deviceImage
+        )
 
         return self.readFromDevice()

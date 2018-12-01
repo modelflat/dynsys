@@ -51,15 +51,13 @@ class PhasePortrait(ComputedImage):
                          typeConfig=typeConfig)
         self.paramCount = paramCount
 
-    def __call__(self, *params, sparse=5, iterations=512, skip=1):
-        real, _ = self.tc()
-
+    def __call__(self, *params, sparse=8, iterations=256, skip=0):
         self.clear()
 
         self.program.draw_phase_portrait(
             self.queue, tuple(map(lambda x: x // sparse, self.imageShape)), None,
-            *wrapParameterArgs(self.paramCount, params, real),
-            numpy.array(self.spaceShape, dtype=numpy.float32),
+            *wrapParameterArgs(self.paramCount, params, self.tc.real()),
+            numpy.array(self.spaceShape, dtype=self.tc.boundsType),
             numpy.array(self.imageShape, dtype=numpy.int32),
             numpy.int32(skip), numpy.int32(iterations),
             self.deviceImage

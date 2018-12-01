@@ -1,10 +1,7 @@
-import numpy as np
-import pyopencl as cl
 from PyQt5 import Qt, QtCore
 
 from .ui import vStack as qt_vstack
 from .ui.image_widgets import toPixmap as to_pixmap
-
 
 
 class Crosshair:
@@ -125,108 +122,3 @@ class ParametrizedImageWidget(Qt.QWidget):
     def get_selection(self):
         return self.current_selection
 
-
-class ComputedImage:
-
-    def __init__(self, ctx, queue, width, height, bounds, *sources, type_config):
-        self.ctx, self.queue, self.tc = ctx, queue, type_config
-        self.width, self.height = width, height
-        self.image, self.image_device = allocate_image(ctx, width, height)
-        self.bounds = bounds
-        self.program = cl.Program(ctx, make_cl_source(
-            *sources, type_config=type_config
-        )).build()
-
-    def clear(self, read_back=False, color=(1.0, 1.0, 1.0, 1.0)):
-        cl.enqueue_fill_image(self.queue, self.image_device, np.array(color), origin=(0, 0), region=(self.width, self.height))
-        if read_back:
-            cl.enqueue_copy(self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
-
-    def read_from_device(self, queue=None):
-        cl.enqueue_copy(queue if queue is not None else self.queue, self.image, self.image_device, origin=(0, 0), region=(self.width, self.height))
-        return self.image
-
-
-class ObservableValue(Qt.QObject):
-
-    valueChanged = Qt.pyqtSignal(object)
-
-    def __init__(self, initial):
-        super().__init__()
-        self._value = initial
-
-    def value(self):
-        return self._value
-
-    def setValue(self, v):
-        self._value = v
-        self.valueChanged.emit( v )
-
-    @staticmethod
-    def makeAndConnect(initial, connect_to=None):
-        o = ObservableValue(initial)
-        if connect_to is not None:
-            o.valueChanged.connect(connect_to)
-        return o
-
-
-# COMMON_SOURCE = """
-#
-# #define ID_2D (int2)(get_global_id(0), get_global_id(1))
-# #define ID_2D_Y_INV (int2)(get_global_id(0), get_global_size(1) - get_global_id(1))
-#
-# #define SIZE_2D (int2)(get_global_size(0), get_global_size(1))
-#
-# #define TRANSLATE(id, size, min_, max_) \
-#     ((min_) + (id)*((max_) - (min_))/(size))
-#
-# #define TRANSLATE_BACK(v, min_, max_, size) \
-#     (((v) - (min_)) / ((max_) - (min_)) * (size))
-#
-# #define TRANSLATE_BACK_INV(v, min_, max_, size) \
-#     ((size) - TRANSLATE_BACK((v), (min_), (max_), (size)))
-#
-# #define TRANSLATE_2D(id, size, x_min, x_max, y_min, y_max) \
-#     (real2)((x_min) + (id).x*((x_max) - (x_min))/(size).x, (y_min) + (id).y*((y_max) - (y_min))/(size).y)
-#
-# #define TRANSLATE_2D_INV_Y(id, size, x_min, x_max, y_min, y_max) \
-#     (real2)((x_min) + (id).x*((x_max) - (x_min))/(size).x, (y_min) + ((size).y - (id).y)*((y_max) - (y_min))/((size).y))
-#
-# #define TRANSLATE_BACK_2D(v, x_min, x_max, y_min, y_max, size) \
-#     convert_int2_rtz( (real2) (((v).x - (x_min))/((x_max) - (x_min))*(size).x, \
-#                                ((v).y - (y_min))/((y_max) - (y_min))*(size).y ))
-#
-# #define TRANSLATE_BACK_2D_INV_Y(v, x_min, x_max, y_min, y_max, size) \
-#     convert_int2_rtz( (real2) ( ((v).x - (x_min))/((x_max) - (x_min))*(size).x, \
-#                                 (size).y - ((v).y - (y_min))/((y_max) - (y_min))*(size).y ))
-#
-# #define NEAR(a, b, abs_error) (fabs((a) - (b)) < (abs_error))
-#
-# float3 hsv2rgb(float3);
-#
-# float3 hsv2rgb(float3 hsv) {
-#     const float c = hsv.y * hsv.z;
-#     const float x = c * (1 - fabs(fmod( hsv.x / 60, 2 ) - 1));
-#     float3 rgb;
-#     if      (0 <= hsv.x && hsv.x < 60) {
-#         rgb = (float3)(c, x, 0);
-#     } else if (60 <= hsv.x && hsv.x < 120) {
-#         rgb = (float3)(x, c, 0);
-#     } else if (120 <= hsv.x && hsv.x < 180) {
-#         rgb = (float3)(0, c, x);
-#     } else if (180 <= hsv.x && hsv.x < 240) {
-#         rgb = (float3)(0, x, c);
-#     } else if (240 <= hsv.x && hsv.x < 300) {
-#         rgb = (float3)(x, 0, c);
-#     } else {
-#         rgb = (float3)(c, 0, x);
-#     }
-#     return (rgb + (hsv.z - c));
-# }
-#
-#
-# """
-#
-#
-# def make_cl_source(*args, type_config=None):
-#     return type_config.cl() + "\n" + COMMON_SOURCE + "\n" + "\n".join(args)

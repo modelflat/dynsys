@@ -1,7 +1,46 @@
-VARIABLE_NAME = "_DS_var"
+VARIABLE_TEMPLATE = r"""
+#define VARIABLE _DS_var
+#define VARIABLE_TYPE {}
+#define VARIABLE_SIGNATURE VARIABLE VARIABLE_TYPE
+"""
+
 PARAMETER_NAME = "_DS_par_%d"
-BOUNDS_NAME = "_DS_bs"
-IMAGE_BOUNDS_NAME = "_DS_ibs"
+PARAMETER_TEMPLATE = r"""
+#define SET_PARAMETER {}
+#define PARAMETER_TYPE {}
+#define PARAMETERS {}
+#define PARAMETERS_SIGNATURE {}
+"""
+
+BOUNDS_TEMPLATE = r"""
+#define BOUNDS_VAR _DS_bs
+#define BOUNDS_1D {}2 
+#define BOUNDS_2D {}4
+#define BOUNDS_3D {}6
+
+#if   (DIM == 1)
+#define BOUNDS BOUNDS_1D
+#elif (DIM == 2)
+#define BOUNDS BOUNDS_2D
+#elif (DIM == 3)
+#define BOUNDS BOUNDS_3D
+#endif
+"""
+
+IMAGE_BOUNDS_TEMPLATE = r"""
+#define IMAGE_BOUNDS_VAR _DS_ibs
+#define IMAGE_BOUNDS_1D int2
+#define IMAGE_BOUNDS_2D int4
+#define IMAGE_BOUNDS_3D int6
+
+#if   (DIM == 1)
+#define IMAGE_BOUNDS IMAGE_BOUNDS_1D
+#elif (DIM == 2)
+#define IMAGE_BOUNDS IMAGE_BOUNDS_2D
+#elif (DIM == 3)
+#define IMAGE_BOUNDS IMAGE_BOUNDS_3D
+#endif
+"""
 
 COMMONS_1D = r"""
 
@@ -16,7 +55,7 @@ COMMONS_1D = r"""
     (((v) - (bs).s0) / ((bs).s1 - (bs).s0) * (size))
 
 #define TRANSLATE_BACK_INV_1D(v, bs, size) \
-    ((size) - TRANSLATE_BACK((v), (bs), (size)))
+    ((size) - TRANSLATE_BACK_1D((v), (bs), (size)))
 
 """
 
@@ -56,7 +95,7 @@ COMMONS_3D = r"""
 
 """
 
-COMMON_SOURCE = COMMONS_1D + COMMONS_2D + r"""
+COMMON_SOURCE = COMMONS_1D + COMMONS_2D + COMMONS_3D + r"""
 
 #if (!defined(DIM) || DIM < 1 || DIM > 3)
 #error 'DIM' should be defined to be either 1, 2 or 3
@@ -136,51 +175,40 @@ float3 hsv2rgb(float3 hsv) {
 """
 
 
-def makeSource(*args, typeConfig=None):
-    return typeConfig.cl() + "\n" + COMMON_SOURCE + "\n" + "\n".join(args)
-
-
 def generateParameterCode(typeConfig, paramCount: int) -> str:
     if paramCount > 8:
         # sanity check
         raise ValueError("Supported dimensions are 1-8 (%d requested)" % (paramCount,))
     names = [PARAMETER_NAME % (i,) for i in range(paramCount)]
     paramType = typeConfig.paramType
-    signatures = "#define PARAM_SIGNATURES " + ", ".join([paramType + " " + name for name in names])
-    values =     "#define PARAM_VALUES " + ", ".join(names)
-    setter =     "#define SET_PARAM_VALUE(idx, value) {\\\n\t" + "; \\\n\t".join([
+    values = ", ".join(names)
+    signatures = ", ".join([paramType + " " + name for name in names])
+    setter = "{\\\n\t" + "; \\\n\t".join([
         "if ((idx) == %d) %s = (value)" % (i, name) for i, name in enumerate(names)
-    ]) + "; }"
-    return "\n".join([signatures, values, setter])
+    ]) + ";}"
+    return PARAMETER_TEMPLATE.format(setter, paramType, values, signatures)
 
 
 def generateVariableCode(typeConfig, varCount: int) -> str:
     if varCount > 3:
         # sanity check
         raise ValueError("Supported dimensions are 1-3 (%d requested)" % (varCount,))
-    name = VARIABLE_NAME
-    varType =    "#define VAR_TYPE " + typeConfig.varType + "{}".format(varCount if varCount > 1 else "")
-    signatures = "#define VARIABLE_SIGNATURE {} {}".format(varType, name)
-    values =     "#define VARIABLE_VALUE " + name
-    return "\n".join([varType, signatures, values])
+    return VARIABLE_TEMPLATE.format(typeConfig.varType + "{}".format(varCount if varCount > 1 else ""))
 
 
 def generateBoundsCode(typeConfig, dims: int) -> str:
     if dims > 3 or dims < 1:
         # sanity check
         raise ValueError("Supported dimensions for bounds are 1, 2 and 3 (%d requested)" % (dims,))
-    if dims == 1:
-        bound_type = typeConfig.boundsType + "2"
-    if dims == 2:
-        bound_type = typeConfig.boundsType + "4"
-    if dims == 3:
-        bound_type = typeConfig.boundsType + "6"
-    return "\n#define BOUNDS {} {}\n".format(bound_type, BOUNDS_NAME)
+    return BOUNDS_TEMPLATE.format([typeConfig.boundsType]*3)
 
 
 def generateImageBoundsCode(dims: int) -> str:
     if dims > 3 or dims < 2:
         # sanity check
         raise ValueError("Supported dimensions for image bounds are 2 and 3 (%d requested)" % (dims,))
-    return "\n#define IMAGE_BOUNDS {} {}\n".format("int" + str(dims), IMAGE_BOUNDS_NAME)
+    return IMAGE_BOUNDS_TEMPLATE
 
+
+def makeSource(*args, typeConfig):
+    return typeConfig.cl() + "\n" + COMMON_SOURCE + "\n" + "\n".join(args)

@@ -2,6 +2,8 @@ import numpy
 import pyopencl as cl
 import sys
 
+from typing import Union
+
 from .codegen import makeSource
 
 
@@ -105,7 +107,10 @@ def wrapParameterArgs(total_params, params, type, active_idx=None):
 
 class ComputedImage:
 
-    def __init__(self, ctx, queue, imageShape, spaceShape, *sources, typeConfig):
+    def __init__(self, ctx: cl.Context, queue: cl.CommandQueue,
+                 imageShape: Union[tuple, int], spaceShape: tuple,
+                 *sources: str,
+                 typeConfig: TypeConfig):
         self.ctx, self.queue, self.tc = ctx, queue, typeConfig
         self.imageShape = imageShape
         self.spaceShape = spaceShape
@@ -114,18 +119,17 @@ class ComputedImage:
         self.program = cl.Program(ctx, src).build(["-DDIM={}".format(len(imageShape))])
 
     def clear(self, readBack=False, color=(1.0, 1.0, 1.0, 1.0)):
-        cl.enqueue_fill_image(self.queue, self.deviceImage,
-                              color=numpy.array(color),
-                              origin=(0,)*len(self.imageShape),
-                              region=self.imageShape)
+        cl.enqueue_fill_image(
+            self.queue, self.deviceImage,
+            color=numpy.array(color),
+            origin=(0,)*len(self.imageShape), region=self.imageShape
+        )
         if readBack:
-            cl.enqueue_copy(self.queue, self.hostImage, self.deviceImage,
-                            origin=(0,)*len(self.imageShape),
-                            region=self.imageShape)
+            self.readFromDevice()
 
-    def readFromDevice(self, queue=None):
-        cl.enqueue_copy(queue if queue is not None else self.queue,
-                        self.hostImage, self.deviceImage,
-                        origin=(0,)*len(self.imageShape),
-                        region=self.imageShape)
+    def readFromDevice(self):
+        cl.enqueue_copy(
+            self.queue, self.hostImage, self.deviceImage,
+            origin=(0,)*len(self.imageShape), region=self.imageShape
+        )
         return self.hostImage

@@ -6,7 +6,7 @@ class RealSlider(QSlider):
     valueChanged = Signal(float)
 
     def __init__(self, min_val, max_val, steps=10000, horizontal=True):
-        super().__init__(self)
+        super().__init__()
         self.steps = steps
         self.min_val = min_val
         self.max_val = max_val
@@ -15,7 +15,7 @@ class RealSlider(QSlider):
         self.setMaximum(self.steps)
         self.valueChanged.connect(self._value_changed)
 
-    @QtCore.pyqtSlot(int, name="_value_changed")
+    @QtCore.pyqtSlot(float, name="_value_changed")
     def _value_changed(self, _):
         self.valueChanged.emit(self.value())
 
@@ -38,7 +38,7 @@ class RealSlider(QSlider):
 class IntegerSlider(QSlider):
 
     def __init__(self, min_val, max_val, horizontal=True):
-        super().__init__(self)
+        super().__init__()
         self.setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
         self.setMinimum(min_val)
         self.setMaximum(max_val)

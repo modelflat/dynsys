@@ -7,15 +7,16 @@ bifurcation_tree_source = """
 
 kernel void compute_bifurcation_tree(
     const real x0,
-    PARAM_SIGNATURES, const int active_param,
-    const real start, const real stop,
+    PARAM_SIGNATURES, 
+    const int active_param,
+    const real2 bounds,
     const real max_allowed_value,
-    const int skip, const int samples_count,
-    
+    const int skip, 
+    const int samples_count,
     global real* result, global real2* result_minmax
 ) {
     const int id = get_global_id(0);
-    const real param = TRANSLATE(id, get_global_size(0), start, stop);
+    const real param = TRANSLATE_1D(id, get_global_size(0), bounds);
 
     result += id * samples_count;
     
@@ -43,14 +44,14 @@ kernel void compute_bifurcation_tree(
 kernel void draw_bifurcation_tree(
     const global real* samples,
     const int samples_count,
-    const real min_, const real max_,
+    const real2 bounds,
     const real height,
     write_only image2d_t result
 ) {
     const int id = get_global_id(0);
     samples += id * samples_count;
     for (int i = 0; i < samples_count; ++i) {
-        int2 coord = (int2)(id, TRANSLATE_BACK_INV(samples[i], min_, max_, height));
+        int2 coord = (int2)(id, TRANSLATE_BACK_INV_1D(samples[i], bounds, height));
         write_imagef(result, coord, TREE_COLOR);
     }
 }
@@ -60,44 +61,54 @@ kernel void draw_bifurcation_tree(
 
 class BifurcationTree(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, map_function_source, param_count=1, type_config=FLOAT):
-        ComputedImage.__init__(self, ctx, queue, width, height, None,
-                               map_function_source, generateParameterCode(param_count), bifurcation_tree_source,
-                               type_config=type_config)
-        self.param_count = param_count
+    def __init__(self, ctx, queue, imageShape, mapFunctionSource, paramCount, typeConfig):
+        ComputedImage.__init__(self, ctx, queue, imageShape, (),
+                               # sources
+                               mapFunctionSource,
+                               generateParameterCode(typeConfig, paramCount),
+                               bifurcation_tree_source,
+                               #
+                               typeConfig=typeConfig)
+        self.paramCount = paramCount
 
-    def __call__(self, x0, samples_count, param_start, param_stop, *params, active_idx=0, skip=0, max_allowed_value=1000):
-        real, real_size = self.tc()
+    def __call__(self, startPoint, iterations, paramRange, paramIndex,
+                 *otherParams,
+                 skip=0, maxAllowedValue=1000):
+        real, realSize = self.tc()
+        width = self.imageShape[0]
 
-        result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=samples_count*self.width * real_size)
-        result_minmax_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=self.width * 2 * real_size)
-
-        param_list = wrapParameterArgs(self.param_count, params, real, active_idx=active_idx)
-
-        self.program.compute_bifurcation_tree(
-            self.queue, (self.width, ), None,
-            real(x0),
-            *param_list, np.int32(active_idx),
-            real(param_start), real(param_stop),
-            real(max_allowed_value),
-            np.int32(skip), np.int32(samples_count),
-            result_device, result_minmax_device
+        resultDevice = cl.Buffer(
+            self.ctx, cl.mem_flags.READ_WRITE, size=iterations * width * realSize
+        )
+        resultMinMaxDevice = cl.Buffer(
+            self.ctx, cl.mem_flags.WRITE_ONLY, size=width * 2 * realSize
         )
 
-        result_minmax = np.empty((self.width*2,), dtype=real)
+        self.program.compute_bifurcation_tree(
+            self.queue, (self.imageShape[0],), None,
+            real(startPoint),
+            *wrapParameterArgs(self.paramCount, otherParams, real, active_idx=paramIndex),
+            np.int32(paramIndex),
+            numpy.array(paramRange, dtype=self.tc.real()),
+            real(maxAllowedValue),
+            np.int32(skip), np.int32(iterations),
+            resultDevice, resultMinMaxDevice
+        )
 
-        cl.enqueue_copy(self.queue, result_minmax, result_minmax_device)
+        resultMinMaxHost = np.empty((self.imageShape[0]*2,), dtype=real)
 
-        min_, max_ = min(result_minmax), max(result_minmax)
+        cl.enqueue_copy(self.queue, resultMinMaxHost, resultMinMaxDevice)
+
+        minMax = min(resultMinMaxHost), max(resultMinMaxHost)
 
         self.clear()
 
         self.program.draw_bifurcation_tree(
-            self.queue, (self.width, ), None,
-            result_device,
-            np.int32(samples_count),
-            real(min_), real(max_),
-            real(self.height),
+            self.queue, (self.imageShape[0],), None,
+            resultDevice,
+            np.int32(iterations),
+            numpy.array(minMax, dtype=self.tc.real()),
+            real(self.imageShape[1]),
             self.deviceImage
         )
 

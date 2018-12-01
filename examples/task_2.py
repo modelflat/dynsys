@@ -16,6 +16,8 @@ lambda_bounds = Bounds.x(
 )
 
 map_function_source = """
+real map_function(real x, real lam);
+
 real map_function(real x, real lam) {
     return (lam - x*x)*x;
 }
@@ -58,13 +60,17 @@ class Task2(SimpleApp):
 
     def draw_diag(self, *args):
         self.cobweb_diagram_image.set_image(self.cobweb_diagram(
-            self.x0.value(), self.iter_count.value(), self.p_lambda.value(), skip_first=skip_count
+            self.x0.value(), self.p_lambda.value(),
+            iterations=self.iter_count.value(), skip=skip_count
         ))
 
     def draw_tree(self, *args):
-        self.bifurcation_tree_image.set_image(self.bifurcation_tree(
-            self.x0.value(), tree_samples_count, lambda_bounds.x_min, lambda_bounds.x_max,
-            skip=tree_skip_count, max_allowed_value=tree_max_value
+        self.bifurcation_tree_image.set_image(
+            self.bifurcation_tree(
+                self.x0.value(), tree_samples_count,
+                (lambda_bounds.x_min, lambda_bounds.x_max),
+                0,
+                skip=tree_skip_count, maxAllowedValue=tree_max_value
         ))
 
 
