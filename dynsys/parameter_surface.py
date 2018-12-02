@@ -17,8 +17,8 @@ kernel void fill_parameter_surface(
 
 class ParameterSurface(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, colorFunctionSource, typeConfig):
-        super().__init__(ctx, queue, (width, height), bounds.asTuple(),
+    def __init__(self, ctx, queue, imageShape, spaceShape, colorFunctionSource, typeConfig):
+        super().__init__(ctx, queue, imageShape, spaceShape,
                          colorFunctionSource,
                          generateBoundsCode(typeConfig, 2),
                          parameterSurfaceSource,

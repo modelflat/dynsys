@@ -1,8 +1,8 @@
 from dynsys import *
 from dynsys.ui.slider_widgets import createSlider
 
-iterations = 2 ** 15
-skip = iterations // 10 * 9
+iterations = 5 * 10**4
+skip = iterations // 100 * 95
 
 parameter_surface_bounds = Bounds(
     0, .5,
@@ -27,7 +27,9 @@ phase_plot_bounds = (
 )
 
 imageShape = (
-    128, 128, 128
+    128,
+    128,
+    128
 )
 
 system_function_source = """
@@ -49,24 +51,22 @@ T system_fn(T v, real a, real b, real r) {
 """
 
 
-class Task1(SimpleApp):
+class Ressler(SimpleApp):
 
     def __init__(self):
-        super().__init__("Task 1")
+        super().__init__("Ressler")
 
         self.abSurface = self.makeParameterSurface(parameter_surface_bounds, parameter_surface_source)
         self.abSurfaceUi = ParameterizedImageWidget(parameter_surface_bounds.asTuple(), names=("a", "b"), targetColor=Qt.black)
 
         self.attr = self.makePhasePortrait(imageShape, phase_plot_bounds, system_function_source, 3)
-
         self.attr_image = Image3D(phase_plot_bounds)
-        # self.attr_image = Image2D(spaceShape=phase_plot_bounds)
 
         self.rSlider, rSliderUi = createSlider(
             "real", rBounds,
             withLabel="r = {}", labelPosition="top",
             withValue=2.5,
-            connectTo=lambda r: self.draw_phase_plot(*self.abSurfaceUi._imageWidget.targetReal(), r)
+            connectTo=lambda r: self.draw_phase_plot(*self.abSurfaceUi.value(), r)
         )
 
         self.abSurfaceUi.selectionChanged.connect(
@@ -74,15 +74,14 @@ class Task1(SimpleApp):
         )
 
         self.setLayout(
-            hStack(
-                vStack(rSliderUi, self.abSurfaceUi),
-                self.attr_image,
+            vStack(rSliderUi,
+                   hStack(self.abSurfaceUi, self.attr_image)
             )
         )
         self.attr_image.setFixedSize(512, 512)
 
         self.draw_parameter_surface()
-        self.abSurfaceUi._imageWidget.setTargetReal((.25, .155))
+        self.abSurfaceUi.setValue((.25, .155))
         self.draw_phase_plot(.25, .155, 2.5)
 
     def draw_parameter_surface(self):
@@ -92,8 +91,8 @@ class Task1(SimpleApp):
         import time
         t = time.perf_counter()
         self.attr_image.setTexture(self.attr(a, b, r, sparse=8, iterations=iterations, skip=skip))
-        print( "%.3f s" % (time.perf_counter() - t,))
+        self.setWindowTitle("%s | Last draw time: %d ms" % ("Ressler", int(1000*(time.perf_counter() - t))))
 
 
 if __name__ == '__main__':
-    Task1().run()
+    Ressler().run()

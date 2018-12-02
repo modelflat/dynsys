@@ -109,7 +109,7 @@ class SimpleApp(QWidget):
                          paramCount=paramCount, typeConfig=typeConfig)
 
     def makeParameterSurface(self, bounds, colorFunctionSource, width=512, height=512, typeConfig=FLOAT):
-        return ParameterSurface(self.ctx, self.queue, width, height, bounds, colorFunctionSource, typeConfig=typeConfig)
+        return ParameterSurface(self.ctx, self.queue, (width, height), bounds.asTuple(), colorFunctionSource, typeConfig=typeConfig)
 
     def makeCobwebDiagram(self, bounds, carrying_function_source, param_count=1, width=512, height=512, type_config=FLOAT):
         return CobwebDiagram(self.ctx, self.queue, (width, height), bounds.asTuple(), carrying_function_source,

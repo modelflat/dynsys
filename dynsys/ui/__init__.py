@@ -60,9 +60,11 @@ class ParameterizedImageWidget(QWidget):
     def setImage(self, image: numpy.ndarray):
         self._imageWidget.setTexture(image)
 
+    def value(self):
+        return self._imageWidget.targetReal()
+
     def setValue(self, targetValue: tuple):
         self._imageWidget.setTargetReal(targetValue)
+        self.updatePositionLabel(targetValue, (False, False))
 
-    def getTarget(self):
-        raise NotImplementedError()
 

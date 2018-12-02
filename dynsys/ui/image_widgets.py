@@ -3,8 +3,9 @@ import numpy
 
 from PyQt5 import QtCore
 from PyQt5.Qt import QVector3D, QImage, QPixmap, QColor, QPainter, QPen, pyqtSignal as Signal
-from PyQt5.QtDataVisualization import QCustom3DVolume, Q3DScatter, Q3DTheme, Q3DCamera, QAbstract3DGraph
+from PyQt5.QtDataVisualization import QCustom3DVolume, Q3DScatter, Q3DTheme, Q3DCamera, QAbstract3DGraph, Q3DInputHandler
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PyQt5.QtGui import QMouseEvent
 
 
 def toPixmap(data: numpy.ndarray):
@@ -156,28 +157,52 @@ class Image2D(ImageWidget):
         self.repaint()
 
 
+def exchangeLeftAndRightButtonState(event: QMouseEvent) -> QMouseEvent:
+    if event.button() == QtCore.Qt.LeftButton:
+        event = QMouseEvent(event.type(), event.pos(), QtCore.Qt.RightButton, event.buttons(), event.modifiers())
+    elif event.button() == QtCore.Qt.RightButton:
+        event = QMouseEvent(event.type(), event.pos(), QtCore.Qt.LeftButton, event.buttons(), event.modifiers())
+    return event
+
+
+class Custom3DInputHander(Q3DInputHandler):
+
+    def mousePressEvent(self, event, QPoint):
+        super().mousePressEvent(exchangeLeftAndRightButtonState(event), QPoint)
+
+    def mouseReleaseEvent(self, event, QPoint):
+        super().mouseReleaseEvent(exchangeLeftAndRightButtonState(event), QPoint)
+
+    def mouseMoveEvent(self, event: QMouseEvent, QPoint):
+        super().mouseMoveEvent(exchangeLeftAndRightButtonState(event), QPoint)
+
+
 class Image3D(ImageWidget):
 
     def __init__(self,
                  spaceShape: tuple = (-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
-                 segmentShape: tuple = (8, 8, 8)):
+                 segmentShape: tuple = (8, 8, 8),
+                 swapRightAndLeftButtons=True):
         super().__init__()
 
         self._graph = Q3DScatter()
+        if swapRightAndLeftButtons:
+            self._graph.setActiveInputHandler(Custom3DInputHander())
         self._graph.setOrthoProjection(True)
         self._graph.activeTheme().setType(Q3DTheme.ThemeQt)
         self._graph.activeTheme().setBackgroundEnabled(False)
         self._graph.setShadowQuality(QAbstract3DGraph.ShadowQualityNone)
         self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
         self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
+        self._graph.scene().activeCamera().setZoomLevel(180)
         self._graph.axisX().setSegmentCount(segmentShape[0])
         self._graph.axisX().setTitle("X")
         self._graph.axisX().setTitleVisible(True)
         self._graph.axisY().setSegmentCount(segmentShape[1])
-        self._graph.axisY().setTitle("Y")
+        self._graph.axisY().setTitle("Z")
         self._graph.axisY().setTitleVisible(True)
         self._graph.axisZ().setSegmentCount(segmentShape[2])
-        self._graph.axisZ().setTitle("Z")
+        self._graph.axisZ().setTitle("Y")
         self._graph.axisZ().setTitleVisible(True)
         self._graph.setAspectRatio(1)
 
