@@ -111,8 +111,8 @@ COMMONS_3D = r"""
     (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
         (size).y - ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y, \
         ((v).z - (bs).s4)/((bs).s5 - (bs).s4)*(size).z)
-                          
-#define CONVERT_SPACE_TO_COORD_3D(val) convert_int4_rtz((real4)(val.s012, 0.0))
+
+#define CONVERT_SPACE_TO_COORD_3D(val) convert_int4_rtz((real4)(val, 0.0))
 
 #define VALID_POINT_3D(area, point) \
     (point.x >= 0 && point.y >= 0 && point.z >= 0 && point.x < area.x && point.y < area.y && point.z < area.z)

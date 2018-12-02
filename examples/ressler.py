@@ -13,7 +13,7 @@ rBounds = (0, 3)
 parameter_surface_source = """
 #define D 1e-4
 float3 color_for_point(real2 p) {
-    if (fabs(p.x - .25) < .01 && fabs(p.y - 0.15) < .01) {
+    if (fabs(p.x - .25f) < .01 && fabs(p.y - 0.15f) < .01) {
         return (float3)(0, .5, 0);
     }
     return 1.0;

@@ -22,9 +22,7 @@ kernel void draw_phase_plot(
     
     for (int i = skip; i < iterations; ++i) {
         point = user_SYSTEM(point, PARAMETERS);
-        const COORD_TYPE_EXPORT coord = CONVERT_SPACE_TO_COORD(
-            TRANSLATE_BACK_INV_Y(VARIABLE_TYPE, point, bounds, image_bounds)
-        );
+        const COORD_TYPE_EXPORT coord = CONVERT_SPACE_TO_COORD(TRANSLATE_BACK_INV_Y(VARIABLE_TYPE, point, bounds, image_bounds));
         
         if (VALID_POINT(image_bounds, coord)) {
 #ifdef DYNAMIC_COLOR
