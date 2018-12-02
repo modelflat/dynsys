@@ -3,10 +3,9 @@ from json import load
 
 from .cl.core import *
 from .cl.codegen import *
-from .common import *
 from .ui import *
 
-from .phase_portrait import PhasePortrait
+from .phase_plot import PhasePlot
 from .parameter_surface import ParameterSurface
 from .cobweb_diagram import CobwebDiagram
 from .parameter_map import ParameterMap
@@ -104,9 +103,10 @@ class SimpleApp(QWidget):
 
         self.ctx, self.queue = createContextAndQueue(self.config)
 
-    def makePhasePortrait(self, bounds, system_function_source, param_count=2, width=512, height=512, type_config=FLOAT):
-        return PhasePortrait(self.ctx, self.queue, (width, height), bounds, system_function_source,
-                             paramCount=param_count, typeConfig=type_config)
+    def makePhasePortrait(self, imageShape, spaceShape, systemFunction, paramCount, typeConfig=FLOAT):
+        bounds = spaceShape if type(spaceShape) is tuple else spaceShape.asTuple()
+        return PhasePlot(self.ctx, self.queue, imageShape, bounds, systemFunction,
+                         paramCount=paramCount, typeConfig=typeConfig)
 
     def makeParameterSurface(self, bounds, colorFunctionSource, width=512, height=512, typeConfig=FLOAT):
         return ParameterSurface(self.ctx, self.queue, width, height, bounds, colorFunctionSource, typeConfig=typeConfig)

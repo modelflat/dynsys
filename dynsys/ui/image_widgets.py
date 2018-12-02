@@ -149,14 +149,11 @@ class Image2D(ImageWidget):
         return x, y
 
     def setTargetReal(self, targetLocation: tuple) -> None:
-        # x = self._spaceShape[0] + targetLocation[0] / self._textureShape[0] * (self._spaceShape[1] - self._spaceShape[0])
-        # if self._invertY:
-        #     y = self._spaceShape[2] + (self._textureShape[1] - targetLocation[1]) / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
-        # else:
-        #     y = self._spaceShape[2] + targetLocation[1] / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
-        # self._target.setPos((x, y))
+        x, y = targetLocation
+        x = (x - self._spaceShape[0]) / (self._spaceShape[1] - self._spaceShape[0])*self._textureShape[0]
+        y = self._textureShape[1] - (y - self._spaceShape[2]) / (self._spaceShape[3] - self._spaceShape[2])*self._textureShape[1]
+        self._target.setPos((x, y))
         self.repaint()
-        raise NotImplementedError()
 
 
 class Image3D(ImageWidget):
@@ -174,8 +171,14 @@ class Image3D(ImageWidget):
         self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
         self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
         self._graph.axisX().setSegmentCount(segmentShape[0])
+        self._graph.axisX().setTitle("X")
+        self._graph.axisX().setTitleVisible(True)
         self._graph.axisY().setSegmentCount(segmentShape[1])
+        self._graph.axisY().setTitle("Y")
+        self._graph.axisY().setTitleVisible(True)
         self._graph.axisZ().setSegmentCount(segmentShape[2])
+        self._graph.axisZ().setTitle("Z")
+        self._graph.axisZ().setTitleVisible(True)
         self._graph.setAspectRatio(1)
 
         self._volume = QCustom3DVolume()

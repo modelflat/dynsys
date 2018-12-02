@@ -6,10 +6,10 @@ from .cl.codegen import *
 
 parameterSurfaceSource = """
 kernel void fill_parameter_surface(
-    const BOUNDS, write_only image2d_t result
+    const BOUNDS_2D bounds, write_only image2d_t result
 ) {    
     const int2 id = ID_2D;
-    const real2 v = TRANSLATE_2D(real2, id, SIZE_2D, _DS_bs);
+    const real2 v = TRANSLATE_2D(real2, id, SIZE_2D, bounds);
     write_imagef(result, (int2)(id.x, get_global_size(1) - id.y), (float4)(color_for_point(v), 1.0));
 }
 """

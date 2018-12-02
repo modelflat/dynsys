@@ -29,11 +29,11 @@ class Task2(SimpleApp):
         super().__init__("Task 2")
 
         self.cobweb_diagram = self.makeCobwebDiagram(cobweb_bounds, map_function_source)
-        self.cobweb_diagram_image = ParametrizedImageWidget(cobweb_bounds, shape=(False, False))
+        self.cobweb_diagram_image = ParameterizedImageWidget(cobweb_bounds, shape=(False, False))
 
         self.bifurcation_tree = self.makeBifurcationTree(map_function_source)
-        self.bifurcation_tree_image = ParametrizedImageWidget(lambda_bounds, names=("lambda", ""),
-                                                              shape=(True, False))
+        self.bifurcation_tree_image = ParameterizedImageWidget(lambda_bounds, names=("lambda", ""),
+                                                               shape=(True, False))
 
         self.p_lambda = \
             ObservableValue.makeAndConnect(2.5, connect_to=self.draw_diag)
@@ -59,13 +59,13 @@ class Task2(SimpleApp):
         )
 
     def draw_diag(self, *args):
-        self.cobweb_diagram_image.set_image(self.cobweb_diagram(
+        self.cobweb_diagram_image.setImage(self.cobweb_diagram(
             self.x0.value(), self.p_lambda.value(),
             iterations=self.iter_count.value(), skip=skip_count
         ))
 
     def draw_tree(self, *args):
-        self.bifurcation_tree_image.set_image(
+        self.bifurcation_tree_image.setImage(
             self.bifurcation_tree(
                 self.x0.value(), tree_samples_count,
                 (lambda_bounds.x_min, lambda_bounds.x_max),

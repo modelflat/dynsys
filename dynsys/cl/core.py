@@ -61,9 +61,13 @@ class TypeConfig:
 
     def __init__(self, realType, varType=None, paramType=None, boundsType=None):
         self.realType = realType
-        self.varType = TypeConfig.TYPES[paramType] if varType is not None else TypeConfig.TYPES[realType]
-        self.paramType = TypeConfig.TYPES[paramType] if paramType is not None else TypeConfig.TYPES[realType]
-        self.boundsType = TypeConfig.TYPES[boundsType] if boundsType is not None else TypeConfig.TYPES[realType]
+        self.realTypeName = TypeConfig.TYPES[self.realType]
+        self.varType = varType if varType is not None else realType
+        self.varTypeName = TypeConfig.TYPES[self.varType]
+        self.paramType = paramType if paramType is not None else realType
+        self.paramTypeName = TypeConfig.TYPES[self.paramType]
+        self.boundsType = boundsType if boundsType is not None else realType
+        self.boundsTypeName = TypeConfig.TYPES[self.boundsType]
 
     def real(self, arg=None):
         return self.realType(arg) if arg is not None else self.realType
@@ -95,16 +99,6 @@ FLOAT =  TypeConfig(numpy.float32)
 DOUBLE = TypeConfig(numpy.float64)
 
 
-def wrapParameterArgs(total_params, params, type, active_idx=None):
-    if total_params < len(params):
-        params = params[:total_params] # todo raise warning?
-    if total_params == len(params):
-        return list(map(type, params))
-    if total_params - 1 == len(params) and active_idx is not None:
-        return list(map(type, params[:active_idx])) + [type(0.0),] + list(map(type, params[active_idx+1:]))
-    raise ValueError("Out of %d arguments, only %d were provided." % (total_params, len(params)))
-
-
 class ComputedImage:
 
     def __init__(self, ctx: cl.Context, queue: cl.CommandQueue,
@@ -117,6 +111,22 @@ class ComputedImage:
         self.hostImage, self.deviceImage = allocateImage(ctx, imageShape)
         src = makeSource(*sources, typeConfig=typeConfig)
         self.program = cl.Program(ctx, src).build(["-DDIM={}".format(len(imageShape))])
+
+    def wrapArgs(self, requiredArgCount, *args, skipIndex=None):
+        if requiredArgCount < len(args):
+            args = args[:args]
+            raise RuntimeWarning(
+                "wrapArgs: {} arguments is required, but {} supplied. Taking first {} to process".format(
+                    requiredArgCount, len(args), requiredArgCount
+                ))
+        if requiredArgCount == len(args):
+            return list(map(self.tc.realType, args))
+        if requiredArgCount - 1 == len(args) and skipIndex is not None:
+            return list(map(self.tc.realType, args[:skipIndex])) \
+                   + [self.tc.realType(0.0),] \
+                   + list(map(self.tc.realType, args[skipIndex+1:]))
+        # not enough args
+        raise ValueError("Out of %d arguments, only %d were provided." % (requiredArgCount, len(args)))
 
     def clear(self, readBack=False, color=(1.0, 1.0, 1.0, 1.0)):
         cl.enqueue_fill_image(

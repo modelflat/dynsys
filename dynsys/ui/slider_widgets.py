@@ -1,52 +1,84 @@
-from PyQt5 import Qt, QtCore
-from PyQt5.Qt import QSlider, pyqtSignal as Signal
+from typing import Union, Iterable, Callable
+
+from PyQt5.Qt import pyqtSignal as Signal
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QLayout, QLabel, QSlider
 
 
 class RealSlider(QSlider):
     valueChanged = Signal(float)
 
-    def __init__(self, min_val, max_val, steps=10000, horizontal=True):
+    def __init__(self, bounds: tuple, horizontal=True, steps=10000):
         super().__init__()
-        self.steps = steps
-        self.min_val = min_val
-        self.max_val = max_val
-        self.setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
+        self._steps = steps
+        self._bounds = bounds
+        self.setOrientation(Qt.Vertical if not horizontal else Qt.Horizontal)
         self.setMinimum(0)
-        self.setMaximum(self.steps)
-        self.valueChanged.connect(self._value_changed)
+        self.setMaximum(self._steps)
 
-    @QtCore.pyqtSlot(float, name="_value_changed")
-    def _value_changed(self, _):
-        self.valueChanged.emit(self.value())
+        super().valueChanged.connect(lambda _: self.valueChanged.emit(self.value()))
 
-    def set_value(self, v):
-        super().setValue(int((v - self.min_val) / (self.max_val - self.min_val) * self.steps))
+    def setValue(self, v):
+        super().setValue(int((v - self._bounds[0]) / (self._bounds[1] - self._bounds[0]) * self._steps))
 
     def value(self):
-        return float(super().value()) / self.steps * (self.max_val - self.min_val) + self.min_val
-
-    @staticmethod
-    def makeAndConnect(min_val, max_val, current_val=None, steps=10000,
-                       horizontal=True, connect_to=None):
-        s = RealSlider(min_val, max_val, steps=steps, horizontal=horizontal)
-        if connect_to is not None:
-            s.valueChanged.connect(connect_to)
-        s.set_value(current_val if current_val is not None else min_val)
-        return s
+        return float(super().value()) / self._steps * (self._bounds[1] - self._bounds[0]) + self._bounds[0]
 
 
 class IntegerSlider(QSlider):
 
-    def __init__(self, min_val, max_val, horizontal=True):
+    def __init__(self, bounds: tuple, horizontal=True):
         super().__init__()
-        self.setOrientation(QtCore.Qt.Vertical if not horizontal else QtCore.Qt.Horizontal)
-        self.setMinimum(min_val)
-        self.setMaximum(max_val)
+        self.setOrientation(Qt.Vertical if not horizontal else Qt.Horizontal)
+        self.setMinimum(bounds[0])
+        self.setMaximum(bounds[1])
 
-    @staticmethod
-    def makeAndConnect(min_val, max_val, current_val=None, horizontal=True, connect_to=None):
-        s = IntegerSlider(min_val, max_val, horizontal=horizontal)
-        if connect_to is not None:
-            s.valueChanged.connect(connect_to)
-        s.setValue(current_val if current_val is not None else min_val)
-        return s
+
+def createSlider(sliderType: str, bounds: tuple,
+                 horizontal: bool = True,
+                 withLabel: str = None, labelPosition: str = "left",
+                 withValue: Union[float, int, None] = None,
+                 connectTo: Union[Iterable, Callable, None] = None,
+                 putToLayout: QLayout = None
+                 ) -> tuple:
+    sliderType = sliderType.lower()
+    if   sliderType in { "real", "r", "float" }:
+        slider = RealSlider(bounds, horizontal)
+    elif sliderType in { "int", "integer", "i", "d" }:
+        slider = IntegerSlider(bounds, horizontal)
+    else:
+        raise ValueError("Unknown slider type: {}".format(sliderType))
+    if withValue is not None:
+        slider.setValue(withValue)
+
+    layout = None
+    if withLabel is not None:
+        positions = { "left", "top" }
+        if labelPosition not in positions:
+            raise ValueError("Label position must be one of: {}".format(positions))
+        supportsValues = True
+        try:
+            withLabel.format(0.42)
+        except:
+            supportsValues = False
+        label = QLabel(withLabel)
+
+        if supportsValues:
+            setVal = lambda val: label.setText(withLabel.format(val))
+            setVal(withValue)
+            slider.valueChanged.connect(setVal)
+
+        if putToLayout is None:
+            layout = (QHBoxLayout if labelPosition == "left" else QVBoxLayout)()
+        else:
+            layout = putToLayout
+        layout.addWidget(label)
+        layout.addWidget(slider)
+
+    if connectTo is not None:
+        if isinstance(connectTo, Iterable):
+            [slider.valueChanged.connect(fn) for fn in connectTo]
+        else:
+            slider.valueChanged.connect(connectTo)
+
+    return slider, slider if layout is None else layout

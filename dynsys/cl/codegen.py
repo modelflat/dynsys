@@ -13,10 +13,10 @@ PARAMETER_TEMPLATE = r"""
 """
 
 BOUNDS_TEMPLATE = r"""
-#define BOUNDS_VAR _DS_bs
+#define BOUNDS_VAR _DS_bs 
 #define BOUNDS_1D {}2 
 #define BOUNDS_2D {}4
-#define BOUNDS_3D {}6
+#define BOUNDS_3D {}8
 
 #if   (DIM == 1)
 #define BOUNDS BOUNDS_1D
@@ -29,13 +29,10 @@ BOUNDS_TEMPLATE = r"""
 
 IMAGE_BOUNDS_TEMPLATE = r"""
 #define IMAGE_BOUNDS_VAR _DS_ibs
-#define IMAGE_BOUNDS_1D int2
-#define IMAGE_BOUNDS_2D int4
-#define IMAGE_BOUNDS_3D int6
+#define IMAGE_BOUNDS_2D int2
+#define IMAGE_BOUNDS_3D int4
 
-#if   (DIM == 1)
-#define IMAGE_BOUNDS IMAGE_BOUNDS_1D
-#elif (DIM == 2)
+#if   (DIM == 2)
 #define IMAGE_BOUNDS IMAGE_BOUNDS_2D
 #elif (DIM == 3)
 #define IMAGE_BOUNDS IMAGE_BOUNDS_3D
@@ -74,12 +71,14 @@ COMMONS_2D = r"""
     (T)((bs).s0 + (id).x*((bs).s1 - (bs).s0)/(size).x, (bs).s2 + ((size).y - (id).y)*((bs).s3 - (bs).s2)/((size).y))
 
 #define TRANSLATE_BACK_2D(T, v, bs, size) \
-    convert_int2_rtz( (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
-                         ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y ))
+    (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
+        ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y )
 
 #define TRANSLATE_BACK_INV_Y_2D(T, v, bs, size) \
-    convert_int2_rtz( (T) ( ((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
-                            (size).y - ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y ))
+    (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
+        (size).y - ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y )
+        
+#define CONVERT_SPACE_TO_COORD_2D(val) convert_int2_rtz(val)
 
 #define VALID_POINT_2D(area, point) \
     (point.x >= 0 && point.y >= 0 && point.x < area.x && point.y < area.y)
@@ -92,6 +91,32 @@ COMMONS_3D = r"""
 #define ID_Y_INV_3D (int3)(get_global_id(0), get_global_size(1) - get_global_id(1), get_global_id(2))
 
 #define SIZE_3D (int3)(get_global_size(0), get_global_size(1), get_global_size(2))
+
+#define TRANSLATE_3D(T, id, size, bs) \
+    (T)((bs).s0 + (id).x*((bs).s1 - (bs).s0)/(size).x, \
+        (bs).s2 + (id).y*((bs).s3 - (bs).s2)/(size).y, \
+        (bs).s4 + (id).z*((bs).s5 - (bs).s4)/(size).z )
+
+#define TRANSLATE_INV_Y_3D(T, id, size, bs) \
+    (T)((bs).s0 + (id).x*((bs).s1 - (bs).s0)/(size).x,\
+        (bs).s2 + ((size).y - (id).y)*((bs).s3 - (bs).s2)/((size).y), \
+        (bs).s4 + (id).z*((bs).s5 - (bs).s4)/(size).z )
+
+#define TRANSLATE_BACK_3D(T, v, bs, size) \
+    (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
+        ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y, \
+        ((v).z - (bs).s4)/((bs).s5 - (bs).s4)*(size).z)
+
+#define TRANSLATE_BACK_INV_Y_3D(T, v, bs, size) \
+    (T)(((v).x - (bs).s0)/((bs).s1 - (bs).s0)*(size).x, \
+        (size).y - ((v).y - (bs).s2)/((bs).s3 - (bs).s2)*(size).y, \
+        ((v).z - (bs).s4)/((bs).s5 - (bs).s4)*(size).z)
+                          
+#define CONVERT_SPACE_TO_COORD_3D(val) convert_int4_rtz((real4)(val.s012, 0.0))
+
+#define VALID_POINT_3D(area, point) \
+    (point.x >= 0 && point.y >= 0 && point.z >= 0 && point.x < area.x && point.y < area.y && point.z < area.z)
+
 
 """
 
@@ -109,6 +134,7 @@ COMMON_SOURCE = COMMONS_1D + COMMONS_2D + COMMONS_3D + r"""
 #elif (DIM == 2)
 
 #define COORD_TYPE int2
+#define COORD_TYPE_EXPORT COORD_TYPE
 #define IMAGE_TYPE image2d_t
 
 #define ID ID_2D
@@ -116,6 +142,10 @@ COMMON_SOURCE = COMMONS_1D + COMMONS_2D + COMMONS_3D + r"""
 #define SIZE SIZE_2D
 
 #elif (DIM == 3)
+
+#define COORD_TYPE int3
+#define COORD_TYPE_EXPORT int4
+#define IMAGE_TYPE image3d_t
 
 #define ID ID_3D
 #define ID_Y_INV ID_Y_INV_3D
@@ -126,28 +156,43 @@ COMMON_SOURCE = COMMONS_1D + COMMONS_2D + COMMONS_3D + r"""
 #if   (DIM == 2)
 #define TRANSLATE TRANSLATE_2D
 #elif (DIM == 3)
-#error TRANSLATE
+#define TRANSLATE TRANSLATE_3D
 #endif
 
 #if   (DIM == 2)
 #define TRANSLATE_INV_Y TRANSLATE_INV_Y_2D
 #elif (DIM == 3)
-#error TRANSLATE_INV_Y
+#define TRANSLATE_INV_Y TRANSLATE_INV_Y_3D
 #endif
 
 #if   (DIM == 2)
 #define TRANSLATE_BACK TRANSLATE_BACK_2D
 #elif (DIM == 3)
-#error TRANSLATE_BACK
+#define TRANSLATE_BACK TRANSLATE_BACK_3D
 #endif
 
 #if   (DIM == 2)
 #define TRANSLATE_BACK_INV_Y TRANSLATE_BACK_INV_Y_2D
 #elif (DIM == 3)
-#error TRANSLATE_BACK_INV_Y
+#define TRANSLATE_BACK_INV_Y TRANSLATE_BACK_INV_Y_3D
 #endif
 
+#if   (DIM == 2)
+#define VALID_POINT VALID_POINT_2D
+#elif (DIM == 3)
+#define VALID_POINT VALID_POINT_3D
+#endif
+
+#if   (DIM == 2)
+#define CONVERT_SPACE_TO_COORD CONVERT_SPACE_TO_COORD_2D
+#elif (DIM == 3)
+#define CONVERT_SPACE_TO_COORD CONVERT_SPACE_TO_COORD_3D
+#endif
+
+
 #define NEAR(a, b, abs_error) (fabs((a) - (b)) < (abs_error))
+
+#define DEFAULT_ENTITY_COLOR (float4)(0.0, 0.0, 0.0, 1.0) // black
 
 float3 hsv2rgb(float3);
 
@@ -180,7 +225,7 @@ def generateParameterCode(typeConfig, paramCount: int) -> str:
         # sanity check
         raise ValueError("Supported dimensions are 1-8 (%d requested)" % (paramCount,))
     names = [PARAMETER_NAME % (i,) for i in range(paramCount)]
-    paramType = typeConfig.paramType
+    paramType = typeConfig.paramTypeName
     values = ", ".join(names)
     signatures = ", ".join([paramType + " " + name for name in names])
     setter = "{\\\n\t" + "; \\\n\t".join([
@@ -193,14 +238,14 @@ def generateVariableCode(typeConfig, varCount: int) -> str:
     if varCount > 3:
         # sanity check
         raise ValueError("Supported dimensions are 1-3 (%d requested)" % (varCount,))
-    return VARIABLE_TEMPLATE.format(typeConfig.varType + "{}".format(varCount if varCount > 1 else ""))
+    return VARIABLE_TEMPLATE.format(typeConfig.varTypeName + "{}".format(varCount if varCount > 1 else ""))
 
 
 def generateBoundsCode(typeConfig, dims: int) -> str:
     if dims > 3 or dims < 1:
         # sanity check
         raise ValueError("Supported dimensions for bounds are 1, 2 and 3 (%d requested)" % (dims,))
-    return BOUNDS_TEMPLATE.format([typeConfig.boundsType]*3)
+    return BOUNDS_TEMPLATE.format(*[typeConfig.boundsTypeName, ]*3)
 
 
 def generateImageBoundsCode(dims: int) -> str:

@@ -10,12 +10,12 @@ attractor_bounds = Bounds(
     -3, 3
 )
 
-iter_count = 2 ** 15
-draw_count = iter_count  # 16
+iterations = 2 ** 15
+skip = 0
 
 system_function_source = """
 #define STEP (real)(4e-4)
-real2 system(real2 v, real m, real b) {
+real2 system_fn(real2 v, real m, real b) {
     real2 p = (real2)(
         (1 + b*v.x - v.x*v.x)*v.x - v.x*v.y,
         v.y*(v.x - m)
@@ -48,13 +48,14 @@ class Task4(SimpleApp):
         super().__init__("Task 4")
 
         self.parameter_surface = self.makeParameterSurface(parameter_map_bounds, parameter_surface_color_function)
-        self.parameter_surface_image = ParametrizedImageWidget(parameter_map_bounds, names=("b", "m"),
-                                                               crosshair_color=QtCore.Qt.white)
+        self.parameter_surface_image = ParameterizedImageWidget(parameter_map_bounds.asTuple(), names=("b", "m"),
+                                                                targetColor=Qt.white)
 
-        self.attractor = self.makePhasePortrait(attractor_bounds, system_function_source)
-        self.attractor_image = ParametrizedImageWidget(attractor_bounds, shape=(False, False))
+        self.attractor = self.makePhasePortrait((512, 512),attractor_bounds.asTuple(), system_function_source, 2)
+        self.attractor_image = ParameterizedImageWidget(attractor_bounds.asTuple(), shape=(False, False))
 
-        self.parameter_surface_image.selectionChanged.connect(self.draw_attractor)
+        self.parameter_surface_image.selectionChanged.connect(
+            lambda val, _: self.draw_attractor(*val))
 
         self.setLayout(
             hStack(
@@ -66,12 +67,12 @@ class Task4(SimpleApp):
         self.draw_attractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
 
     def draw_attractor(self, a, b):
-        self.attractor_image.set_image(self.attractor(
-            iter_count, a, b, draw_last_points=draw_count
+        self.attractor_image.setImage(self.attractor(
+            a, b, iterations=iterations, skip=skip
         ))
 
     def draw_pararameter_surface(self):
-        self.parameter_surface_image.set_image(self.parameter_surface())
+        self.parameter_surface_image.setImage(self.parameter_surface())
 
 
 

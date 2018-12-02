@@ -42,17 +42,17 @@ class Task7(SimpleApp):
 
         self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source,
                                                    var_count=2)
-        self.parameter_map_image = ParametrizedImageWidget(parameter_map_bounds, names=["lam", "A"],
-                                                           crosshair_color=QtCore.Qt.white)
+        self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=["lam", "A"],
+                                                            targetColor=QtCore.Qt.white)
 
         self.parameter_map_zoomed = self.makeParameterMap(parameter_map_bounds_zoomed, map_function_source,
                                                           width=512, height=512,
                                                           var_count=2)
-        self.parameter_map_zoomed_image = ParametrizedImageWidget(parameter_map_bounds_zoomed, names=["lam", "A"],
-                                                                  crosshair_color=QtCore.Qt.white)
+        self.parameter_map_zoomed_image = ParameterizedImageWidget(parameter_map_bounds_zoomed, names=["lam", "A"],
+                                                                   targetColor=QtCore.Qt.white)
 
         self.attractor = self.makePhasePortrait(attractor_bounds, map_function_source)
-        self.attractor_image = ParametrizedImageWidget(attractor_bounds)
+        self.attractor_image = ParameterizedImageWidget(attractor_bounds)
 
         self.parameter_map_image.selectionChanged.connect(self.draw_attractor)
         self.parameter_map_zoomed_image.selectionChanged.connect(self.draw_attractor)
@@ -69,17 +69,17 @@ class Task7(SimpleApp):
         self.draw_parameter_map_zoomed()
 
     def draw_parameter_map(self):
-        self.parameter_map_image.set_image(self.parameter_map(
+        self.parameter_map_image.setImage(self.parameter_map(
             80, 512, x0, y0
         ))
 
     def draw_parameter_map_zoomed(self):
-        self.parameter_map_zoomed_image.set_image(self.parameter_map_zoomed(
+        self.parameter_map_zoomed_image.setImage(self.parameter_map_zoomed(
             80, 512, x0, y0
         ))
 
     def draw_attractor(self, A, lam):
-        self.attractor_image.set_image(self.attractor(
+        self.attractor_image.setImage(self.attractor(
             iter_count, A, lam, draw_last_points=draw_last
         ))
 

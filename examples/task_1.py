@@ -25,14 +25,14 @@ phase_plot_bounds = Bounds(
 
 system_function_source = """
 #define STEP (real)(1e-4)
-real2 system(real2 v, real lam, real k) {
+real2 system_fn(real2 v, real lam, real k) {
     real2 p = (real2)(
         (lam + k*v.x*v.x - v.x*v.x*v.x*v.x)*v.y - v.x,
         v.x
     );
     return v + STEP*p;
 }
-#define DYNAMIC_COLOR
+// #define DYNAMIC_COLOR
 """
 
 
@@ -42,13 +42,14 @@ class Task1(SimpleApp):
         super().__init__("Task 1")
 
         self.param_surface = self.makeParameterSurface(parameter_surface_bounds, parameter_surface_source)
-        self.param_surface_image = ParametrizedImageWidget(parameter_surface_bounds, names=("lam", "k"),
-                                                           crosshair_color=QtCore.Qt.black)
+        self.param_surface_image = ParameterizedImageWidget(parameter_surface_bounds.asTuple(), names=("lam", "k"),
+                                                            targetColor=Qt.black)
 
-        self.attr = self.makePhasePortrait(phase_plot_bounds, system_function_source)
-        self.attr_image = ParametrizedImageWidget(phase_plot_bounds, shape=(True, False))
+        self.attr = self.makePhasePortrait((512, 512), phase_plot_bounds, system_function_source, 2)
+        self.attr_image = ParameterizedImageWidget(phase_plot_bounds.asTuple(), shape=(True, False))
 
-        self.param_surface_image.selectionChanged.connect(self.draw_phase_plot)
+        self.param_surface_image.selectionChanged.connect(
+            lambda val, _: self.draw_phase_plot(*val))
 
         self.setLayout(
             hStack(
@@ -60,10 +61,10 @@ class Task1(SimpleApp):
         self.draw_phase_plot(1., 1.)
 
     def draw_parameter_surface(self):
-        self.param_surface_image.set_image(self.param_surface())
+        self.param_surface_image.setImage(self.param_surface())
 
     def draw_phase_plot(self, lam, k):
-        self.attr_image.set_image(self.attr(lam, k, iterations=iter_count, skip=skip))
+        self.attr_image.setImage(self.attr(lam, k, iterations=iter_count, skip=skip))
 
 
 if __name__ == '__main__':

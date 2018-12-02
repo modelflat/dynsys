@@ -44,24 +44,24 @@ class Task6(SimpleApp):
         super().__init__("Task 6")
 
         self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source, var_count=2)
-        self.parameter_map_image = ParametrizedImageWidget(parameter_map_bounds, names=("lam1", "lam2"),
-                                                           crosshair_color=QtCore.Qt.white)
+        self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=("lam1", "lam2"),
+                                                            targetColor=QtCore.Qt.white)
 
         self.phase_plot = self.makePhasePortrait(attractor_bounds, map_function_source, width=sub_w, height=sub_h)
-        self.phase_plot_image = ParametrizedImageWidget(attractor_bounds)
+        self.phase_plot_image = ParameterizedImageWidget(attractor_bounds)
 
         self.basins_of_attraction = self.makeBasinsOfAttraction(attractor_bounds, map_function_source, width=sub_w, height=sub_h)
-        self.basins_of_attraction_image = ParametrizedImageWidget(attractor_bounds, crosshair_color=QtCore.Qt.gray)
+        self.basins_of_attraction_image = ParameterizedImageWidget(attractor_bounds, targetColor=QtCore.Qt.gray)
 
         self.basins_label = Qt.QLabel()
 
         def attr_to_phase(x, y):
-            a, b =  self.parameter_map_image.get_selection()
+            a, b =  self.parameter_map_image.getTarget()
             x_attr, y_attr = self.basins_of_attraction.find_attraction(x, y, iter_count, a, b)
             if isnan(x_attr) or isnan(y_attr):
-                self.phase_plot_image.set_crosshair_pos(-1, -1)
+                self.phase_plot_image.setTarget(-1, -1)
             else:
-                self.phase_plot_image.set_crosshair_pos(
+                self.phase_plot_image.setTarget(
                     *attractor_bounds.to_integer(x_attr, y_attr, sub_w, sub_h, invert_y=True))
 
         self.basins_of_attraction_image.selectionChanged.connect(attr_to_phase)
@@ -84,16 +84,16 @@ class Task6(SimpleApp):
 
     def draw_basins(self, a, b):
         img, count = self.basins_of_attraction(iter_count, a, b)
-        self.basins_of_attraction_image.set_image(img)
+        self.basins_of_attraction_image.setImage(img)
         self.basins_label.setText("Attractors found: " + str(count))
 
     def draw_phase_plot(self, a, b):
-        self.phase_plot_image.set_image(self.phase_plot(
+        self.phase_plot_image.setImage(self.phase_plot(
             iter_count, a, b, draw_last_points=draw_count
         ))
 
     def draw_parameter_map(self):
-        self.parameter_map_image.set_image(self.parameter_map(
+        self.parameter_map_image.setImage(self.parameter_map(
             80, 512, x0, y0
         ))
 
