@@ -1,7 +1,7 @@
-from .cl.core import *
-from .cl.codegen import *
+import numpy
+import pyopencl as cl
 
-import numpy as np
+from .cl import ComputedImage, generateParameterCode
 
 
 basins_of_attraction_source = """
@@ -125,12 +125,15 @@ kernel void find_attraction(
 
 class BasinsOfAttraction(ComputedImage):
 
-    def __init__(self, ctx, queue, width, height, bounds, system_function_source, param_count=2, type_config=FLOAT):
-        super().__init__(ctx, queue, width, height, bounds, system_function_source,
-                         generateParameterCode(param_count),
+    def __init__(self, ctx, queue, imageShape, spaceShape, systemFunction, paramCount, typeConfig):
+        super().__init__(ctx, queue, imageShape, spaceShape,
+                         # sources
+                         systemFunction,
+                         generateParameterCode(typeConfig, paramCount),
                          basins_of_attraction_source,
-                         type_config=type_config)
-        self.param_count = param_count
+                         #
+                         typeConfig=typeConfig)
+        self.param_count = paramCount
         self._find_attr_kernel = self.program.find_attraction
         self.num_basins = 0
 
@@ -139,16 +142,16 @@ class BasinsOfAttraction(ComputedImage):
 
         result_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, real_size*2)
 
-        pl = wrapParameterArgs(self.param_count, params, real)
+        pl = self.wrapArgs(self.param_count, *params)
 
         self._find_attr_kernel.set_args(
             real(x), real(y), *pl,
-            np.int32(iter_count),
+            numpy.int32(iter_count),
             result_device
         )
         cl.enqueue_task(self.queue, self._find_attr_kernel)
 
-        result = np.empty((2,), dtype=real)
+        result = numpy.empty((2,), dtype=real)
 
         cl.enqueue_copy(self.queue, result, result_device)
 
@@ -159,7 +162,7 @@ class BasinsOfAttraction(ComputedImage):
         bounds = self.bounds
         real, real_size = self.tc()
 
-        pl = wrapParameterArgs(self.param_count, params, real)
+        pl = self.wrapArgs(self.param_count, params)
 
         result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=self.width*self.height*2*real_size)
 
@@ -167,14 +170,14 @@ class BasinsOfAttraction(ComputedImage):
             self.queue, (self.width, self.height), None,
             real(bounds.x_min), real(bounds.x_max), real(bounds.y_min), real(bounds.y_max),
             *pl,
-            np.int32(iter_count), result_device
+            numpy.int32(iter_count), result_device
         )
 
-        result = np.empty(shape=(self.width*self.height, 2), order="C", dtype=real)
+        result = numpy.empty(shape=(self.width * self.height, 2), order="C", dtype=real)
 
         cl.enqueue_copy(self.queue, result, result_device)
 
-        result_unique = np.unique(result, axis=0)
+        result_unique = numpy.unique(result, axis=0)
 
         self.num_basins = len(result_unique) - 1 # except trivial solution
 
@@ -184,7 +187,7 @@ class BasinsOfAttraction(ComputedImage):
 
         self.program.draw_attraction_map(
             self.queue, (self.width, self.height), None,
-            np.int32(len(result_unique)),
+            numpy.int32(len(result_unique)),
             result_unique_device, result_device, self.deviceImage
         )
 

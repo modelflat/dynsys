@@ -1,62 +1,18 @@
 import sys
-from json import load
 
-from .cl.core import *
-from .cl.codegen import *
-from .ui import *
-
-from .phase_plot import PhasePlot
-from .parameter_surface import ParameterSurface
-from .cobweb_diagram import CobwebDiagram
-from .parameter_map import ParameterMap
-from .bifurcation_tree import BifurcationTree
-from .basins_of_attraction import BasinsOfAttraction
+from typing import Union
 
 from PyQt5.Qt import QWidget, QApplication
-
-import numpy as np
-import pyopencl as cl
-
 from PyQt5.Qt import QObject, pyqtSignal as Signal
 
-
-class Bounds:
-
-    def __init__(self, x_min, x_max, y_min, y_max):
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
-
-    def clamp_x(self, v):
-        return np.clip(v, self.x_min, self.x_max)
-
-    def from_integer_x(self, v, v_max):
-        return self.x_min + v / v_max * (self.x_max - self.x_min)
-
-    def clamp_y(self, v):
-        return np.clip(v, self.y_min, self.y_max)
-
-    def from_integer_y(self, v, v_max, invert=True):
-        return self.y_min + ((v_max - v) if invert else v)/ v_max * (self.y_max - self.y_min)
-
-    def to_integer(self, x, y, w, h, invert_y=True):
-        y_val = int((y - self.y_min) / (self.y_max - self.y_min) * h)
-        return (
-            int((x - self.x_min) / (self.x_max - self.x_min) * w),
-            y_val if not invert_y else h - y_val
-        )
-
-    def asTuple(self):
-        return self.x_min, self.x_max, self.y_min, self.y_max
-
-    @staticmethod
-    def x(x_min, x_max):
-        return Bounds(x_min, x_max, None, None)
-
-    @staticmethod
-    def y(y_min, y_max):
-        return Bounds(None, None, y_min, y_max)
+from .cl import *
+from .ui import *
+from .PhasePlot import PhasePlot
+from .ParameterSurface import ParameterSurface
+from .CobwebDiagram import CobwebDiagram
+from .ParameterMap import ParameterMap
+from .BifurcationTree import BifurcationTree
+from .BasinsOfAttraction import BasinsOfAttraction
 
 
 class ObservableValue(QObject):
@@ -85,6 +41,7 @@ class ObservableValue(QObject):
 class SimpleApp(QWidget):
 
     def __init__(self, title):
+        import json
         self.app = QApplication(sys.argv)
         super().__init__(parent=None)
         self.setWindowTitle(title)
@@ -95,7 +52,7 @@ class SimpleApp(QWidget):
             print("Loading config from file: ", self.configFile)
             try:
                 with open(self.configFile) as f:
-                    self.config = load(f)
+                    self.config = json.load(f)
             except Exception as e:
                 raise RuntimeWarning("Cannot load configuration from file %s: %s" % (self.configFile, str(e)))
             else:
@@ -103,33 +60,108 @@ class SimpleApp(QWidget):
 
         self.ctx, self.queue = createContextAndQueue(self.config)
 
-    def makePhasePortrait(self, imageShape, spaceShape, systemFunction, paramCount, typeConfig=FLOAT):
-        bounds = spaceShape if type(spaceShape) is tuple else spaceShape.asTuple()
-        return PhasePlot(self.ctx, self.queue, imageShape, bounds, systemFunction,
-                         paramCount=paramCount, typeConfig=typeConfig)
+    def _convertBounds(self, bounds):
+        return bounds.asTuple() if type(bounds) is Bounds else bounds
 
-    def makeParameterSurface(self, bounds, colorFunctionSource, width=512, height=512, typeConfig=FLOAT):
-        return ParameterSurface(self.ctx, self.queue, (width, height), bounds.asTuple(), colorFunctionSource, typeConfig=typeConfig)
-
-    def makeCobwebDiagram(self, bounds, carrying_function_source, param_count=1, width=512, height=512, type_config=FLOAT):
-        return CobwebDiagram(self.ctx, self.queue, (width, height), bounds.asTuple(), carrying_function_source,
-                             paramCount=param_count, typeConfig=type_config)
-
-    def makeParameterMap(self, bounds, map_function_source, var_count=1, width=512, height=512, type_config=FLOAT):
-        return ParameterMap(
-            self.ctx, self.queue, (width, height), bounds.asTuple(),
-            map_function_source,
-            varCount=var_count,
-            typeConfig=type_config
+    def makePhasePlot(self, source: str, paramCount: int,
+                      spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
+                      imageShape: tuple = (512, 512),
+                      backColor: tuple = (1.0, 1.0, 1.0, 1.0),
+                      typeConfig: TypeConfig = FLOAT,
+                      withUi: bool = True,
+                      uiNames: tuple = ("x", "y"),
+                      uiShape: tuple = (False, False),
+                      uiTargetColor: QColor = Qt.red
+                      ):
+        bounds = self._convertBounds(spaceShape)
+        plot = PhasePlot(
+            self.ctx, self.queue, imageShape, bounds, source,
+            paramCount=paramCount, backColor=backColor, typeConfig=typeConfig
         )
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return plot if ui is None else (plot, ui)
 
-    def makeBifurcationTree(self, map_function_source, param_count=1, width=512, height=512, type_config=FLOAT):
-        return BifurcationTree(self.ctx, self.queue, (width, height), map_function_source,
-                               paramCount=param_count, typeConfig=type_config)
+    def makeParameterSurface(self, source: str,
+                             spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
+                             imageShape: tuple = (512, 512),
+                             typeConfig: TypeConfig = FLOAT,
+                             withUi: bool = True,
+                             uiNames: tuple = None,
+                             uiShape: tuple = None,
+                             uiTargetColor: QColor = Qt.red
+                             ):
+        bounds = self._convertBounds(spaceShape)
+        surf = ParameterSurface(self.ctx, self.queue, imageShape, bounds, source, typeConfig=typeConfig)
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return surf if ui is None else (surf, ui)
 
-    def makeBasinsOfAttraction(self, bounds, system_function_source, width=512, height=512, param_count=2, type_config=FLOAT):
-        return BasinsOfAttraction(self.ctx, self.queue, width, height, bounds, system_function_source,
-                                  param_count=param_count, type_config=type_config)
+    def makeCobwebDiagram(self, source: str, paramCount: int,
+                          spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
+                          imageShape: tuple = (512, 512),
+                          typeConfig: TypeConfig = FLOAT,
+                          withUi: bool = True,
+                          uiNames: tuple = None,
+                          uiShape: tuple = None,
+                          uiTargetColor: QColor = Qt.red
+                          ):
+        bounds = self._convertBounds(spaceShape)
+        diag = CobwebDiagram(
+            self.ctx, self.queue, imageShape, bounds, source,
+            paramCount=paramCount, typeConfig=typeConfig
+        )
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return diag if ui is None else (diag, ui)
+
+    def makeParameterMap(self, source: str, variableCount: int,
+                         spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
+                         imageShape: tuple = (512, 512),
+                         typeConfig: TypeConfig = FLOAT,
+                         withUi: bool = True,
+                         uiNames: tuple = None,
+                         uiShape: tuple = None,
+                         uiTargetColor: QColor = Qt.red
+                         ):
+        bounds = self._convertBounds(spaceShape)
+        pmap = ParameterMap(
+            self.ctx, self.queue, imageShape, bounds, source,
+            varCount=variableCount, typeConfig=typeConfig
+        )
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return pmap if ui is None else (pmap, ui)
+
+    def makeBifurcationTree(self, source, paramCount: int,
+                            paramRange: Union[tuple, Bounds] = (-1., 1.),
+                            imageShape: tuple = (512, 512),
+                            typeConfig: TypeConfig = FLOAT,
+                            withUi: bool = True,
+                            uiNames: tuple = None,
+                            uiShape: tuple = None,
+                            uiTargetColor: QColor = Qt.red
+                            ):
+        bounds = self._convertBounds(paramRange)
+        bif = BifurcationTree(
+            self.ctx, self.queue, imageShape, source,
+            paramCount=paramCount, typeConfig=typeConfig
+        )
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return bif if ui is None else (bif, ui)
+
+    def makeBasinsOfAttraction(self, source, paramCount: int,
+                               spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
+                               imageShape: tuple = (512, 512),
+                               typeConfig: TypeConfig = FLOAT,
+                               withUi: bool = True,
+                               uiNames: tuple = None,
+                               uiShape: tuple = None,
+                               uiTargetColor: QColor = Qt.red
+                               ):
+        bounds = self._convertBounds(spaceShape)
+        boa = BasinsOfAttraction(
+            self.ctx, self.queue, imageShape, bounds, source,
+            paramCount=paramCount, typeConfig=typeConfig
+        )
+        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return boa if ui is None else (boa, ui)
 
     def run(self):
         self.show()

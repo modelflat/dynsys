@@ -1,11 +1,9 @@
 import numpy
 
-from .cl.core import *
-from .cl.codegen import *
-
+from .cl import ComputedImage, generateBoundsCode
 
 parameterSurfaceSource = """
-kernel void fill_parameter_surface(
+kernel void fillParameterSurface(
     const BOUNDS_2D bounds, write_only image2d_t result
 ) {    
     const int2 id = ID_2D;
@@ -25,7 +23,7 @@ class ParameterSurface(ComputedImage):
                          typeConfig=typeConfig)
 
     def __call__(self):
-        self.program.fill_parameter_surface(
+        self.program.fillParameterSurface(
             self.queue, self.imageShape, None,
             numpy.array(self.spaceShape, dtype=numpy.float32),
             self.deviceImage

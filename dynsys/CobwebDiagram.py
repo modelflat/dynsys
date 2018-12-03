@@ -1,6 +1,8 @@
-from .cl.core import *
-from .cl.codegen import *
-import numpy as np
+import numpy
+import pyopencl as cl
+
+from .cl import ComputedImage, \
+    generateBoundsCode, generateImageBoundsCode, generateParameterCode
 
 cobwebDiagramSource = """
 
@@ -10,8 +12,9 @@ cobwebDiagramSource = """
 
 // compute samples for diagram, single-threaded 
 // (usually iterations count is small enough, and we avoid copying data)
-kernel void compute_samples(
-    const real start, PARAM_SIGNATURES,
+kernel void computeSamples(
+    const real start, 
+    const PARAMETERS_SIGNATURE,
     const int skip,
     const int iterations,
     global real* samples
@@ -19,13 +22,13 @@ kernel void compute_samples(
     real x = start;
 
     for (int i = 0; i < skip; ++i) {
-        x = map_function(x, PARAM_VALUES);
+        x = map_function(x, PARAMETERS);
     }
     
     samples[0] = x;
     samples[1] = x;
     for (int i = skip + 2; i < iterations; ++i) {
-        x = map_function(x, PARAM_VALUES);
+        x = map_function(x, PARAMETERS);
         samples[i - skip] = x;   
     }
 }
@@ -37,16 +40,17 @@ kernel void compute_samples(
 #define FILL_COLOR     (float4)(1.0)
 
 // draw background (secant line and carrying function) for this cobweb diagram
-kernel void draw_background(
-    const PARAM_SIGNATURES, const BOUNDS,
+kernel void drawBackground(
+    const PARAMETERS_SIGNATURE, 
+    const BOUNDS bounds,
     write_only image2d_t result
 ) {
     const int2 id = ID_2D;
-    const real2 v = TRANSLATE_INV_Y_2D(real2, id, SIZE_2D, _DS_bs);
+    const real2 v = TRANSLATE_INV_Y_2D(real2, id, SIZE_2D, bounds);
     
-    if (NEAR(v.y, v.x, ABS_ERROR)) {
+    if (NEAR_1D(v.y, v.x, ABS_ERROR)) {
         write_imagef(result, id, CROSSING_COLOR);
-    } else if (NEAR(v.y, carrying_function(v.x, PARAM_VALUES), ABS_ERROR * 5)) {
+    } else if (NEAR_1D(v.y, carrying_function(v.x, PARAMETERS), ABS_ERROR * 5)) {
         write_imagef(result, id, CARRY_COLOR);
     } else {
         write_imagef(result, id, FILL_COLOR);
@@ -55,10 +59,10 @@ kernel void draw_background(
 
 #define ITER_COLOR (float4)(0, 0, 0, 1)
 
-kernel void draw_cobweb_diagram(
+kernel void drawCobwebDiagram(
     const global real* samples,
-    const BOUNDS,
-    const IMAGE_BOUNDS,
+    const BOUNDS bounds,
+    const IMAGE_BOUNDS image_bounds,
     write_only image2d_t result
 ) {
     const int id = get_global_id(0);
@@ -73,22 +77,22 @@ kernel void draw_cobweb_diagram(
         return;   
     }
 
-    const int2 p1 = TRANSLATE_BACK_INV_Y_2D(real2, x.s01, _DS_bs, _DS_ibs);
-    const int2 p2 = TRANSLATE_BACK_INV_Y_2D(real2, x.s12, _DS_bs, _DS_ibs);
+    const int2 p1 = CONVERT_SPACE_TO_COORD(TRANSLATE_BACK_INV_Y_2D(real2, x.s01, bounds, image_bounds));
+    const int2 p2 = CONVERT_SPACE_TO_COORD(TRANSLATE_BACK_INV_Y_2D(real2, x.s12, bounds, image_bounds));
     
     int2 line = (int2)(min(p1.x, p2.x), max(p1.x, p2.x));
-    if (p1.y < _DS_ibs.y && p1.y >= 0) {
-        for (int i = clamp(line.s0, 0, _DS_ibs.x); i <= line.s1; ++i) {
-            if (i < _DS_ibs.y && i >= 0) {
+    if (p1.y < image_bounds.y && p1.y >= 0) {
+        for (int i = clamp(line.s0, 0, image_bounds.x); i <= line.s1; ++i) {
+            if (i < image_bounds.y && i >= 0) {
                 write_imagef(result, (int2)(i, p1.y), ITER_COLOR);
             }
         }
     }
     
     line = (int2)(min(p1.y, p2.y), max(p1.y, p2.y));
-    if (p2.x < _DS_ibs.x && p2.x >= 0) {
-        for (int i = clamp(line.s0, 0, _DS_ibs.y); i <= line.s1; ++i) {
-            if (i < _DS_ibs.y && i >= 0) {
+    if (p2.x < image_bounds.x && p2.x >= 0) {
+        for (int i = clamp(line.s0, 0, image_bounds.y); i <= line.s1; ++i) {
+            if (i < image_bounds.y && i >= 0) {
                 write_imagef(result, (int2)(p2.x, i), ITER_COLOR);
             }
         }
@@ -111,31 +115,29 @@ class CobwebDiagram(ComputedImage):
                                #
                                typeConfig=typeConfig)
         self.paramCount = paramCount
-        self.computeSamples = self.program.compute_samples
 
-    def __call__(self, x0, *params, iterations=256, skip=0):
-        # iterations = max(iterations - skip, 1)
+    def __call__(self, startPoint, parameters, iterations, skip=0):
         real, realSize = self.tc()
 
         samplesDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, realSize * iterations)
 
-        paramList = wrapParameterArgs(self.paramCount, params, real)
+        paramList = self.wrapArgs(self.paramCount, *parameters)
 
-        self.program.compute_samples(
+        self.program.computeSamples(
             self.queue, (1,), None,
-            real(x0), *paramList,
-            np.int32(skip),
-            np.int32(iterations), samplesDevice
+            real(startPoint), *paramList,
+            numpy.int32(skip),
+            numpy.int32(iterations), samplesDevice
         )
 
-        self.program.draw_background(
+        self.program.drawBackground(
             self.queue, self.imageShape, None,
             *paramList,
             numpy.array(self.spaceShape, dtype=self.tc.boundsType),
             self.deviceImage
         )
 
-        self.program.draw_cobweb_diagram(
+        self.program.drawCobwebDiagram(
             self.queue, (iterations,), None,
             samplesDevice,
             numpy.array(self.spaceShape, dtype=self.tc.boundsType),

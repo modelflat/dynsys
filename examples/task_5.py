@@ -33,11 +33,11 @@ class Task5(SimpleApp):
     def __init__(self):
         super().__init__("Task 5")
 
-        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source, var_count=2)
+        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source, variableCount=2)
         self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=("b", "lam"),
                                                             targetColor=QtCore.Qt.white)
 
-        self.attractor = self.makePhasePortrait(attractor_bounds, map_function_source)
+        self.attractor = self.makePhasePlot(attractor_bounds, map_function_source)
         self.attractor_image = ParameterizedImageWidget(attractor_bounds)
 
         self.parameter_map_image.selectionChanged.connect(self.draw_attractor)

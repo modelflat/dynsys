@@ -4,7 +4,7 @@ import sys
 
 from typing import Union
 
-from .codegen import makeSource
+from .CodeGen import makeSource
 
 
 def getEndianness(ctx: cl.Context):
@@ -31,7 +31,7 @@ def allocateImage(ctx: cl.Context, dim: tuple, flags=cl.mem_flags.WRITE_ONLY):
     return numpy.empty((*dim, 4), dtype=numpy.uint8), cl.Image(ctx, flags, fmt, shape=dim)
 
 
-def _getAlternatives(d: dict, *alternatives):
+def getAlternatives(d: dict, *alternatives):
     for alt in alternatives:
         val = d.get(alt)
         if val is not None:
@@ -44,8 +44,8 @@ def createContextAndQueue(jsonConfig: dict = None):
         ctx = cl.create_some_context(interactive=False)
         print("Using auto-detected device:", ctx.get_info(cl.context_info.DEVICES))
     else:
-        pl = cl.get_platforms()[_getAlternatives(jsonConfig, "pid", "platform", "platformId")]
-        dev = pl.get_devices() [_getAlternatives(jsonConfig, "did", "device", "deviceId")]
+        pl = cl.get_platforms()[getAlternatives(jsonConfig, "pid", "platform", "platformId")]
+        dev = pl.get_devices() [getAlternatives(jsonConfig, "did", "device", "deviceId")]
         print("Using specified device:", dev)
         ctx = cl.Context([dev])
     return ctx, cl.CommandQueue(ctx)
@@ -131,7 +131,7 @@ class ComputedImage:
     def clear(self, readBack=False, color=(1.0, 1.0, 1.0, 1.0)):
         cl.enqueue_fill_image(
             self.queue, self.deviceImage,
-            color=numpy.array(color),
+            color=numpy.array(color, dtype=numpy.float32),
             origin=(0,)*len(self.imageShape), region=self.imageShape
         )
         if readBack:
@@ -143,3 +143,42 @@ class ComputedImage:
             origin=(0,)*len(self.imageShape), region=self.imageShape
         )
         return self.hostImage
+
+
+class Bounds:
+
+    def __init__(self, x_min, x_max, y_min, y_max):
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+
+    def clamp_x(self, v):
+        return numpy.clip(v, self.x_min, self.x_max)
+
+    def from_integer_x(self, v, v_max):
+        return self.x_min + v / v_max * (self.x_max - self.x_min)
+
+    def clamp_y(self, v):
+        return numpy.clip(v, self.y_min, self.y_max)
+
+    def from_integer_y(self, v, v_max, invert=True):
+        return self.y_min + ((v_max - v) if invert else v)/ v_max * (self.y_max - self.y_min)
+
+    def to_integer(self, x, y, w, h, invert_y=True):
+        y_val = int((y - self.y_min) / (self.y_max - self.y_min) * h)
+        return (
+            int((x - self.x_min) / (self.x_max - self.x_min) * w),
+            y_val if not invert_y else h - y_val
+        )
+
+    def asTuple(self):
+        return self.x_min, self.x_max, self.y_min, self.y_max
+
+    @staticmethod
+    def x(x_min, x_max):
+        return Bounds(x_min, x_max, 0, 0)
+
+    @staticmethod
+    def y(y_min, y_max):
+        return Bounds(0, 0, y_min, y_max)

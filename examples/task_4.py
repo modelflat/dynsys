@@ -47,32 +47,43 @@ class Task4(SimpleApp):
     def __init__(self):
         super().__init__("Task 4")
 
-        self.parameter_surface = self.makeParameterSurface(parameter_map_bounds, parameter_surface_color_function)
-        self.parameter_surface_image = ParameterizedImageWidget(parameter_map_bounds.asTuple(), names=("b", "m"),
-                                                                targetColor=Qt.white)
+        self.paramSurface, self.paramSurfaceUi = self.makeParameterSurface(
+            source=parameter_surface_color_function,
+            spaceShape=parameter_map_bounds,
+            withUi=True,
+            uiNames=("b", "m"),
+            uiTargetColor=Qt.white
+        )
 
-        self.attractor = self.makePhasePortrait((512, 512),attractor_bounds.asTuple(), system_function_source, 2)
-        self.attractor_image = ParameterizedImageWidget(attractor_bounds.asTuple(), shape=(False, False))
+        self.attractor, self.attractorUi = self.makePhasePlot(
+            source=system_function_source, paramCount=2,
+            spaceShape=attractor_bounds,
+            withUi=True
+        )
 
-        self.parameter_surface_image.selectionChanged.connect(
-            lambda val, _: self.draw_attractor(*val))
+        self.paramSurfaceUi.selectionChanged.connect(
+            lambda val, _: self.drawAttractor(*val)
+        )
 
         self.setLayout(
             hStack(
-                self.parameter_surface_image, self.attractor_image
+                self.paramSurfaceUi, self.attractorUi
             )
         )
 
-        self.draw_pararameter_surface()
-        self.draw_attractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
+        self.drawParamSurface()
+        self.drawAttractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
 
-    def draw_attractor(self, a, b):
-        self.attractor_image.setImage(self.attractor(
-            a, b, iterations=iterations, skip=skip
+    def drawAttractor(self, a, b):
+        self.attractorUi.setImage(self.attractor(
+            parameters=(a, b),
+            iterations=iterations,
+            skip=skip,
+            gridSparseness=16
         ))
 
-    def draw_pararameter_surface(self):
-        self.parameter_surface_image.setImage(self.parameter_surface())
+    def drawParamSurface(self):
+        self.paramSurfaceUi.setImage(self.paramSurface())
 
 
 

@@ -1,16 +1,16 @@
 from dynsys import *
-from dynsys.ui.slider_widgets import createSlider
+from dynsys.ui.SliderWidgets import createSlider
 
 iterations = 5 * 10**4
 skip = iterations // 100 * 95
 
-parameter_surface_bounds = Bounds(
+paramSurfaceBounds = Bounds(
     0, .5,
     0, .5,
 )
 rBounds = (0, 3)
 
-parameter_surface_source = """
+paramSurfaceFn = """
 #define D 1e-4
 float3 color_for_point(real2 p) {
     if (fabs(p.x - .25f) < .01 && fabs(p.y - 0.15f) < .01) {
@@ -20,7 +20,7 @@ float3 color_for_point(real2 p) {
 }
 """
 
-phase_plot_bounds = (
+phaseBounds = (
     -6, 7,
     0, 10,
     -6, 7,
@@ -32,7 +32,7 @@ imageShape = (
     128
 )
 
-system_function_source = """
+systemFn = """
 #define STEP (real)(1e-2)
 
 // #define T real2
@@ -54,13 +54,23 @@ T system_fn(T v, real a, real b, real r) {
 class Ressler(SimpleApp):
 
     def __init__(self):
-        super().__init__("Ressler")
+        super().__init__("Example: 3D Ressler system")
 
-        self.abSurface = self.makeParameterSurface(parameter_surface_bounds, parameter_surface_source)
-        self.abSurfaceUi = ParameterizedImageWidget(parameter_surface_bounds.asTuple(), names=("a", "b"), targetColor=Qt.black)
+        self.abSurface, self.abSurfaceUi = self.makeParameterSurface(
+            source=paramSurfaceFn,
+            spaceShape=paramSurfaceBounds,
+            withUi=True,
+            uiNames=("a", "b"),
+            uiTargetColor=Qt.black
+        )
 
-        self.attr = self.makePhasePortrait(imageShape, phase_plot_bounds, system_function_source, 3)
-        self.attr_image = Image3D(phase_plot_bounds)
+        self.attractor, self.attractorUi = self.makePhasePlot(
+            source=systemFn, paramCount=3,
+            spaceShape=phaseBounds,
+            imageShape=imageShape,
+            backColor=(0.0, 0.0, 0.0, 0.0),
+            withUi=False
+        ), Image3D(phaseBounds)
 
         self.rSlider, rSliderUi = createSlider(
             "real", rBounds,
@@ -75,10 +85,10 @@ class Ressler(SimpleApp):
 
         self.setLayout(
             vStack(rSliderUi,
-                   hStack(self.abSurfaceUi, self.attr_image)
+                   hStack(self.abSurfaceUi, self.attractorUi)
             )
         )
-        self.attr_image.setFixedSize(512, 512)
+        self.attractorUi.setFixedSize(512, 512)
 
         self.draw_parameter_surface()
         self.abSurfaceUi.setValue((.25, .155))
@@ -90,7 +100,12 @@ class Ressler(SimpleApp):
     def draw_phase_plot(self, a, b, r, skip=skip):
         import time
         t = time.perf_counter()
-        self.attr_image.setTexture(self.attr(a, b, r, sparse=8, iterations=iterations, skip=skip))
+        self.attractorUi.setTexture(self.attractor(
+            parameters=(a, b, r),
+            iterations=iterations,
+            skip=skip,
+            gridSparseness=8
+        ))
         self.setWindowTitle("%s | Last draw time: %d ms" % ("Ressler", int(1000*(time.perf_counter() - t))))
 
 

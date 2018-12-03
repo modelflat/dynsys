@@ -1,12 +1,12 @@
 VARIABLE_TEMPLATE = r"""
 #define VARIABLE _DS_var
 #define VARIABLE_TYPE {}
-#define VARIABLE_SIGNATURE VARIABLE VARIABLE_TYPE
+#define VARIABLE_SIGNATURE VARIABLE_TYPE VARIABLE 
 """
 
 PARAMETER_NAME = "_DS_par_%d"
 PARAMETER_TEMPLATE = r"""
-#define SET_PARAMETER {}
+#define SET_PARAMETER(idx, value) {}
 #define PARAMETER_TYPE {}
 #define PARAMETERS {}
 #define PARAMETERS_SIGNATURE {}
@@ -53,6 +53,10 @@ COMMONS_1D = r"""
 
 #define TRANSLATE_BACK_INV_1D(v, bs, size) \
     ((size) - TRANSLATE_BACK_1D((v), (bs), (size)))
+    
+#define IN_RANGE_EX(val, range) ((val) > (range).s0 && (val) < (range).s2)
+
+#define NEAR_1D(a, b, precision) (fabs((a) - (b)) < (precision))
 
 """
 
@@ -82,6 +86,7 @@ COMMONS_2D = r"""
 
 #define VALID_POINT_2D(area, point) \
     (point.x >= 0 && point.y >= 0 && point.x < area.x && point.y < area.y)
+
 
 """
 
@@ -190,7 +195,6 @@ COMMON_SOURCE = COMMONS_1D + COMMONS_2D + COMMONS_3D + r"""
 #endif
 
 
-#define NEAR(a, b, abs_error) (fabs((a) - (b)) < (abs_error))
 
 #define DEFAULT_ENTITY_COLOR (float4)(0.0, 0.0, 0.0, 1.0) // black
 

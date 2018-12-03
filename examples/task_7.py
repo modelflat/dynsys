@@ -41,17 +41,17 @@ class Task7(SimpleApp):
         super().__init__("Task 7")
 
         self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source,
-                                                   var_count=2)
+                                                   variableCount=2)
         self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=["lam", "A"],
                                                             targetColor=QtCore.Qt.white)
 
         self.parameter_map_zoomed = self.makeParameterMap(parameter_map_bounds_zoomed, map_function_source,
                                                           width=512, height=512,
-                                                          var_count=2)
+                                                          variableCount=2)
         self.parameter_map_zoomed_image = ParameterizedImageWidget(parameter_map_bounds_zoomed, names=["lam", "A"],
                                                                    targetColor=QtCore.Qt.white)
 
-        self.attractor = self.makePhasePortrait(attractor_bounds, map_function_source)
+        self.attractor = self.makePhasePlot(attractor_bounds, map_function_source)
         self.attractor_image = ParameterizedImageWidget(attractor_bounds)
 
         self.parameter_map_image.selectionChanged.connect(self.draw_attractor)

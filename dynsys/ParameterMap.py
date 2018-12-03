@@ -1,9 +1,10 @@
-from .cl.core import *
-from .cl.codegen import *
+import numpy
+import pyopencl as cl
 
-import numpy as np
+from .cl import ComputedImage, generateBoundsCode, generateVariableCode
 
-parameter_map_source = """
+
+utility = r"""
 
 #ifndef DIVERGENCE_THRESHOLD
 #define DIVERGENCE_THRESHOLD 1e100
@@ -85,20 +86,25 @@ float3 color_for_count(int count, int total) {
 #endif
 }
 
-kernel void compute_map(
-    const BOUNDS,
-    VARIABLE_SIGNATURES,
+"""
+
+parameter_map_source = utility + r"""
+
+kernel void computeMap(
+    const BOUNDS bounds,
+    VARIABLE_SIGNATURE,
     const int samples_count,
     const int skip,
     global VARIABLE_TYPE* samples,
     write_only image2d_t map
 ) {
     const int2 id = ID_2D;
-    samples += (id.x * get_global_size(1) + id.y)*samples_count;
-    const real2 v = TRANSLATE_2D_INV_Y(id, SIZE_2D, x_min, x_max, y_min, y_max);
     
-    VARIABLE_TYPE x = VARIABLES;
-
+    samples += (id.x * get_global_size(1) + id.y)*samples_count;
+    
+    const real2 v = TRANSLATE_INV_Y_2D(real2, id, SIZE_2D, bounds);
+    
+    VARIABLE_TYPE x = VARIABLE;
     for (int i = 0; i < skip; ++i) {
         x = map_function(x, v.x, v.y);
     }
@@ -108,15 +114,15 @@ kernel void compute_map(
         x = map_function(x, v.x, v.y);
         samples[i] = x;
         
-        if (VARIABLE_VECTOR_ANY_ISNAN(x) || VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
-            write_imagef(map, id, DIVERGENCE_COLOR);
-            return;
-        }
+        //if (VARIABLE_VECTOR_ANY_ISNAN(x) || VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
+        //    write_imagef(map, id, DIVERGENCE_COLOR);
+        //    return;
+        //}
         
         int found = 0;
         for (int j = 0; j < i; ++j) {
-            const VARIABLE_ACCEPTOR_TYPE t = samples[j];
-            if (VARIABLE_VECTOR_NEAR(x, t, VALUE_DETECTION_PRECISION)) {
+            const VARIABLE_TYPE t = samples[j];
+            if (distance(x, t) < VALUE_DETECTION_PRECISION) {
                 found = 1;
                 break;
             }
@@ -148,13 +154,15 @@ class ParameterMap(ComputedImage):
     def __init__(self, ctx, queue, imageShape, spaceShape, mapFunctionSource, varCount, typeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # source
-                         mapFunctionSource, generateVariableCode(typeConfig, varCount),
+                         mapFunctionSource,
+                         generateVariableCode(typeConfig, varCount),
+                         generateBoundsCode(typeConfig, len(imageShape)),
                          parameter_map_source,
                          #
                          typeConfig=typeConfig)
         self.varCount = varCount
 
-    def __call__(self, *variables, iterations, skip):
+    def __call__(self, varValues, iterations, skip=0):
         real, realSize = self.tc()
 
         samplesDevice = cl.Buffer(
@@ -162,11 +170,11 @@ class ParameterMap(ComputedImage):
             size=numpy.prod(self.imageShape) * iterations * realSize * self.varCount
         )
 
-        self.program.compute_map(
+        self.program.computeMap(
             self.queue, self.imageShape, None,
-            numpy.array(self.spaceShape, dtype=self.tc.boundsType)
-            *wrapParameterArgs(self.varCount, variables, real),
-            np.int32(iterations), np.int32(skip),
+            numpy.array(self.spaceShape, dtype=self.tc.boundsType),
+            *self.wrapArgs(self.varCount, *varValues),
+            numpy.int32(iterations), numpy.int32(skip),
             samplesDevice,
             self.deviceImage
         )

@@ -1,7 +1,8 @@
 import numpy
+import pyopencl as cl
 
-from .cl.core import cl, ComputedImage, TypeConfig
-from .cl.codegen import *
+from .cl import ComputedImage, TypeConfig,\
+    generateParameterCode, generateImageBoundsCode, generateBoundsCode, generateVariableCode
 
 PHASE_PLOT_SOURCE = """
 #define user_SYSTEM system_fn
@@ -46,8 +47,9 @@ class PhasePlot(ComputedImage):
     def __init__(self,
                  ctx: cl.Context, queue: cl.CommandQueue,
                  imageShape: tuple, spaceShape: tuple,
-                 systemSource: str,
-                 paramCount: int, typeConfig: TypeConfig):
+                 systemSource: str, paramCount: int,
+                 backColor: tuple,
+                 typeConfig: TypeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # sources
                          systemSource,
@@ -59,9 +61,10 @@ class PhasePlot(ComputedImage):
                          #
                          typeConfig=typeConfig)
         self.paramCount = paramCount
+        self.backColor = backColor
 
-    def __call__(self, *params, sparse=8, iterations=256, skip=0):
-        self.clear(color=(0, 0, 0, 0.0))
+    def __call__(self, parameters, iterations, skip=0, gridSparseness=8):
+        self.clear(color=self.backColor)
 
         space = tuple(self.spaceShape[i] if i < len(self.spaceShape) else numpy.nan
                       for i in range(ceilToPow2(len(self.spaceShape))))
@@ -70,8 +73,8 @@ class PhasePlot(ComputedImage):
                       for i in range(ceilToPow2(len(self.imageShape))))
 
         self.program.draw_phase_plot(
-            self.queue, tuple(map(lambda x: x // sparse + 1, self.imageShape)), None,
-            *self.wrapArgs(self.paramCount, *params),
+            self.queue, tuple(map(lambda x: x // gridSparseness + 1, self.imageShape)), None,
+            *self.wrapArgs(self.paramCount, *parameters),
             numpy.array(space, dtype=self.tc.boundsType),
             numpy.array(image, dtype=numpy.int32),
             numpy.int32(skip), numpy.int32(iterations),

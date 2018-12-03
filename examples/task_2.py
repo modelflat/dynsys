@@ -1,21 +1,21 @@
 from dynsys import *
 
-skip_count = 16
+skipCount = 16
 
-tree_samples_count = 512
-tree_skip_count = 256
-tree_max_value = 10
+treeSamplesCount = 512
+treeSkipCount = 256
+treeMaxValue = 10
 
-cobweb_bounds = Bounds(
+cobwebBounds = Bounds(
     -2, 2,
     -2, 2
 )
 
 lambda_bounds = Bounds.x(
-    1.9, 3
+    1, 3
 )
 
-map_function_source = """
+mapFunction = """
 real map_function(real x, real lam);
 
 real map_function(real x, real lam) {
@@ -24,55 +24,80 @@ real map_function(real x, real lam) {
 """
 
 
-class Task2(SimpleApp):
+class BifTreeAndCobweb(SimpleApp):
     def __init__(self):
-        super().__init__("Task 2")
+        super().__init__("Example: BifTree + Cobweb")
 
-        self.cobweb_diagram = self.makeCobwebDiagram(cobweb_bounds, map_function_source)
-        self.cobweb_diagram_image = ParameterizedImageWidget(cobweb_bounds, shape=(False, False))
+        self.cobweb, self.cobwebUi = self.makeCobwebDiagram(
+            source=mapFunction, paramCount=1,
+            spaceShape=cobwebBounds,
+            withUi=True,
+            uiNames=("x_n", "x_n+1")
+        )
 
-        self.bifurcation_tree = self.makeBifurcationTree(map_function_source)
-        self.bifurcation_tree_image = ParameterizedImageWidget(lambda_bounds, names=("lambda", ""),
-                                                               shape=(True, False))
+        self.bifTree, self.bifTreeUi = self.makeBifurcationTree(
+            source=mapFunction, paramCount=1,
+            paramRange=lambda_bounds,
+            withUi=True,
+            uiNames=("lambda", None),
+        )
 
-        self.p_lambda = \
-            ObservableValue.makeAndConnect(2.5, connect_to=self.draw_diag)
-        self.iter_count = \
-            ObservableValue.makeAndConnect(500, connect_to=self.draw_diag)
-        self.x0 = \
-            ObservableValue.makeAndConnect(0.1, connect_to=lambda *args: (self.draw_tree(), self.draw_diag()))
+        self.pLambda = ObservableValue.makeAndConnect(
+            2.5, connect_to=self.drawDiagram
+        )
+        self.iterations = ObservableValue.makeAndConnect(
+            500, connect_to=self.drawDiagram
+        )
+        self.x0 = ObservableValue.makeAndConnect(
+            0.1, connect_to=lambda *args: (self.drawTree(), self.drawDiagram())
+        )
 
-        self.bifurcation_tree_image.selectionChanged.connect(lambda x, y: self.p_lambda.setValue(x))
+        self.bifTreeUi.selectionChanged.connect(lambda x, y: self.pLambda.setValue(x))
 
-        self.iter_count_slider = IntegerSlider.makeAndConnect(1, 1000, self.iter_count.value(),
-                                                              connect_to=self.iter_count.setValue)
-        self.x0_slider = RealSlider.makeAndConnect(-1.2, 1.2, self.x0.value(), connect_to=self.x0.setValue)
+        self.iterationsSlider, iterationsSliderUi = createSlider(
+            "integer", (1, 1000),
+            withValue=self.iterations.value(),
+            connectTo=self.iterations.setValue
+        )
+
+        self.x0Slider, x0SliderUi = createSlider(
+            "real", (-1.2, 1.2),
+            withValue=self.x0.value(),
+            connectTo=self.x0.setValue
+        )
 
         self.setLayout(
             vStack(
-                hStack(self.bifurcation_tree_image, self.cobweb_diagram_image),
+                hStack(self.bifTreeUi, self.cobwebUi),
                 vStack(
-                    self.x0_slider,
-                    self.iter_count_slider,
+                    x0SliderUi,
+                    iterationsSliderUi,
                 )
             )
         )
 
-    def draw_diag(self, *args):
-        self.cobweb_diagram_image.setImage(self.cobweb_diagram(
-            self.x0.value(), self.p_lambda.value(),
-            iterations=self.iter_count.value(), skip=skip_count
+        self.drawDiagram()
+        self.drawTree()
+
+    def drawDiagram(self, *args):
+        self.cobwebUi.setImage(self.cobweb(
+            startPoint=self.x0.value(),
+            parameters=(self.pLambda.value(),),
+            iterations=self.iterations.value(),
+            skip=skipCount
         ))
 
-    def draw_tree(self, *args):
-        self.bifurcation_tree_image.setImage(
-            self.bifurcation_tree(
-                self.x0.value(), tree_samples_count,
-                (lambda_bounds.x_min, lambda_bounds.x_max),
-                0,
-                skip=tree_skip_count, maxAllowedValue=tree_max_value
+    def drawTree(self, *args):
+        self.bifTreeUi.setImage(self.bifTree(
+            startPoint=self.x0.value(),
+            paramIndex=0,
+            paramRange=lambda_bounds.asTuple(),
+            otherParams=(),
+            iterations=treeSamplesCount,
+            skip=treeSkipCount,
+            maxAllowedValue=treeMaxValue
         ))
 
 
 if __name__ == '__main__':
-    Task2().run()
+    BifTreeAndCobweb().run()

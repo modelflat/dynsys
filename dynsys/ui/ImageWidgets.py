@@ -113,7 +113,7 @@ class Image2D(ImageWidget):
         self.setMouseTracking(True)
         self._target = Target2D(targetColor, targetShape)
         self._spaceShape = spaceShape
-        self._selection = (None, None)
+        # self._selection = (None, None)
         self._invertY = invertY
         self._textureShape = (1, 1)
         self._textureDataReference = None
