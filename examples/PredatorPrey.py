@@ -76,7 +76,7 @@ class PredatorPrey(SimpleApp):
         )
 
         self.drawParamSurface()
-        self.drawAttractor(parameterMapBounds.x_min, parameterMapBounds.y_min)
+        self.drawAttractor(parameterMapBounds.xMin, parameterMapBounds.yMin)
 
     def drawAttractor(self, a, b):
         self.attractorUi.setImage(self.attractor(

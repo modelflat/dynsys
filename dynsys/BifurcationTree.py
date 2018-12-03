@@ -4,7 +4,7 @@ import pyopencl as cl
 from .cl import ComputedImage, generateParameterCode
 
 
-bifurcationTreeSource = """
+SOURCE = """
 
 kernel void computeBifurcationTree(
     const real x0,
@@ -14,7 +14,7 @@ kernel void computeBifurcationTree(
     const real maxAllowedValue,
     const int skip, 
     const int iterations,
-    global real* result, global real2* result_minmax
+    global real* result, global real2* resultMinMax
 ) {
     const int id = ID_1D;
     const real param = TRANSLATE_1D(id, SIZE_1D, bounds);
@@ -37,7 +37,7 @@ kernel void computeBifurcationTree(
         result[i] = clamp(x, -maxAllowedValue, maxAllowedValue);
     }
 
-    result_minmax[id] = (real2)(min_, max_); // save minmax
+    resultMinMax[id] = (real2)(min_, max_); // save min/max
 }
 
 #define TREE_COLOR (float4)(0, 0, 0, 1.0)
@@ -68,7 +68,7 @@ class BifurcationTree(ComputedImage):
                                # sources
                                mapFunctionSource,
                                generateParameterCode(typeConfig, paramCount),
-                               bifurcationTreeSource,
+                               SOURCE,
                                #
                                typeConfig=typeConfig)
         self.paramCount = paramCount

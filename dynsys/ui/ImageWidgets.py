@@ -11,6 +11,7 @@ from PyQt5.QtGui import QMouseEvent
 def toPixmap(data: numpy.ndarray):
     image = QImage(data.data, *data.shape[:-1], QImage.Format_ARGB32)
     pixmap = QPixmap()
+    # noinspection PyArgumentList
     pixmap.convertFromImage(image)
     return pixmap
 
@@ -80,10 +81,10 @@ class Target2D:
 
 class Image2D(ImageWidget):
 
-    def _onMouseEvent(self, QMouseEvent):
-        left, right = mouseButtonsState(QMouseEvent)
+    def _onMouseEvent(self, event):
+        left, right = mouseButtonsState(event)
         if left:
-            self._target.setPos((QMouseEvent.x(), QMouseEvent.y()))
+            self._target.setPos((event.x(), event.y()))
             self.repaint()
             if self._target.setPosCalled():
                 vals = self.targetReal()
@@ -92,13 +93,13 @@ class Image2D(ImageWidget):
                      vals[1] if self._target.shape()[1] else None),
                     (left, right))
 
-    def mousePressEvent(self, QMouseEvent):
-        super(Image2D, self).mousePressEvent(QMouseEvent)
-        self._onMouseEvent(QMouseEvent)
+    def mousePressEvent(self, event):
+        super(Image2D, self).mousePressEvent(event)
+        self._onMouseEvent(event)
 
-    def mouseMoveEvent(self, QMouseEvent):
-        super(Image2D, self).mouseMoveEvent(QMouseEvent)
-        self._onMouseEvent(QMouseEvent)
+    def mouseMoveEvent(self, event):
+        super(Image2D, self).mouseMoveEvent(event)
+        self._onMouseEvent(event)
 
     def paintEvent(self, QPaintEvent):
         super(ImageWidget, self).paintEvent(QPaintEvent)
@@ -113,7 +114,6 @@ class Image2D(ImageWidget):
         self.setMouseTracking(True)
         self._target = Target2D(targetColor, targetShape)
         self._spaceShape = spaceShape
-        # self._selection = (None, None)
         self._invertY = invertY
         self._textureShape = (1, 1)
         self._textureDataReference = None
@@ -142,7 +142,8 @@ class Image2D(ImageWidget):
         x, y = self._target.pos()
         x = self._spaceShape[0] + x / self._textureShape[0] * (self._spaceShape[1] - self._spaceShape[0])
         if self._invertY:
-            y = self._spaceShape[2] + (self._textureShape[1] - y) / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+            y = self._spaceShape[2] + (self._textureShape[1] - y) /\
+                self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
         else:
             y = self._spaceShape[2] + y / self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
         x = numpy.clip(x, self._spaceShape[0], self._spaceShape[1])
@@ -152,7 +153,8 @@ class Image2D(ImageWidget):
     def setTargetReal(self, targetLocation: tuple) -> None:
         x, y = targetLocation
         x = (x - self._spaceShape[0]) / (self._spaceShape[1] - self._spaceShape[0])*self._textureShape[0]
-        y = self._textureShape[1] - (y - self._spaceShape[2]) / (self._spaceShape[3] - self._spaceShape[2])*self._textureShape[1]
+        y = self._textureShape[1] - (y - self._spaceShape[2]) /\
+            self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
         self._target.setPos((x, y))
         self.repaint()
 

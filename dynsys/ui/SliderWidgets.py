@@ -42,9 +42,9 @@ def createSlider(sliderType: str, bounds: tuple,
                  putToLayout: QLayout = None
                  ) -> tuple:
     sliderType = sliderType.lower()
-    if   sliderType in { "real", "r", "float" }:
+    if sliderType in {"real", "r", "float"}:
         slider = RealSlider(bounds, horizontal)
-    elif sliderType in { "int", "integer", "i", "d" }:
+    elif sliderType in {"int", "integer", "i", "d"}:
         slider = IntegerSlider(bounds, horizontal)
     else:
         raise ValueError("Unknown slider type: {}".format(sliderType))
@@ -53,7 +53,7 @@ def createSlider(sliderType: str, bounds: tuple,
 
     layout = None
     if withLabel is not None:
-        positions = { "left", "top" }
+        positions = {"left", "top"}
         if labelPosition not in positions:
             raise ValueError("Label position must be one of: {}".format(positions))
         supportsValues = True
@@ -64,7 +64,8 @@ def createSlider(sliderType: str, bounds: tuple,
         label = QLabel(withLabel)
 
         if supportsValues:
-            setVal = lambda val: label.setText(withLabel.format(val))
+            def setVal(val): label.setText(withLabel.format(val))
+
             setVal(withValue)
             slider.valueChanged.connect(setVal)
 

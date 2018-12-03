@@ -45,7 +45,7 @@ def createContextAndQueue(jsonConfig: dict = None):
         print("Using auto-detected device:", ctx.get_info(cl.context_info.DEVICES))
     else:
         pl = cl.get_platforms()[getAlternatives(jsonConfig, "pid", "platform", "platformId")]
-        dev = pl.get_devices() [getAlternatives(jsonConfig, "did", "device", "deviceId")]
+        dev = pl.get_devices()[getAlternatives(jsonConfig, "did", "device", "deviceId")]
         print("Using specified device:", dev)
         ctx = cl.Context([dev])
     return ctx, cl.CommandQueue(ctx)
@@ -94,8 +94,8 @@ class TypeConfig:
         return self.realType, self.realSize()
 
 
-HALF =   TypeConfig(numpy.float16)
-FLOAT =  TypeConfig(numpy.float32)
+HALF = TypeConfig(numpy.float16)
+FLOAT = TypeConfig(numpy.float32)
 DOUBLE = TypeConfig(numpy.float64)
 
 
@@ -123,7 +123,7 @@ class ComputedImage:
             return list(map(self.tc.realType, args))
         if requiredArgCount - 1 == len(args) and skipIndex is not None:
             return list(map(self.tc.realType, args[:skipIndex])) \
-                   + [self.tc.realType(0.0),] \
+                   + [self.tc.realType(0.0), ] \
                    + list(map(self.tc.realType, args[skipIndex+1:]))
         # not enough args
         raise ValueError("Out of %d arguments, only %d were provided." % (requiredArgCount, len(args)))
@@ -147,38 +147,38 @@ class ComputedImage:
 
 class Bounds:
 
-    def __init__(self, x_min, x_max, y_min, y_max):
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
+    def __init__(self, xMin, xMax, yMin, yMax):
+        self.xMin = xMin
+        self.xMax = xMax
+        self.yMin = yMin
+        self.yMax = yMax
 
-    def clamp_x(self, v):
-        return numpy.clip(v, self.x_min, self.x_max)
+    def clampX(self, v):
+        return numpy.clip(v, self.xMin, self.xMax)
 
-    def from_integer_x(self, v, v_max):
-        return self.x_min + v / v_max * (self.x_max - self.x_min)
+    def fromIntegerX(self, v, vMax):
+        return self.xMin + v / vMax * (self.xMax - self.xMin)
 
-    def clamp_y(self, v):
-        return numpy.clip(v, self.y_min, self.y_max)
+    def clampY(self, v):
+        return numpy.clip(v, self.yMin, self.yMax)
 
-    def from_integer_y(self, v, v_max, invert=True):
-        return self.y_min + ((v_max - v) if invert else v)/ v_max * (self.y_max - self.y_min)
+    def fromIntegerY(self, v, vMax, invert=True):
+        return self.yMin + ((vMax - v) if invert else v) / vMax * (self.yMax - self.yMin)
 
-    def to_integer(self, x, y, w, h, invert_y=True):
-        y_val = int((y - self.y_min) / (self.y_max - self.y_min) * h)
+    def toInteger(self, x, y, w, h, invert_y=True):
+        yVal = int((y - self.yMin) / (self.yMax - self.yMin) * h)
         return (
-            int((x - self.x_min) / (self.x_max - self.x_min) * w),
-            y_val if not invert_y else h - y_val
+            int((x - self.xMin) / (self.xMax - self.xMin) * w),
+            yVal if not invert_y else h - yVal
         )
 
     def asTuple(self):
-        return self.x_min, self.x_max, self.y_min, self.y_max
+        return self.xMin, self.xMax, self.yMin, self.yMax
 
     @staticmethod
-    def x(x_min, x_max):
-        return Bounds(x_min, x_max, 0, 0)
+    def x(xMin, xMax):
+        return Bounds(xMin, xMax, 0, 0)
 
     @staticmethod
-    def y(y_min, y_max):
-        return Bounds(0, 0, y_min, y_max)
+    def y(yMin, yMax):
+        return Bounds(0, 0, yMin, yMax)

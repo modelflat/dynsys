@@ -1,16 +1,16 @@
 from dynsys import *
 
-parameter_map_bounds_zoomed = Bounds(
+paramMapBoundsZoomed = Bounds(
     .75, 1.14,
     .75, 1.35,
 )
 
-parameter_map_bounds = Bounds(
+paramMapBounds = Bounds(
     -.25, 2.05,
     -.75, 1.7,
 )
 
-attractor_bounds = Bounds(
+phasePlotBounds = Bounds(
     -1, 3,
     -1, 3
 )
@@ -45,7 +45,7 @@ class NonIdenticalPairedLogisticMaps(SimpleApp):
 
         self.paramMap, self.paramMapUi = self.makeParameterMap(
             source=map_function_source, variableCount=2,
-            spaceShape=parameter_map_bounds,
+            spaceShape=paramMapBounds,
             withUi=True,
             uiNames=("lam", "A"),
             uiTargetColor=Qt.white
@@ -53,7 +53,7 @@ class NonIdenticalPairedLogisticMaps(SimpleApp):
 
         self.paramMapZoomed, self.paramMapZoomedUi = self.makeParameterMap(
             source=map_function_source, variableCount=2,
-            spaceShape=parameter_map_bounds_zoomed,
+            spaceShape=paramMapBoundsZoomed,
             withUi=True,
             uiNames=("lam", "A"),
             uiTargetColor=Qt.white
@@ -64,32 +64,32 @@ class NonIdenticalPairedLogisticMaps(SimpleApp):
             withUi=True
         )
 
-        self.paramMapUi.selectionChanged.connect(self.draw_attractor)
-        self.paramMapZoomedUi.selectionChanged.connect(self.draw_attractor)
+        self.paramMapUi.selectionChanged.connect(self.drawAttractor)
+        self.paramMapZoomedUi.selectionChanged.connect(self.drawAttractor)
 
         self.setLayout(
             hStack(self.paramMapUi, self.paramMapZoomedUi, self.attractorUi)
         )
 
-        self.draw_parameter_map()
-        self.draw_parameter_map_zoomed()
-        self.draw_attractor(1, 1)
+        self.drawParameterMap()
+        self.drawParameterMapZoomed()
+        self.drawAttractor(1, 1)
 
-    def draw_parameter_map(self):
+    def drawParameterMap(self):
         self.paramMapUi.setImage(self.paramMap(
             variables=(x0, y0),
             iterations=80,
             skip=512
         ))
 
-    def draw_parameter_map_zoomed(self):
+    def drawParameterMapZoomed(self):
         self.paramMapZoomedUi.setImage(self.paramMapZoomed(
             variables=(x0, y0),
             iterations=80,
             skip=512
         ))
 
-    def draw_attractor(self, A, lam):
+    def drawAttractor(self, A, lam):
         self.attractorUi.setImage(self.attractor(
             parameters=(A, lam),
             iterations=iterations,

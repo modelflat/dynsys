@@ -7,6 +7,7 @@ from PyQt5.Qt import QObject
 
 from .cl import *
 from .ui import *
+
 from .PhasePlot import PhasePlot
 from .ParameterSurface import ParameterSurface
 from .CobwebDiagram import CobwebDiagram
@@ -45,6 +46,7 @@ class SimpleApp(QWidget):
     def __init__(self, title):
         import json
         self.app = QApplication(sys.argv)
+        # noinspection PyArgumentList
         super().__init__(parent=None)
         self.setWindowTitle(title)
         self.configFile = None

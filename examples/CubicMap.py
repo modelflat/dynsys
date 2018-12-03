@@ -11,7 +11,7 @@ cobwebBounds = Bounds(
     -2, 2
 )
 
-lambda_bounds = Bounds.x(
+lambdaRange = Bounds.x(
     1, 3
 )
 
@@ -37,7 +37,7 @@ class CubicMap(SimpleApp):
 
         self.bifTree, self.bifTreeUi = self.makeBifurcationTree(
             source=mapFunction, paramCount=1,
-            paramRange=lambda_bounds,
+            paramRange=lambdaRange,
             withUi=True,
             uiNames=("lambda", None),
         )
@@ -91,7 +91,7 @@ class CubicMap(SimpleApp):
         self.bifTreeUi.setImage(self.bifTree(
             startPoint=self.x0.value(),
             paramIndex=0,
-            paramRange=lambda_bounds.asTuple(),
+            paramRange=lambdaRange.asTuple(),
             otherParams=(),
             iterations=treeSamplesCount,
             skip=treeSkipCount,

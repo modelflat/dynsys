@@ -4,7 +4,7 @@ import pyopencl as cl
 from .cl import ComputedImage, generateBoundsCode, generateVariableCode
 
 
-utility = r"""
+UTILITY_SOURCE = r"""
 
 #ifndef DIVERGENCE_THRESHOLD
 #define DIVERGENCE_THRESHOLD 1e100
@@ -88,7 +88,7 @@ float3 color_for_count(int count, int total) {
 
 """
 
-parameter_map_source = utility + r"""
+SOURCE = UTILITY_SOURCE + r"""
 
 kernel void computeMap(
     const BOUNDS bounds,
@@ -157,7 +157,7 @@ class ParameterMap(ComputedImage):
                          mapFunctionSource,
                          generateVariableCode(typeConfig, varCount),
                          generateBoundsCode(typeConfig, len(imageShape)),
-                         parameter_map_source,
+                         SOURCE,
                          #
                          typeConfig=typeConfig)
         self.varCount = varCount

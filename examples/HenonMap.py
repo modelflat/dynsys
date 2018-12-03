@@ -61,7 +61,7 @@ class HenonMap(SimpleApp):
         )
 
         self.drawParamMap()
-        self.drawPhasePlot(paramMapBounds.x_min, paramMapBounds.y_min)
+        self.drawPhasePlot(paramMapBounds.xMin, paramMapBounds.yMin)
 
     def drawPhasePlot(self, a, b):
         self.attractorUi.setImage(self.attractor(

@@ -4,7 +4,7 @@ import pyopencl as cl
 from .cl import ComputedImage, generateParameterCode, generateBoundsCode
 
 
-utility = r"""
+UTILITY_SOURCE = r"""
 
 #ifndef DETECTION_PRECISION 
 #define DETECTION_PRECISION 1e-4
@@ -70,8 +70,7 @@ int binary_search(int size, const global real2* arr, real2 value) {
 """
 
 
-basins_of_attraction_source = utility + r"""
-
+SOURCE = UTILITY_SOURCE + r"""
 #ifndef FALLBACK_COLOR 
 #define FALLBACK_COLOR (float4)(0, 0, 0, 1)
 #endif
@@ -136,6 +135,7 @@ kernel void findAttraction(
 
 """
 
+
 class BasinsOfAttraction(ComputedImage):
 
     def __init__(self, ctx, queue, imageShape, spaceShape, systemFunction, paramCount, typeConfig):
@@ -144,7 +144,7 @@ class BasinsOfAttraction(ComputedImage):
                          systemFunction,
                          generateParameterCode(typeConfig, paramCount),
                          generateBoundsCode(typeConfig, len(imageShape)),
-                         basins_of_attraction_source,
+                         SOURCE,
                          #
                          typeConfig=typeConfig)
         self.paramCount = paramCount
@@ -169,28 +169,23 @@ class BasinsOfAttraction(ComputedImage):
     def __call__(self, parameters, iterations):
         real, real_size = self.tc()
 
-        pl = self.wrapArgs(self.paramCount, *parameters)
-
         resultDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
                                  size=numpy.prod(self.imageShape) * real_size * 2)
 
         self.program.createAttractionMap(
             self.queue, self.imageShape, None,
             numpy.array(self.spaceShape, dtype=real),
-            *pl,
+            *self.wrapArgs(self.paramCount, *parameters),
             numpy.int32(iterations),
             resultDevice
         )
 
         result = numpy.empty(shape=(*self.imageShape, 2), order="C", dtype=real)
-
         cl.enqueue_copy(self.queue, result, resultDevice)
 
         resultUnique = numpy.unique(result, axis=0)
-
         resultUniqueDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY,
                                        size=resultUnique.itemsize * resultUnique.size)
-
         cl.enqueue_copy(self.queue, resultUniqueDevice, resultUnique)
 
         self.program.drawAttractionMap(
@@ -202,4 +197,3 @@ class BasinsOfAttraction(ComputedImage):
         )
 
         return self.readFromDevice(), len(resultUnique) - 1
-

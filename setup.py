@@ -41,7 +41,7 @@ setup(
 
     packages=find_packages(exclude=["examples"]),
 
-    install_requires=["pyopencl", "PyQt5"],
+    install_requires=["numpy", "pyopencl", "PyQt5"],
 
     python_requires=">=3",
 )

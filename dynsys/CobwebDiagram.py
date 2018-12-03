@@ -4,7 +4,7 @@ import pyopencl as cl
 from .cl import ComputedImage, \
     generateBoundsCode, generateImageBoundsCode, generateParameterCode
 
-cobwebDiagramSource = """
+SOURCE = """
 
 #ifndef carrying_function
 #define carrying_function map_function
@@ -111,7 +111,7 @@ class CobwebDiagram(ComputedImage):
                                generateParameterCode(typeConfig, paramCount),
                                generateBoundsCode(typeConfig, 2),
                                generateImageBoundsCode(2),
-                               cobwebDiagramSource,
+                               SOURCE,
                                #
                                typeConfig=typeConfig)
         self.paramCount = paramCount

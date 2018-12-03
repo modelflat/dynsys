@@ -2,7 +2,7 @@ import numpy
 
 from .cl import ComputedImage, generateBoundsCode
 
-parameterSurfaceSource = """
+SOURCE = """
 kernel void fillParameterSurface(
     const BOUNDS_2D bounds, write_only image2d_t result
 ) {    
@@ -19,7 +19,7 @@ class ParameterSurface(ComputedImage):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          colorFunctionSource,
                          generateBoundsCode(typeConfig, 2),
-                         parameterSurfaceSource,
+                         SOURCE,
                          typeConfig=typeConfig)
 
     def __call__(self):

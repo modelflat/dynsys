@@ -4,7 +4,7 @@ import pyopencl as cl
 from .cl import ComputedImage, TypeConfig,\
     generateParameterCode, generateImageBoundsCode, generateBoundsCode, generateVariableCode
 
-PHASE_PLOT_SOURCE = """
+SOURCE = """
 #define user_SYSTEM system_fn
 
 kernel void drawPhasePlot(
@@ -57,7 +57,7 @@ class PhasePlot(ComputedImage):
                          generateBoundsCode(typeConfig, len(imageShape)),
                          generateVariableCode(typeConfig, len(imageShape)),
                          generateParameterCode(typeConfig, paramCount),
-                         PHASE_PLOT_SOURCE,
+                         SOURCE,
                          #
                          typeConfig=typeConfig)
         self.paramCount = paramCount
