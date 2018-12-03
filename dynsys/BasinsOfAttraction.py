@@ -1,54 +1,28 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, generateParameterCode
+from .cl import ComputedImage, generateParameterCode, generateBoundsCode
 
 
-basins_of_attraction_source = """
-
-#ifndef FALLBACK_COLOR 
-#define FALLBACK_COLOR (float4)(0, 0, 0, 1)
-#endif
+utility = r"""
 
 #ifndef DETECTION_PRECISION 
 #define DETECTION_PRECISION 1e-4
 #endif
 
-#ifndef DETECTION_PRECISION_EXPONENT 
-#define DETECTION_PRECISION_EXPONENT 4
-#endif
-
-long2 round_and_compress(real2 point, real to_sign) {
+long2 roundCompress(real2, real);
+long2 roundCompress(real2 point, real to_sign) {
     return convert_long2_rtz(point / to_sign);
 }
 
-real2 round_point(real2 point, int to_sign) {
+real2 roundPoint(real2, int);
+real2 roundPoint(real2 point, int to_sign) {
     return convert_real2(convert_long2_rtz(point * pow(10.0f, (float)to_sign))) / pow(10.0f, (float)(to_sign)); 
 }
 
-kernel void create_attraction_map(
-    const real x_min, const real x_max, const real y_min, const real y_max,
-    PARAM_SIGNATURES,
-    const int iter_count,
-    global real2* result
-) {
-    const int2 id = ID_2D;
-    const int2 size = SIZE_2D;
-    
-    real2 point = TRANSLATE_2D_INV_Y(id, size, x_min, x_max, y_min, y_max);
-    
-    for (int i = 0; i < iter_count; ++i) {
-        point = system(point, PARAM_VALUES);
-    }
-    
-    result[id.x * size.y + id.y] = round_point(point, DETECTION_PRECISION_EXPONENT);
-}
-
-int pair_eq(const real2 p1, const real2 p2) {
-    return NEAR(p1.x, p2.x, DETECTION_PRECISION) && NEAR(p1.y, p2.y, DETECTION_PRECISION);
-}
 
 // C++ STL pair operator< implementation
+int pair_lt(const real2, const real2);
 int pair_lt(const real2 p1, const real2 p2) {
     if (p1.x < p2.x) {
         return 1;
@@ -61,11 +35,18 @@ int pair_lt(const real2 p1, const real2 p2) {
     }
 }
 
+int pair_eq(real2, real2);
+int pair_eq(real2 p1, real2 p2) {
+    return NEAR_1D(p1.x, p2.x, DETECTION_PRECISION) && NEAR_1D(p1.y, p2.y, DETECTION_PRECISION);
+}
+
+int pair_gt(const real2, const real2);
 int pair_gt(const real2 p1, const real2 p2) {
     return !(pair_lt(p1, p2) || pair_eq(p1, p2));
 }
 
-int binary_search(const int size, const global real2* arr, const real2 value) {
+int binary_search(int, const global real2*, real2);
+int binary_search(int size, const global real2* arr, real2 value) {
     int l = 0, r = size;
     
     while (l < r) {
@@ -86,18 +67,52 @@ int binary_search(const int size, const global real2* arr, const real2 value) {
     return (r + l) / 2;
 }
 
-kernel void draw_attraction_map(
+"""
+
+
+basins_of_attraction_source = utility + r"""
+
+#ifndef FALLBACK_COLOR 
+#define FALLBACK_COLOR (float4)(0, 0, 0, 1)
+#endif
+
+#ifndef DETECTION_PRECISION_EXPONENT 
+#define DETECTION_PRECISION_EXPONENT 4
+#endif
+
+#define user_SYSTEM system_fn
+
+kernel void createAttractionMap(
+    const BOUNDS bounds,
+    const PARAMETERS_SIGNATURE,
+    const int iterations,
+    global real2* result
+) {
+    const int2 id = ID_2D;
+    const int2 size = SIZE_2D;
+    
+    real2 point = TRANSLATE_INV_Y_2D(real2, id, size, bounds);
+    
+    for (int i = 0; i < iterations; ++i) {
+        point = user_SYSTEM(point, PARAMETERS);
+    }
+    
+    #define FLAT_ID id.x * size.y + id.y
+    result[FLAT_ID] = roundPoint(point, DETECTION_PRECISION_EXPONENT);
+}
+
+kernel void drawAttractionMap(
     const int attraction_points_count,
     const global real2* attraction_points,
     const global real2* result,
-    
     write_only image2d_t map
 ) {
     const int2 id = ID_2D;
     const real2 val = result[id.x * get_global_size(1) + id.y];
     const int color_idx = binary_search(attraction_points_count, attraction_points, val);
     
-    if (color_idx == -1 || length(val) < DETECTION_PRECISION) { // in case of trivial solution (0, 0), we want to fallback too
+    if (color_idx == -1 || length(val) < DETECTION_PRECISION) { 
+        // in case of trivial solution (0, 0), we want to fallback too
         write_imagef(map, id, FALLBACK_COLOR);
         return;
     }
@@ -106,18 +121,16 @@ kernel void draw_attraction_map(
     write_imagef(map, id, (float4)( hsv2rgb((float3)(240.0 * ratio, 1.0, 1.0)), 1 ));
 }
 
-kernel void find_attraction(
+kernel void findAttraction(
     const real x, const real y,
-    PARAM_SIGNATURES,
-    const int iter_count,
+    const PARAMETERS_SIGNATURE,
+    const int iterations,
     global real2* result
 ) {
     real2 p = (real2)(x, y);
-    
-    for (int i = 0; i < iter_count; ++i) {
-        p = system(p, PARAM_VALUES);
+    for (int i = 0; i < iterations; ++i) {
+        p = user_SYSTEM(p, PARAMETERS);
     }
-    
     *result = p;
 }
 
@@ -130,66 +143,63 @@ class BasinsOfAttraction(ComputedImage):
                          # sources
                          systemFunction,
                          generateParameterCode(typeConfig, paramCount),
+                         generateBoundsCode(typeConfig, len(imageShape)),
                          basins_of_attraction_source,
                          #
                          typeConfig=typeConfig)
-        self.param_count = paramCount
-        self._find_attr_kernel = self.program.find_attraction
-        self.num_basins = 0
+        self.paramCount = paramCount
 
-    def find_attraction(self, x, y, iter_count, *params):
-        real, real_size = self.tc()
+    def findAttraction(self, targetPoint: tuple, parameters: tuple, iterations: int):
+        real, realSize = self.tc()
 
-        result_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, real_size*2)
+        resultDevice = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, realSize*2)
 
-        pl = self.wrapArgs(self.param_count, *params)
-
-        self._find_attr_kernel.set_args(
-            real(x), real(y), *pl,
-            numpy.int32(iter_count),
-            result_device
+        self.program.findAttraction(
+            self.queue, (1,), None,
+            *numpy.array(targetPoint, real),
+            *self.wrapArgs(self.paramCount, *parameters),
+            numpy.int32(iterations),
+            resultDevice
         )
-        cl.enqueue_task(self.queue, self._find_attr_kernel)
 
         result = numpy.empty((2,), dtype=real)
-
-        cl.enqueue_copy(self.queue, result, result_device)
-
+        cl.enqueue_copy(self.queue, result, resultDevice)
         return result
 
-    def __call__(self, iter_count, *params):
-
-        bounds = self.bounds
+    def __call__(self, parameters, iterations):
         real, real_size = self.tc()
 
-        pl = self.wrapArgs(self.param_count, params)
+        pl = self.wrapArgs(self.paramCount, *parameters)
 
-        result_device = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=self.width*self.height*2*real_size)
+        resultDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
+                                 size=numpy.prod(self.imageShape) * real_size * 2)
 
-        self.program.create_attraction_map(
-            self.queue, (self.width, self.height), None,
-            real(bounds.x_min), real(bounds.x_max), real(bounds.y_min), real(bounds.y_max),
+        self.program.createAttractionMap(
+            self.queue, self.imageShape, None,
+            numpy.array(self.spaceShape, dtype=real),
             *pl,
-            numpy.int32(iter_count), result_device
+            numpy.int32(iterations),
+            resultDevice
         )
 
-        result = numpy.empty(shape=(self.width * self.height, 2), order="C", dtype=real)
+        result = numpy.empty(shape=(*self.imageShape, 2), order="C", dtype=real)
 
-        cl.enqueue_copy(self.queue, result, result_device)
+        cl.enqueue_copy(self.queue, result, resultDevice)
 
-        result_unique = numpy.unique(result, axis=0)
+        resultUnique = numpy.unique(result, axis=0)
 
-        self.num_basins = len(result_unique) - 1 # except trivial solution
+        resultUniqueDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY,
+                                       size=resultUnique.itemsize * resultUnique.size)
 
-        result_unique_device = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=result_unique.itemsize*result_unique.size)
+        cl.enqueue_copy(self.queue, resultUniqueDevice, resultUnique)
 
-        cl.enqueue_copy(self.queue, result_unique_device, result_unique)
-
-        self.program.draw_attraction_map(
-            self.queue, (self.width, self.height), None,
-            numpy.int32(len(result_unique)),
-            result_unique_device, result_device, self.deviceImage
+        self.program.drawAttractionMap(
+            self.queue, self.imageShape, None,
+            numpy.int32(len(resultUnique)),
+            resultUniqueDevice,
+            resultDevice,
+            self.deviceImage
         )
 
-        return self.readFromDevice(), self.num_basins
+        return self.readFromDevice(), len(resultUnique) - 1
 

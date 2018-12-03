@@ -162,7 +162,7 @@ class ParameterMap(ComputedImage):
                          typeConfig=typeConfig)
         self.varCount = varCount
 
-    def __call__(self, varValues, iterations, skip=0):
+    def __call__(self, variables, iterations, skip=0):
         real, realSize = self.tc()
 
         samplesDevice = cl.Buffer(
@@ -173,7 +173,7 @@ class ParameterMap(ComputedImage):
         self.program.computeMap(
             self.queue, self.imageShape, None,
             numpy.array(self.spaceShape, dtype=self.tc.boundsType),
-            *self.wrapArgs(self.varCount, *varValues),
+            numpy.array(variables, dtype=self.tc.varType),
             numpy.int32(iterations), numpy.int32(skip),
             samplesDevice,
             self.deviceImage

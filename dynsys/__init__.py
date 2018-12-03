@@ -2,8 +2,8 @@ import sys
 
 from typing import Union
 
-from PyQt5.Qt import QWidget, QApplication
-from PyQt5.Qt import QObject, pyqtSignal as Signal
+from PyQt5.Qt import QApplication, QDesktopWidget
+from PyQt5.Qt import QObject
 
 from .cl import *
 from .ui import *
@@ -164,5 +164,9 @@ class SimpleApp(QWidget):
         return boa if ui is None else (boa, ui)
 
     def run(self):
+        screen = QDesktopWidget().screenGeometry()
         self.show()
+        x = ((screen.width() - self.width()) // 2) if screen.width() > self.width() else 0
+        y = ((screen.height() - self.height()) // 2) if screen.height() > self.height() else 0
+        self.move(x, y)
         sys.exit(self.app.exec_())

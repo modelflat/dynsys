@@ -136,7 +136,7 @@ class Image2D(ImageWidget):
         return self._target.pos()
 
     def setTargetPx(self, targetLocation: tuple) -> None:
-        raise NotImplementedError()
+        self._target.setPos(targetLocation)
 
     def targetReal(self) -> tuple:
         x, y = self._target.pos()

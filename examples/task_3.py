@@ -63,7 +63,7 @@ class Task3(SimpleApp):
 
     def drawParamMap(self):
         self.paramMapUi.setImage(self.paramMap(
-            varValues=(x0,),
+            variables=(x0,),
             iterations=80,
             skip=512
         ))

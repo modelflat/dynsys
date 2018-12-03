@@ -11,25 +11,28 @@ parameter_map_bounds = Bounds(
 )
 
 attractor_bounds = Bounds(
-    -.5, 1.5,
-    -1, 1.5
+    -1, 3,
+    -1, 3
 )
 
-iter_count = 2 ** 12 
-draw_last = 2 ** 10
+iterations = 2 ** 12
+skip = 0
 
 x0, y0 = .0005, .0005
 
 map_function_source = """
+real2 map_function(real2, real, real);
+
 real2 map_function(real2 v, real lam, real A) {
     return (real2) (
         1 - lam*v.x*v.x - (-.25)*v.y*v.y,
         1 - A*v.y*v.y - (.375)*v.x*v.x
     );
 }
+
 #define DIVERGENCE_THRESHOLD 5
 #define DIVERGENCE_COLOR (float4)(.4)
-#define system map_function
+#define system_fn map_function
 #define DYNAMIC_COLOR
 //#define GENERATE_COLORS
 """
@@ -40,47 +43,60 @@ class Task7(SimpleApp):
     def __init__(self):
         super().__init__("Task 7")
 
-        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source,
-                                                   variableCount=2)
-        self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=["lam", "A"],
-                                                            targetColor=QtCore.Qt.white)
+        self.paramMap, self.paramMapUi = self.makeParameterMap(
+            source=map_function_source, variableCount=2,
+            spaceShape=parameter_map_bounds,
+            imageShape=(256, 256),
+            withUi=True,
+            uiNames=("lam", "A"),
+            uiTargetColor=Qt.white
+        )
 
-        self.parameter_map_zoomed = self.makeParameterMap(parameter_map_bounds_zoomed, map_function_source,
-                                                          width=512, height=512,
-                                                          variableCount=2)
-        self.parameter_map_zoomed_image = ParameterizedImageWidget(parameter_map_bounds_zoomed, names=["lam", "A"],
-                                                                   targetColor=QtCore.Qt.white)
+        self.paramMapZoomed, self.paramMapZoomedUi = self.makeParameterMap(
+            source=map_function_source, variableCount=2,
+            spaceShape=parameter_map_bounds_zoomed,
+            imageShape=(256, 256),
+            withUi=True,
+            uiNames=("lam", "A"),
+            uiTargetColor=Qt.white
+        )
 
-        self.attractor = self.makePhasePlot(attractor_bounds, map_function_source)
-        self.attractor_image = ParameterizedImageWidget(attractor_bounds)
+        self.attractor, self.attractorUi = self.makePhasePlot(
+            source=map_function_source, paramCount=2,
+            imageShape=(256, 256),
+            withUi=True
+        )
 
-        self.parameter_map_image.selectionChanged.connect(self.draw_attractor)
-        self.parameter_map_zoomed_image.selectionChanged.connect(self.draw_attractor)
+        self.paramMapUi.selectionChanged.connect(self.draw_attractor)
+        self.paramMapZoomedUi.selectionChanged.connect(self.draw_attractor)
 
         self.setLayout(
-            hStack(self.parameter_map_zoomed_image,
-                   vStack(
-                          self.attractor_image,
-                          self.parameter_map_image
-                      ))
+            hStack(self.paramMapUi, self.paramMapZoomedUi, self.attractorUi)
         )
 
         self.draw_parameter_map()
         self.draw_parameter_map_zoomed()
+        self.draw_attractor(1, 1)
 
     def draw_parameter_map(self):
-        self.parameter_map_image.setImage(self.parameter_map(
-            80, 512, x0, y0
+        self.paramMapUi.setImage(self.paramMap(
+            variables=(x0, y0),
+            iterations=80,
+            skip=512
         ))
 
     def draw_parameter_map_zoomed(self):
-        self.parameter_map_zoomed_image.setImage(self.parameter_map_zoomed(
-            80, 512, x0, y0
+        self.paramMapZoomedUi.setImage(self.paramMapZoomed(
+            variables=(x0, y0),
+            iterations=80,
+            skip=512
         ))
 
     def draw_attractor(self, A, lam):
-        self.attractor_image.setImage(self.attractor(
-            iter_count, A, lam, draw_last_points=draw_last
+        self.attractorUi.setImage(self.attractor(
+            parameters=(A, lam),
+            iterations=iterations,
+            skip=skip
         ))
 
 

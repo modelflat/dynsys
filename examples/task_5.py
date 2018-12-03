@@ -10,18 +10,21 @@ attractor_bounds = Bounds(
     -2, 2
 )
 
-iter_count = 2 ** 15
-draw_count = 1  # 2**15
+iterations = 2 ** 15
+skip = 2**14
 
 x0, y0 = -.5, -.5
 
 map_function_source = """
+real2 map_function(real2, real, real);
+
 real2 map_function(real2 v, real b, real lam) {
     real xp = 1 - lam*v.x*v.x - b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
-#define system map_function
+
+#define system_fn map_function
 //#define DYNAMIC_COLOR
 //#define GENERATE_COLORS
 #define DIVERGENCE_THRESHOLD 1e3
@@ -33,32 +36,43 @@ class Task5(SimpleApp):
     def __init__(self):
         super().__init__("Task 5")
 
-        self.parameter_map = self.makeParameterMap(parameter_map_bounds, map_function_source, variableCount=2)
-        self.parameter_map_image = ParameterizedImageWidget(parameter_map_bounds, names=("b", "lam"),
-                                                            targetColor=QtCore.Qt.white)
+        self.paramMap, self.paramMapUi = self.makeParameterMap(
+            source=map_function_source, variableCount=2,
+            spaceShape=parameter_map_bounds,
+            withUi=True,
+            uiNames=("b", "lam"),
+            uiTargetColor=Qt.white
+        )
 
-        self.attractor = self.makePhasePlot(attractor_bounds, map_function_source)
-        self.attractor_image = ParameterizedImageWidget(attractor_bounds)
+        self.attractor, self.attractorUi = self.makePhasePlot(
+            source=map_function_source, paramCount=2,
+            spaceShape=attractor_bounds,
+            withUi=True
+        )
 
-        self.parameter_map_image.selectionChanged.connect(self.draw_attractor)
+        self.paramMapUi.selectionChanged.connect(self.drawAttractor)
 
         self.setLayout(
             hStack(
-                self.parameter_map_image, self.attractor_image
+                self.paramMapUi, self.attractorUi
             )
         )
 
-        self.draw_parameter_map()
-        self.draw_attractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
+        self.drawParamMap()
+        self.drawAttractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
 
-    def draw_attractor(self, a, b):
-        self.attractor_image.setImage(self.attractor(
-            iter_count, a, b, draw_last_points=draw_count
+    def drawAttractor(self, a, b):
+        self.attractorUi.setImage(self.attractor(
+            parameters=(a, b),
+            iterations=iterations,
+            skip=skip
         ))
 
-    def draw_parameter_map(self):
-        self.parameter_map_image.setImage(self.parameter_map(
-            16, 512, x0, y0
+    def drawParamMap(self):
+        self.paramMapUi.setImage(self.paramMap(
+            variables=(x0, y0),
+            iterations=16,
+            skip=512
         ))
 
 

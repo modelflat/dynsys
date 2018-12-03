@@ -76,11 +76,11 @@ class Ressler(SimpleApp):
             "real", rBounds,
             withLabel="r = {}", labelPosition="top",
             withValue=2.5,
-            connectTo=lambda r: self.draw_phase_plot(*self.abSurfaceUi.value(), r)
+            connectTo=lambda r: self.drawPhasePlot(*self.abSurfaceUi.value(), r)
         )
 
         self.abSurfaceUi.selectionChanged.connect(
-            lambda params, _: self.draw_phase_plot(*params, self.rSlider.value())
+            lambda params, _: self.drawPhasePlot(*params, self.rSlider.value())
         )
 
         self.setLayout(
@@ -90,14 +90,14 @@ class Ressler(SimpleApp):
         )
         self.attractorUi.setFixedSize(512, 512)
 
-        self.draw_parameter_surface()
+        self.drawParameterSurface()
         self.abSurfaceUi.setValue((.25, .155))
-        self.draw_phase_plot(.25, .155, 2.5)
+        self.drawPhasePlot(.25, .155, 2.5)
 
-    def draw_parameter_surface(self):
+    def drawParameterSurface(self):
         self.abSurfaceUi.setImage(self.abSurface())
 
-    def draw_phase_plot(self, a, b, r, skip=skip):
+    def drawPhasePlot(self, a, b, r, skip=skip):
         import time
         t = time.perf_counter()
         self.attractorUi.setTexture(self.attractor(

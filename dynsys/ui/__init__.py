@@ -62,8 +62,10 @@ class ParameterizedImageWidget(QWidget):
 
     def updatePositionLabel(self, value, buttons):
         self._positionLabel.setText("  |  ".join(
-            filter(lambda x: x is not None,
-                  (None if sh is None or vl is None else "{} = {}".format(nm, vl) for sh, nm, vl in zip(self._shape, self._names, value)))
+            filter(lambda x: x is not None, (
+                None if sh is None or vl is None else "{0} = {1:.4f}".format(nm, vl)
+                for sh, nm, vl in zip(self._shape, self._names, value)
+            ))
         ))
 
     def setImage(self, image: numpy.ndarray):
@@ -73,7 +75,9 @@ class ParameterizedImageWidget(QWidget):
         return self._imageWidget.targetReal()
 
     def setValue(self, targetValue: tuple):
-        self._imageWidget.setTargetReal(targetValue)
-        self.updatePositionLabel(targetValue, (False, False))
-
-
+        if targetValue is None:
+            self._imageWidget.setTargetPx((-1, -1))
+            self._positionLabel.setText("")
+        else:
+            self._imageWidget.setTargetReal(targetValue)
+            self.updatePositionLabel(targetValue, (False, False))
