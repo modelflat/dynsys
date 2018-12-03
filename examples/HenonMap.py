@@ -1,11 +1,11 @@
 from dynsys import *
 
-parameter_map_bounds = Bounds(
+paramMapBounds = Bounds(
     -.5, .5,
     0, 2
 )
 
-attractor_bounds = Bounds(
+phasePlotBounds = Bounds(
     -2, 2,
     -2, 2
 )
@@ -13,44 +13,46 @@ attractor_bounds = Bounds(
 iterations = 2 ** 15
 skip = 2**14
 
-x0, y0 = -.5, -.5
+point0 = -.5, -.5
 
-map_function_source = """
-real2 map_function(real2, real, real);
+systemSource = """
+real2 fn(real2, real, real);
 
-real2 map_function(real2 v, real b, real lam) {
+real2 fn(real2 v, real b, real lam) {
     real xp = 1 - lam*v.x*v.x - b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
 
-#define system_fn map_function
+#define map_function fn
+#define system_fn fn
+
 //#define DYNAMIC_COLOR
 //#define GENERATE_COLORS
 #define DIVERGENCE_THRESHOLD 1e3
 """
 
 
-class Task5(SimpleApp):
+class HenonMap(SimpleApp):
 
     def __init__(self):
-        super().__init__("Task 5")
+        super().__init__("Example: Henon Map - parameter map and attractor")
 
         self.paramMap, self.paramMapUi = self.makeParameterMap(
-            source=map_function_source, variableCount=2,
-            spaceShape=parameter_map_bounds,
+            source=systemSource, variableCount=2,
+            spaceShape=paramMapBounds,
             withUi=True,
             uiNames=("b", "lam"),
             uiTargetColor=Qt.white
         )
 
         self.attractor, self.attractorUi = self.makePhasePlot(
-            source=map_function_source, paramCount=2,
-            spaceShape=attractor_bounds,
+            source=systemSource, paramCount=2,
+            spaceShape=phasePlotBounds,
             withUi=True
         )
 
-        self.paramMapUi.selectionChanged.connect(self.drawAttractor)
+        self.paramMapUi.selectionChanged.connect(self.drawPhasePlot)
 
         self.setLayout(
             hStack(
@@ -59,9 +61,9 @@ class Task5(SimpleApp):
         )
 
         self.drawParamMap()
-        self.drawAttractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
+        self.drawPhasePlot(paramMapBounds.x_min, paramMapBounds.y_min)
 
-    def drawAttractor(self, a, b):
+    def drawPhasePlot(self, a, b):
         self.attractorUi.setImage(self.attractor(
             parameters=(a, b),
             iterations=iterations,
@@ -70,11 +72,11 @@ class Task5(SimpleApp):
 
     def drawParamMap(self):
         self.paramMapUi.setImage(self.paramMap(
-            variables=(x0, y0),
+            variables=point0,
             iterations=16,
             skip=512
         ))
 
 
 if __name__ == '__main__':
-    Task5().run()
+    HenonMap().run()

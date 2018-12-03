@@ -23,7 +23,7 @@ real map_function(real x, real a, real b) {
 class Task3(SimpleApp):
 
     def __init__(self):
-        super().__init__("Example: ParamMap + Cobweb")
+        super().__init__("Example: Cubic Map with 2 parameters")
 
         self.paramMap, self.paramMapUi = self.makeParameterMap(
             source=mapFunction,

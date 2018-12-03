@@ -38,15 +38,14 @@ real2 map_function(real2 v, real lam, real A) {
 """
 
 
-class Task7(SimpleApp):
+class NonIdenticalPairedLogisticMaps(SimpleApp):
 
     def __init__(self):
-        super().__init__("Task 7")
+        super().__init__("Example: Non-identical paired logistic maps")
 
         self.paramMap, self.paramMapUi = self.makeParameterMap(
             source=map_function_source, variableCount=2,
             spaceShape=parameter_map_bounds,
-            imageShape=(256, 256),
             withUi=True,
             uiNames=("lam", "A"),
             uiTargetColor=Qt.white
@@ -55,7 +54,6 @@ class Task7(SimpleApp):
         self.paramMapZoomed, self.paramMapZoomedUi = self.makeParameterMap(
             source=map_function_source, variableCount=2,
             spaceShape=parameter_map_bounds_zoomed,
-            imageShape=(256, 256),
             withUi=True,
             uiNames=("lam", "A"),
             uiTargetColor=Qt.white
@@ -63,7 +61,6 @@ class Task7(SimpleApp):
 
         self.attractor, self.attractorUi = self.makePhasePlot(
             source=map_function_source, paramCount=2,
-            imageShape=(256, 256),
             withUi=True
         )
 
@@ -101,4 +98,4 @@ class Task7(SimpleApp):
 
 
 if __name__ == '__main__':
-    Task7().run()
+    NonIdenticalPairedLogisticMaps().run()

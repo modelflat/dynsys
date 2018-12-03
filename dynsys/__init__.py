@@ -40,6 +40,8 @@ class ObservableValue(QObject):
 
 class SimpleApp(QWidget):
 
+    DEFAULT_IMAGE_SIZE = (256, 256)
+
     def __init__(self, title):
         import json
         self.app = QApplication(sys.argv)
@@ -49,7 +51,7 @@ class SimpleApp(QWidget):
         self.config = None
         if len(sys.argv) > 1:
             self.configFile = sys.argv[1]
-            print("Loading config from file: ", self.configFile)
+            print("Loading config from file:", self.configFile)
             try:
                 with open(self.configFile) as f:
                     self.config = json.load(f)
@@ -57,15 +59,15 @@ class SimpleApp(QWidget):
                 raise RuntimeWarning("Cannot load configuration from file %s: %s" % (self.configFile, str(e)))
             else:
                 print("Loaded configuration:", self.config)
-
         self.ctx, self.queue = createContextAndQueue(self.config)
 
-    def _convertBounds(self, bounds):
+    @staticmethod
+    def _convertBounds(bounds):
         return bounds.asTuple() if type(bounds) is Bounds else bounds
 
     def makePhasePlot(self, source: str, paramCount: int,
                       spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
-                      imageShape: tuple = (512, 512),
+                      imageShape: tuple = DEFAULT_IMAGE_SIZE,
                       backColor: tuple = (1.0, 1.0, 1.0, 1.0),
                       typeConfig: TypeConfig = FLOAT,
                       withUi: bool = True,
@@ -73,17 +75,17 @@ class SimpleApp(QWidget):
                       uiShape: tuple = (False, False),
                       uiTargetColor: QColor = Qt.red
                       ):
-        bounds = self._convertBounds(spaceShape)
+        bounds = SimpleApp._convertBounds(spaceShape)
         plot = PhasePlot(
             self.ctx, self.queue, imageShape, bounds, source,
             paramCount=paramCount, backColor=backColor, typeConfig=typeConfig
         )
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return plot if ui is None else (plot, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return plot if elem is None else (plot, elem)
 
     def makeParameterSurface(self, source: str,
                              spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
-                             imageShape: tuple = (512, 512),
+                             imageShape: tuple = DEFAULT_IMAGE_SIZE,
                              typeConfig: TypeConfig = FLOAT,
                              withUi: bool = True,
                              uiNames: tuple = None,
@@ -92,76 +94,76 @@ class SimpleApp(QWidget):
                              ):
         bounds = self._convertBounds(spaceShape)
         surf = ParameterSurface(self.ctx, self.queue, imageShape, bounds, source, typeConfig=typeConfig)
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return surf if ui is None else (surf, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return surf if elem is None else (surf, elem)
 
     def makeCobwebDiagram(self, source: str, paramCount: int,
                           spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
-                          imageShape: tuple = (512, 512),
+                          imageShape: tuple = DEFAULT_IMAGE_SIZE,
                           typeConfig: TypeConfig = FLOAT,
                           withUi: bool = True,
                           uiNames: tuple = None,
                           uiShape: tuple = None,
                           uiTargetColor: QColor = Qt.red
                           ):
-        bounds = self._convertBounds(spaceShape)
+        bounds = SimpleApp._convertBounds(spaceShape)
         diag = CobwebDiagram(
             self.ctx, self.queue, imageShape, bounds, source,
             paramCount=paramCount, typeConfig=typeConfig
         )
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return diag if ui is None else (diag, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return diag if elem is None else (diag, elem)
 
     def makeParameterMap(self, source: str, variableCount: int,
                          spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
-                         imageShape: tuple = (512, 512),
+                         imageShape: tuple = DEFAULT_IMAGE_SIZE,
                          typeConfig: TypeConfig = FLOAT,
                          withUi: bool = True,
                          uiNames: tuple = None,
                          uiShape: tuple = None,
                          uiTargetColor: QColor = Qt.red
                          ):
-        bounds = self._convertBounds(spaceShape)
+        bounds = SimpleApp._convertBounds(spaceShape)
         pmap = ParameterMap(
             self.ctx, self.queue, imageShape, bounds, source,
             varCount=variableCount, typeConfig=typeConfig
         )
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return pmap if ui is None else (pmap, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return pmap if elem is None else (pmap, elem)
 
     def makeBifurcationTree(self, source, paramCount: int,
                             paramRange: Union[tuple, Bounds] = (-1., 1.),
-                            imageShape: tuple = (512, 512),
+                            imageShape: tuple = DEFAULT_IMAGE_SIZE,
                             typeConfig: TypeConfig = FLOAT,
                             withUi: bool = True,
                             uiNames: tuple = None,
                             uiShape: tuple = None,
                             uiTargetColor: QColor = Qt.red
                             ):
-        bounds = self._convertBounds(paramRange)
+        bounds = SimpleApp._convertBounds(paramRange)
         bif = BifurcationTree(
             self.ctx, self.queue, imageShape, source,
             paramCount=paramCount, typeConfig=typeConfig
         )
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return bif if ui is None else (bif, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return bif if elem is None else (bif, elem)
 
     def makeBasinsOfAttraction(self, source, paramCount: int,
                                spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),
-                               imageShape: tuple = (512, 512),
+                               imageShape: tuple = DEFAULT_IMAGE_SIZE,
                                typeConfig: TypeConfig = FLOAT,
                                withUi: bool = True,
                                uiNames: tuple = None,
                                uiShape: tuple = None,
                                uiTargetColor: QColor = Qt.red
                                ):
-        bounds = self._convertBounds(spaceShape)
+        bounds = SimpleApp._convertBounds(spaceShape)
         boa = BasinsOfAttraction(
             self.ctx, self.queue, imageShape, bounds, source,
             paramCount=paramCount, typeConfig=typeConfig
         )
-        ui = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
-        return boa if ui is None else (boa, ui)
+        elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
+        return boa if elem is None else (boa, elem)
 
     def run(self):
         screen = QDesktopWidget().screenGeometry()

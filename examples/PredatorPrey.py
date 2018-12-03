@@ -1,11 +1,11 @@
 from dynsys import *
 
-parameter_map_bounds = Bounds(
+parameterMapBounds = Bounds(
     0, 3,
     0, 3
 )
 
-attractor_bounds = Bounds(
+phasePlotBounds = Bounds(
     -3, 3,
     -3, 3
 )
@@ -13,7 +13,9 @@ attractor_bounds = Bounds(
 iterations = 2 ** 15
 skip = 0
 
-system_function_source = """
+systemSource = r"""
+real2 system_fn(real2, real, real);
+
 #define STEP (real)(4e-4)
 real2 system_fn(real2 v, real m, real b) {
     real2 p = (real2)(
@@ -25,7 +27,9 @@ real2 system_fn(real2 v, real m, real b) {
 #define DYNAMIC_COLOR
 """
 
-parameter_surface_color_function = """
+parameterSurfaceSource = """
+float3 color_for_point(real2);
+
 #define D 5e-3
 float3 color_for_point(real2 p) {
     if (fabs(p.y - (1 - sqrt(p.x))) < D) {
@@ -42,22 +46,22 @@ float3 color_for_point(real2 p) {
 """
 
 
-class Task4(SimpleApp):
+class PredatorPrey(SimpleApp):
 
     def __init__(self):
-        super().__init__("Task 4")
+        super().__init__("Example: Predator-Prey Model, phase plot and parameter surface with interesting areas")
 
         self.paramSurface, self.paramSurfaceUi = self.makeParameterSurface(
-            source=parameter_surface_color_function,
-            spaceShape=parameter_map_bounds,
+            source=parameterSurfaceSource,
+            spaceShape=parameterMapBounds,
             withUi=True,
             uiNames=("b", "m"),
             uiTargetColor=Qt.white
         )
 
         self.attractor, self.attractorUi = self.makePhasePlot(
-            source=system_function_source, paramCount=2,
-            spaceShape=attractor_bounds,
+            source=systemSource, paramCount=2,
+            spaceShape=phasePlotBounds,
             withUi=True
         )
 
@@ -72,7 +76,7 @@ class Task4(SimpleApp):
         )
 
         self.drawParamSurface()
-        self.drawAttractor(parameter_map_bounds.x_min, parameter_map_bounds.y_min)
+        self.drawAttractor(parameterMapBounds.x_min, parameterMapBounds.y_min)
 
     def drawAttractor(self, a, b):
         self.attractorUi.setImage(self.attractor(
@@ -86,6 +90,5 @@ class Task4(SimpleApp):
         self.paramSurfaceUi.setImage(self.paramSurface())
 
 
-
 if __name__ == '__main__':
-    Task4().run()
+    PredatorPrey().run()

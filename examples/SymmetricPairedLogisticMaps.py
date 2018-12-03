@@ -1,76 +1,72 @@
 from dynsys import *
-
 from math import isnan
 
-parameter_map_bounds = Bounds(
+paramMapBounds = Bounds(
     -.5, 2,
     -.5, 2
 )
 
-attractor_bounds = Bounds(
+attractorBounds = Bounds(
     -2, 2,
     -2, 2
 )
 
+point0 = 0, 0
+
 iterations = 2 ** 10
 skip = 2 ** 10
 
-x0, y0 = 0, 0
-
-map_function_source = """
-real2 map_function(real2, real, real);
+systemSource = r"""
+real2 fn(real2, real, real);
 
 #define EPSILON 0.2
-real2 map_function(real2 v, real lam1, real lam2) {
+real2 fn(real2 v, real lam1, real lam2) {
     real xp = lam1 - v.x*v.x + EPSILON*(v.y - v.x); 
     real yp = lam2 - v.y*v.y + EPSILON*(v.x - v.y);
     return (real2)(xp, yp);
 }
-#define system_fn map_function
+
+#define map_function fn
+#define system_fn fn
 
 #define DYNAMIC_COLOR
-//#define GENERATE_COLORS
 #define DIVERGENCE_THRESHOLD 1e2
 #define DIVERGENCE_COLOR (float4)(.5)
 #define DETECTION_PRECISION 1e-2
 #define DETECTION_PRECISION_EXPONENT 2
-
 """
 
 
-class Task6(SimpleApp):
+class SymmetricPairedLogisticMaps(SimpleApp):
 
     def __init__(self):
-        super().__init__("Task 6")
+        super().__init__("Example: Symmetric paired logistic maps - basins of attraction")
 
         self.paramMap, self.paramMapUi = self.makeParameterMap(
-            source=map_function_source, variableCount=2,
-            spaceShape=parameter_map_bounds,
-            imageShape=(256, 256),
+            source=systemSource, variableCount=2,
+            spaceShape=paramMapBounds,
             withUi=True,
             uiNames=("lam1", "lam2"),
             uiTargetColor=Qt.white
         )
 
         self.phasePlot, self.phasePlotUi = self.makePhasePlot(
-            source=map_function_source, paramCount=2,
-            spaceShape=attractor_bounds,
-            imageShape=(256, 256),
+            source=systemSource, paramCount=2,
+            spaceShape=attractorBounds,
             withUi=True,
             uiTargetColor=Qt.black
         )
 
         self.basins, self.basinsUi = self.makeBasinsOfAttraction(
-            source=map_function_source, paramCount=2,
-            spaceShape=attractor_bounds,
-            imageShape=(256, 256),
+            source=systemSource, paramCount=2,
+            spaceShape=attractorBounds,
             withUi=True,
             uiTargetColor=Qt.gray
         )
 
         self.basinsNumLabel = QLabel()
 
-        def attr_to_phase(val, _):
+        def attractorToPhase(val, _):
             attraction = self.basins.findAttraction(
                 targetPoint=val,
                 parameters=self.paramMapUi.value(),
@@ -81,7 +77,7 @@ class Task6(SimpleApp):
             else:
                 self.phasePlotUi.setValue(attraction)
 
-        self.basinsUi.selectionChanged.connect(attr_to_phase)
+        self.basinsUi.selectionChanged.connect(attractorToPhase)
 
         self.paramMapUi.selectionChanged.connect(
             lambda val, _: (self.drawBasins(*val), self.drawPhasePlot(*val))
@@ -120,11 +116,11 @@ class Task6(SimpleApp):
 
     def drawParamMap(self):
         self.paramMapUi.setImage(self.paramMap(
-            variables=(x0, y0),
+            variables=point0,
             iterations=80,
             skip=512
         ))
 
 
 if __name__ == '__main__':
-    Task6().run()
+    SymmetricPairedLogisticMaps().run()

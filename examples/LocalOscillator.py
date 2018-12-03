@@ -8,7 +8,12 @@ paramSurfaceBounds = Bounds(
     -2, 2,
 )
 
-paramSurfaceSource = """
+phaseBounds = Bounds(
+    -4, 4,
+    -4, 4,
+)
+
+paramSurfaceSource = r"""
 #define D 1e-4
 float3 color_for_point(real2 p) {
     if (fabs( p.x ) < D || fabs(p.y) < D) {
@@ -16,14 +21,10 @@ float3 color_for_point(real2 p) {
     }
     return 1.0;
 }
+
 """
 
-phaseBounds = Bounds(
-    -4, 4,
-    -4, 4,
-)
-
-systemFnSource = """
+systemFnSource = r"""
 #define STEP (real)(1e-4)
 real2 system_fn(real2 v, real lam, real k) {
     real2 p = (real2)(
@@ -33,13 +34,14 @@ real2 system_fn(real2 v, real lam, real k) {
     return v + STEP*p;
 }
 #define DYNAMIC_COLOR
+
 """
 
 
-class Task1(SimpleApp):
+class LocalOscillator(SimpleApp):
 
     def __init__(self):
-        super().__init__("Example: ParamSurface + Phase")
+        super().__init__("Example: Local Oscillator Phase Plot")
 
         self.paramSurface, self.paramSurfaceUi = self.makeParameterSurface(
             source=paramSurfaceSource,
@@ -80,4 +82,4 @@ class Task1(SimpleApp):
 
 
 if __name__ == '__main__':
-    Task1().run()
+    LocalOscillator().run()

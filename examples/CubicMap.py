@@ -24,9 +24,9 @@ real map_function(real x, real lam) {
 """
 
 
-class BifTreeAndCobweb(SimpleApp):
+class CubicMap(SimpleApp):
     def __init__(self):
-        super().__init__("Example: BifTree + Cobweb")
+        super().__init__("Example: Cubic Map - Bifurcation tree and cobweb diagram")
 
         self.cobweb, self.cobwebUi = self.makeCobwebDiagram(
             source=mapFunction, paramCount=1,
@@ -100,4 +100,4 @@ class BifTreeAndCobweb(SimpleApp):
 
 
 if __name__ == '__main__':
-    BifTreeAndCobweb().run()
+    CubicMap().run()
