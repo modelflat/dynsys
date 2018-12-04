@@ -65,7 +65,7 @@ class SimpleApp(QWidget):
 
     @staticmethod
     def _convertBounds(bounds):
-        return bounds.asTuple() if type(bounds) is Bounds else bounds
+        return bounds.asTuple() if isinstance(bounds, Bounds) else bounds
 
     def makePhasePlot(self, source: str, paramCount: int,
                       spaceShape: Union[tuple, Bounds] = (-1., 1., -1., 1.),

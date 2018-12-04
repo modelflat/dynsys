@@ -80,7 +80,6 @@ class TypeConfig:
         #define real2 {}2
         #define real3 {}3
         #define real4 {}4
-        #define real6 {}6
         #define convert_real convert_{}
         #define convert_real2 convert_{}2
         #define convert_real3 convert_{}3

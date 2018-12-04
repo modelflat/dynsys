@@ -11,9 +11,11 @@ paramSurfaceBounds = Bounds(
 rBounds = (0, 3)
 
 paramSurfaceFn = """
+float3 color_for_point(real2);
+
 #define D 1e-4
 float3 color_for_point(real2 p) {
-    if (fabs(p.x - .25f) < .01 && fabs(p.y - 0.15f) < .01) {
+    if (distance(p, (real2)(.25f, 0.15f)) < .01) {
         return (float3)(0, .5, 0);
     }
     return 1.0;
@@ -37,6 +39,8 @@ systemFn = """
 
 // #define T real2
 #define T real3
+
+T system_fn(T, real, real, real);
 
 T system_fn(T v, real a, real b, real r) {
     T p = (T)(
@@ -84,8 +88,9 @@ class Ressler(SimpleApp):
         )
 
         self.setLayout(
-            vStack(rSliderUi,
-                   hStack(self.abSurfaceUi, self.attractorUi)
+            vStack(
+                rSliderUi,
+                hStack(self.abSurfaceUi, self.attractorUi)
             )
         )
         self.attractorUi.setFixedSize(512, 512)
@@ -97,7 +102,7 @@ class Ressler(SimpleApp):
     def drawParameterSurface(self):
         self.abSurfaceUi.setImage(self.abSurface())
 
-    def drawPhasePlot(self, a, b, r, skip=skip):
+    def drawPhasePlot(self, a, b, r):
         import time
         t = time.perf_counter()
         self.attractorUi.setTexture(self.attractor(
