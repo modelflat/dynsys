@@ -5,7 +5,6 @@ from .cl import ComputedImage, generateCode
 
 
 SOURCE = """
-
 kernel void computeBifurcationTree(
     const real x0,
     PARAMETERS_SIGNATURE, 
@@ -27,11 +26,11 @@ kernel void computeBifurcationTree(
     real min_ = x0;
     real max_ = x0;
     for (int i = 0; i < skip; ++i) {
-        x = map_function(x, PARAMETERS);
+        x = userFn(x, PARAMETERS);
     }
 
     for (int i = 0; i < iterations; ++i) {
-        x = map_function(x, PARAMETERS);
+        x = userFn(x, PARAMETERS);
         if (x < min_ && x > -maxAllowedValue) min_ = x;
         if (x > max_ && x <  maxAllowedValue) max_ = x;
         result[i] = clamp(x, -maxAllowedValue, maxAllowedValue);
@@ -57,7 +56,6 @@ kernel void drawBifurcationTree(
         write_imagef(result, coord, TREE_COLOR);
     }
 }
-
 """
 
 
@@ -76,7 +74,7 @@ class BifurcationTree(ComputedImage):
 
     def __call__(self, startPoint, paramIndex, paramRange, otherParams, iterations,
                  skip: int = 0, maxAllowedValue: float = 1000.0):
-        real, realSize = self.tc()
+        real, realSize = self.typeConf()
         width = self.imageShape[0]
 
         resultDevice = cl.Buffer(
@@ -91,7 +89,7 @@ class BifurcationTree(ComputedImage):
             real(startPoint),
             *self.wrapArgs(self.paramCount, otherParams, skipIndex=paramIndex),
             numpy.int32(paramIndex),
-            numpy.array(paramRange, dtype=self.tc.real()),
+            numpy.array(paramRange, dtype=self.typeConf.real()),
             real(maxAllowedValue),
             numpy.int32(skip), numpy.int32(iterations),
             resultDevice, resultMinMaxDevice
@@ -109,7 +107,7 @@ class BifurcationTree(ComputedImage):
             self.queue, (self.imageShape[0],), None,
             resultDevice,
             numpy.int32(iterations),
-            numpy.array(minMax, dtype=self.tc.real()),
+            numpy.array(minMax, dtype=self.typeConf.real()),
             real(self.imageShape[1]),
             self.deviceImage
         )

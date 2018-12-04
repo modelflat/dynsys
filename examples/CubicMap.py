@@ -7,8 +7,7 @@ treeSkipCount = 256
 treeMaxValue = 10
 
 cobwebBounds = Bounds(
-    -2, 2,
-    -2, 2
+    -2, 2, -2, 2
 )
 
 lambdaRange = Bounds.x(
@@ -16,9 +15,8 @@ lambdaRange = Bounds.x(
 )
 
 mapFunction = """
-real map_function(real x, real lam);
-
-real map_function(real x, real lam) {
+real userFn(real x, real lam);
+real userFn(real x, real lam) {
     return (lam - x*x)*x;
 }
 """
@@ -42,17 +40,11 @@ class CubicMap(SimpleApp):
             uiNames=("lambda", None),
         )
 
-        self.pLambda = ObservableValue.makeAndConnect(
-            2.5, connect_to=self.drawDiagram
-        )
-        self.iterations = ObservableValue.makeAndConnect(
-            500, connect_to=self.drawDiagram
-        )
-        self.x0 = ObservableValue.makeAndConnect(
-            0.1, connect_to=lambda *args: (self.drawTree(), self.drawDiagram())
-        )
+        self.x0 = observable(0.1, connectTo=(self.drawTree, self.drawDiagram))
+        self.pLambda = observable(2.5, connectTo=self.drawDiagram)
+        self.iterations = observable(500, connectTo=self.drawDiagram)
 
-        self.bifTreeUi.selectionChanged.connect(lambda x, y: self.pLambda.setValue(x))
+        self.bifTreeUi.valueChanged.connect(self.pLambda.setValue)
 
         self.iterationsSlider, iterationsSliderUi = createSlider(
             "integer", (1, 1000),
@@ -79,7 +71,7 @@ class CubicMap(SimpleApp):
         self.drawDiagram()
         self.drawTree()
 
-    def drawDiagram(self, *args):
+    def drawDiagram(self, *_):
         self.cobwebUi.setImage(self.cobweb(
             startPoint=self.x0.value(),
             parameters=(self.pLambda.value(),),
@@ -87,7 +79,7 @@ class CubicMap(SimpleApp):
             skip=skipCount
         ))
 
-    def drawTree(self, *args):
+    def drawTree(self, *_):
         self.bifTreeUi.setImage(self.bifTree(
             startPoint=self.x0.value(),
             paramIndex=0,

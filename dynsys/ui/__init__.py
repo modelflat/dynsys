@@ -31,6 +31,8 @@ class ParameterizedImageWidget(QWidget):
 
     selectionChanged = Signal(tuple, tuple)
 
+    valueChanged = Signal(tuple)
+
     def __init__(self, bounds: tuple, names: tuple, shape: tuple, targetColor: QColor = Qt.red):
         super().__init__()
         if len(bounds) != 4:
@@ -52,6 +54,7 @@ class ParameterizedImageWidget(QWidget):
         self._positionLabel = QLabel()
         self._imageWidget = Image2D(targetColor=targetColor, targetShape=shape, spaceShape=bounds)
 
+        self._imageWidget.selectionChanged.connect(lambda val, _: self.valueChanged.emit(val))
         self._imageWidget.selectionChanged.connect(self.selectionChanged)
         self._imageWidget.selectionChanged.connect(self.updatePositionLabel)
 

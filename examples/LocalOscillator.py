@@ -1,32 +1,31 @@
 from dynsys import *
 
-iter_count = 2 ** 14
+iterations = 2 ** 14
 skip = 0
 
 paramSurfaceBounds = Bounds(
-    -2, 2,
-    -2, 2,
+    -2, 2, -2, 2,
 )
 
 phaseBounds = Bounds(
-    -4, 4,
-    -4, 4,
+    -4, 4, -4, 4,
 )
 
 paramSurfaceSource = r"""
-#define D 1e-4
-float3 color_for_point(real2 p) {
+float3 userFn(real2);
+float3 userFn(real2 p) {
+    #define D 1e-4
     if (fabs( p.x ) < D || fabs(p.y) < D) {
         return (float3)(0, .5, 0);
     }
     return 1.0;
 }
-
 """
 
 systemFnSource = r"""
-#define STEP (real)(1e-4)
-real2 system_fn(real2 v, real lam, real k) {
+real2 userFn(real2, real, real);
+real2 userFn(real2 v, real lam, real k) {
+    #define STEP (real)(1e-4)
     real2 p = (real2)(
         (lam + k*v.x*v.x - v.x*v.x*v.x*v.x)*v.y - v.x,
         v.x
@@ -34,7 +33,6 @@ real2 system_fn(real2 v, real lam, real k) {
     return v + STEP*p;
 }
 #define DYNAMIC_COLOR
-
 """
 
 
@@ -47,7 +45,7 @@ class LocalOscillator(SimpleApp):
             source=paramSurfaceSource,
             spaceShape=paramSurfaceBounds,
             withUi=True,
-            uiNames=("lambda", "k"),
+            uiNames=("λ", "k"),
             uiTargetColor=Qt.black
         )
 
@@ -55,28 +53,24 @@ class LocalOscillator(SimpleApp):
             source=systemFnSource, paramCount=2,
             spaceShape=phaseBounds,
             withUi=True,
-            uiShape=(True, False)
         )
 
-        self.paramSurfaceUi.selectionChanged.connect(
-            lambda val, _: self.draw_phase_plot(*val))
+        self.paramSurfaceUi.valueChanged.connect(self.drawPhasePlot)
 
         self.setLayout(
-            hStack(
-                self.paramSurfaceUi, self.attractorUi,
-            )
+            hStack(self.paramSurfaceUi, self.attractorUi)
         )
 
-        self.draw_parameter_surface()
-        self.draw_phase_plot(1., 1.)
+        self.drawParameterSurface()
+        self.drawPhasePlot()
 
-    def draw_parameter_surface(self):
+    def drawParameterSurface(self):
         self.paramSurfaceUi.setImage(self.paramSurface())
 
-    def draw_phase_plot(self, lam, k):
+    def drawPhasePlot(self, params=(1., 1.)):
         self.attractorUi.setImage(self.attractor(
-            parameters=(lam, k),
-            iterations=iter_count,
+            parameters=params,
+            iterations=iterations,
             skip=skip
         ))
 

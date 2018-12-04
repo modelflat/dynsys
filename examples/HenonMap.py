@@ -11,24 +11,16 @@ phasePlotBounds = Bounds(
 )
 
 iterations = 2 ** 15
-skip = 2**14
-
-point0 = -.5, -.5
+skip = 2 ** 14
 
 systemSource = """
-real2 fn(real2, real, real);
-
-real2 fn(real2 v, real b, real lam) {
+real2 userFn(real2, real, real);
+real2 userFn(real2 v, real b, real lam) {
     real xp = 1 - lam*v.x*v.x - b*v.y; 
     real yp = v.x;
     return (real2)(xp, yp);
 }
 
-#define map_function fn
-#define system_fn fn
-
-//#define DYNAMIC_COLOR
-//#define GENERATE_COLORS
 #define DIVERGENCE_THRESHOLD 1e3
 """
 
@@ -52,7 +44,7 @@ class HenonMap(SimpleApp):
             withUi=True
         )
 
-        self.paramMapUi.selectionChanged.connect(self.drawPhasePlot)
+        self.paramMapUi.valueChanged.connect(self.drawPhasePlot)
 
         self.setLayout(
             hStack(
@@ -61,18 +53,18 @@ class HenonMap(SimpleApp):
         )
 
         self.drawParamMap()
-        self.drawPhasePlot(paramMapBounds.xMin, paramMapBounds.yMin)
+        self.drawPhasePlot((paramMapBounds.xMin, paramMapBounds.yMin))
 
-    def drawPhasePlot(self, a, b):
+    def drawPhasePlot(self, ab):
         self.attractorUi.setImage(self.attractor(
-            parameters=(a, b),
+            parameters=ab,
             iterations=iterations,
             skip=skip
         ))
 
     def drawParamMap(self):
         self.paramMapUi.setImage(self.paramMap(
-            variables=point0,
+            variables=(-.5, -.5),
             iterations=16,
             skip=512
         ))

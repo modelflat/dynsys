@@ -5,16 +5,15 @@ iterations = 5 * 10**4
 skip = iterations // 100 * 95
 
 paramSurfaceBounds = Bounds(
-    0, .5,
-    0, .5,
+    0, .5, 0, .5
 )
+
 rBounds = (0, 3)
 
 paramSurfaceFn = """
-float3 color_for_point(real2);
-
-#define D 1e-4
-float3 color_for_point(real2 p) {
+float3 userFn(real2);
+float3 userFn(real2 p) {
+    #define D 1e-4
     if (distance(p, (real2)(.25f, 0.15f)) < .01) {
         return (float3)(0, .5, 0);
     }
@@ -35,15 +34,10 @@ imageShape = (
 )
 
 systemFn = """
-#define STEP (real)(1e-2)
-
-// #define T real2
-#define T real3
-
-T system_fn(T, real, real, real);
-
-T system_fn(T v, real a, real b, real r) {
-    T p = (T)(
+real3 userFn(real3, real, real, real);
+real3 userFn(real3 v, real a, real b, real r) {
+    #define STEP (real)(1e-2)
+    real3 p = (real3)(
         -v.z - v.y, 
         b + (v.x - r)*v.y,
         v.x + a*v.z
@@ -51,6 +45,7 @@ T system_fn(T v, real a, real b, real r) {
     );
     return v + STEP*p;
 }
+
 #define DYNAMIC_COLOR
 """
 
@@ -83,8 +78,8 @@ class Ressler(SimpleApp):
             connectTo=lambda r: self.drawPhasePlot(*self.abSurfaceUi.value(), r)
         )
 
-        self.abSurfaceUi.selectionChanged.connect(
-            lambda params, _: self.drawPhasePlot(*params, self.rSlider.value())
+        self.abSurfaceUi.valueChanged.connect(
+            lambda params: self.drawPhasePlot(*params, self.rSlider.value())
         )
 
         self.setLayout(
@@ -96,7 +91,7 @@ class Ressler(SimpleApp):
         self.attractorUi.setFixedSize(512, 512)
 
         self.drawParameterSurface()
-        self.abSurfaceUi.setValue((.25, .155))
+        self.abSurfaceUi.setValue((.25, .115))
         self.drawPhasePlot(.25, .155, 2.5)
 
     def drawParameterSurface(self):

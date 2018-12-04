@@ -79,8 +79,6 @@ SOURCE = UTILITY_SOURCE + r"""
 #define DETECTION_PRECISION_EXPONENT 4
 #endif
 
-#define user_SYSTEM system_fn
-
 kernel void createAttractionMap(
     const BOUNDS bounds,
     const PARAMETERS_SIGNATURE,
@@ -93,7 +91,7 @@ kernel void createAttractionMap(
     real2 point = TRANSLATE_INV_Y_2D(real2, id, size, bounds);
     
     for (int i = 0; i < iterations; ++i) {
-        point = user_SYSTEM(point, PARAMETERS);
+        point = userFn(point, PARAMETERS);
     }
     
     #define FLAT_ID id.x * size.y + id.y
@@ -128,7 +126,7 @@ kernel void findAttraction(
 ) {
     real2 p = (real2)(x, y);
     for (int i = 0; i < iterations; ++i) {
-        p = user_SYSTEM(p, PARAMETERS);
+        p = userFn(p, PARAMETERS);
     }
     *result = p;
 }
@@ -150,7 +148,7 @@ class BasinsOfAttraction(ComputedImage):
         self.paramCount = paramCount
 
     def findAttraction(self, targetPoint: tuple, parameters: tuple, iterations: int):
-        real, realSize = self.tc()
+        real, realSize = self.typeConf()
 
         resultDevice = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, realSize*2)
 
@@ -167,7 +165,7 @@ class BasinsOfAttraction(ComputedImage):
         return result
 
     def __call__(self, parameters, iterations):
-        real, real_size = self.tc()
+        real, real_size = self.typeConf()
 
         resultDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
                                  size=numpy.prod(self.imageShape) * real_size * 2)

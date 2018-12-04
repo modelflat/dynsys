@@ -1,6 +1,6 @@
 import sys
 
-from typing import Union
+from typing import Union, Iterable
 
 from PyQt5.Qt import QApplication, QDesktopWidget
 from PyQt5.Qt import QObject
@@ -27,16 +27,20 @@ class ObservableValue(QObject):
     def value(self):
         return self._value
 
-    def setValue(self, v):
-        self._value = v
-        self.valueChanged.emit(v)
+    def setValue(self, val):
+        self._value = val
+        self.valueChanged.emit(val)
 
-    @staticmethod
-    def makeAndConnect(initial, connect_to=None):
-        o = ObservableValue(initial)
-        if connect_to is not None:
-            o.valueChanged.connect(connect_to)
-        return o
+
+def observable(initial, connectTo=None):
+    o = ObservableValue(initial)
+    if connectTo is not None:
+        if isinstance(connectTo, Iterable):
+            for fn in connectTo:
+                o.valueChanged.connect(fn)
+        else:
+            o.valueChanged.connect(connectTo)
+    return o
 
 
 class SimpleApp(QWidget):

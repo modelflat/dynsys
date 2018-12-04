@@ -1,7 +1,5 @@
 from dynsys import *
 
-x0 = 0
-
 paramMapBounds = Bounds(
     -1.5, 1.5, -1, 3
 )
@@ -11,16 +9,14 @@ cobwebBounds = Bounds(
 )
 
 mapFunction = """
-
-real map_function(real, real, real);
-
-real map_function(real x, real a, real b) {
+real userFn(real, real, real);
+real userFn(real x, real a, real b) {
     return a + b*x - x*x*x;
 }
 """
 
 
-class Task3(SimpleApp):
+class CubicMap2Param(SimpleApp):
 
     def __init__(self):
         super().__init__("Example: Cubic Map with 2 parameters")
@@ -42,32 +38,30 @@ class Task3(SimpleApp):
             uiShape=(False, False)
         )
 
-        self.paramMapUi.selectionChanged.connect(
-            lambda val, _: self.drawCobwebDiagram(*val)
-        )
+        self.paramMapUi.valueChanged.connect(self.drawCobwebDiagram)
 
         self.setLayout(
             hStack(self.paramMapUi, self.cobwebUi)
         )
 
         self.drawParamMap()
-        self.drawCobwebDiagram(1.0, 1.0)
+        self.drawCobwebDiagram((1.0, 1.0))
 
-    def drawCobwebDiagram(self, a, b):
+    def drawCobwebDiagram(self, ab):
         self.cobwebUi.setImage(self.cobweb(
-            startPoint=x0,
-            parameters=(a, b),
+            startPoint=0,
+            parameters=ab,
             iterations=512,
             skip=0
         ))
 
     def drawParamMap(self):
         self.paramMapUi.setImage(self.paramMap(
-            variables=(x0,),
+            variables=(0,),
             iterations=80,
             skip=512
         ))
 
 
 if __name__ == '__main__':
-    Task3().run()
+    CubicMap2Param().run()

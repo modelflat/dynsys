@@ -4,11 +4,6 @@ import pyopencl as cl
 from .cl import ComputedImage, generateCode
 
 SOURCE = """
-
-#ifndef carrying_function
-#define carrying_function map_function
-#endif
-
 // compute samples for diagram, single-threaded 
 // (usually iterations count is small enough, and we avoid copying data)
 kernel void computeSamples(
@@ -21,13 +16,13 @@ kernel void computeSamples(
     real x = start;
 
     for (int i = 0; i < skip; ++i) {
-        x = map_function(x, PARAMETERS);
+        x = userFn(x, PARAMETERS);
     }
     
     samples[0] = x;
     samples[1] = x;
     for (int i = skip + 2; i < iterations; ++i) {
-        x = map_function(x, PARAMETERS);
+        x = userFn(x, PARAMETERS);
         samples[i - skip] = x;   
     }
 }
@@ -49,7 +44,7 @@ kernel void drawBackground(
     
     if (NEAR_1D(v.y, v.x, ABS_ERROR)) {
         write_imagef(result, id, CROSSING_COLOR);
-    } else if (NEAR_1D(v.y, carrying_function(v.x, PARAMETERS), ABS_ERROR * 5)) {
+    } else if (NEAR_1D(v.y, userFn(v.x, PARAMETERS), ABS_ERROR * 5)) {
         write_imagef(result, id, CARRY_COLOR);
     } else {
         write_imagef(result, id, FILL_COLOR);
@@ -117,7 +112,7 @@ class CobwebDiagram(ComputedImage):
         self.paramCount = paramCount
 
     def __call__(self, startPoint, parameters, iterations, skip=0):
-        real, realSize = self.tc()
+        real, realSize = self.typeConf()
 
         samplesDevice = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, realSize * iterations)
 
@@ -133,14 +128,14 @@ class CobwebDiagram(ComputedImage):
         self.program.drawBackground(
             self.queue, self.imageShape, None,
             *paramList,
-            numpy.array(self.spaceShape, dtype=self.tc.boundsType),
+            numpy.array(self.spaceShape, dtype=self.typeConf.boundsType),
             self.deviceImage
         )
 
         self.program.drawCobwebDiagram(
             self.queue, (iterations,), None,
             samplesDevice,
-            numpy.array(self.spaceShape, dtype=self.tc.boundsType),
+            numpy.array(self.spaceShape, dtype=self.typeConf.boundsType),
             numpy.array(self.imageShape, dtype=numpy.int32),
             self.deviceImage
         )

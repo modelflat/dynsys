@@ -19,7 +19,6 @@ UTILITY_SOURCE = r"""
 #endif
 
 void makeHeap(global real*, int, int);
-
 void makeHeap(global real* data, int n, int i) {
     while (true) {
         int smallest = i;
@@ -41,7 +40,6 @@ void makeHeap(global real* data, int n, int i) {
 }
 
 void heapSort(global real*, int);
-
 void heapSort(global real* data, int n)
 {
     for (int i = n / 2 - 1; i >= 0; --i) {
@@ -55,7 +53,6 @@ void heapSort(global real* data, int n)
 }
 
 float3 color_for_count(int, int);
-
 float3 color_for_count(int count, int total) {
     if (count == total) {
         return 0.0;
@@ -106,12 +103,12 @@ kernel void computeMap(
     
     VARIABLE_TYPE x = VARIABLE;
     for (int i = 0; i < skip; ++i) {
-        x = map_function(x, v.x, v.y);
+        x = userFn(x, v.x, v.y);
     }
 
     int uniques = 0;
     for (int i = 0; i < samples_count; ++i) {
-        x = map_function(x, v.x, v.y);
+        x = userFn(x, v.x, v.y);
         samples[i] = x;
         
         //if (VARIABLE_VECTOR_ANY_ISNAN(x) || VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
@@ -164,7 +161,7 @@ class ParameterMap(ComputedImage):
         self.varCount = varCount
 
     def __call__(self, variables, iterations, skip=0):
-        real, realSize = self.tc()
+        real, realSize = self.typeConf()
 
         samplesDevice = cl.Buffer(
             self.ctx, cl.mem_flags.READ_WRITE,
@@ -173,8 +170,8 @@ class ParameterMap(ComputedImage):
 
         self.program.computeMap(
             self.queue, self.imageShape, None,
-            numpy.array(self.spaceShape, dtype=self.tc.boundsType),
-            numpy.array(variables, dtype=self.tc.varType),
+            numpy.array(self.spaceShape, dtype=self.typeConf.boundsType),
+            numpy.array(variables, dtype=self.typeConf.varType),
             numpy.int32(iterations), numpy.int32(skip),
             samplesDevice,
             self.deviceImage

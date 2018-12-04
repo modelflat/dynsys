@@ -1,23 +1,20 @@
 from dynsys import *
 
 parameterMapBounds = Bounds(
-    0, 3,
-    0, 3
+    0, 3, 0, 3
 )
 
 phasePlotBounds = Bounds(
-    -3, 3,
-    -3, 3
+    -3, 3, -3, 3
 )
 
 iterations = 2 ** 15
 skip = 0
 
 systemSource = r"""
-real2 system_fn(real2, real, real);
-
-#define STEP (real)(4e-4)
-real2 system_fn(real2 v, real m, real b) {
+real2 userFn(real2, real, real);
+real2 userFn(real2 v, real m, real b) {
+    #define STEP (real)(4e-4)
     real2 p = (real2)(
         (1 + b*v.x - v.x*v.x)*v.x - v.x*v.y,
         v.y*(v.x - m)
@@ -28,10 +25,9 @@ real2 system_fn(real2 v, real m, real b) {
 """
 
 parameterSurfaceSource = """
-float3 color_for_point(real2);
-
-#define D 5e-3
-float3 color_for_point(real2 p) {
+float3 userFn(real2);
+float3 userFn(real2 p) {
+    #define D 5e-3
     if (fabs(p.y - (1 - sqrt(p.x))) < D) {
         return (float3)(0, 0, 1);
     }
@@ -65,9 +61,7 @@ class PredatorPrey(SimpleApp):
             withUi=True
         )
 
-        self.paramSurfaceUi.selectionChanged.connect(
-            lambda val, _: self.drawAttractor(*val)
-        )
+        self.paramSurfaceUi.valueChanged.connect(self.drawAttractor)
 
         self.setLayout(
             hStack(
@@ -76,11 +70,11 @@ class PredatorPrey(SimpleApp):
         )
 
         self.drawParamSurface()
-        self.drawAttractor(parameterMapBounds.xMin, parameterMapBounds.yMin)
+        self.drawAttractor((parameterMapBounds.xMin, parameterMapBounds.yMin))
 
-    def drawAttractor(self, a, b):
+    def drawAttractor(self, params):
         self.attractorUi.setImage(self.attractor(
-            parameters=(a, b),
+            parameters=params,
             iterations=iterations,
             skip=skip,
             gridSparseness=16

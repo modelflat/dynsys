@@ -4,8 +4,6 @@ import pyopencl as cl
 from .cl import ComputedImage, TypeConfig, generateCode
 
 SOURCE = """
-#define user_SYSTEM system_fn
-
 kernel void drawPhasePlot(
     const PARAMETERS_SIGNATURE,
     const BOUNDS bounds, 
@@ -17,11 +15,11 @@ kernel void drawPhasePlot(
     VARIABLE_TYPE point = TRANSLATE_INV_Y(VARIABLE_TYPE, id, SIZE, bounds);
     
     for (int i = 0; i < skip; ++i) {
-        point = user_SYSTEM(point, PARAMETERS);
+        point = userFn(point, PARAMETERS);
     }
     
     for (int i = skip; i < iterations; ++i) {
-        point = user_SYSTEM(point, PARAMETERS);
+        point = userFn(point, PARAMETERS);
         const COORD_TYPE_EXPORT coord = CONVERT_SPACE_TO_COORD(TRANSLATE_BACK_INV_Y(VARIABLE_TYPE, point, bounds, image_bounds));
         
         if (VALID_POINT(image_bounds, coord)) {
@@ -75,7 +73,7 @@ class PhasePlot(ComputedImage):
         self.program.drawPhasePlot(
             self.queue, tuple(map(lambda x: x // gridSparseness + 1, self.imageShape)), None,
             *self.wrapArgs(self.paramCount, *parameters),
-            numpy.array(space, dtype=self.tc.boundsType),
+            numpy.array(space, dtype=self.typeConf.boundsType),
             numpy.array(image, dtype=numpy.int32),
             numpy.int32(skip), numpy.int32(iterations),
             self.deviceImage

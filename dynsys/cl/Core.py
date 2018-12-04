@@ -102,7 +102,7 @@ class ComputedImage:
                  imageShape: Union[tuple, int], spaceShape: tuple,
                  *sources: str,
                  typeConfig: TypeConfig):
-        self.ctx, self.queue, self.tc = ctx, queue, typeConfig
+        self.ctx, self.queue, self.typeConf = ctx, queue, typeConfig
         self.imageShape = imageShape
         self.spaceShape = spaceShape
         self.hostImage, self.deviceImage = allocateImage(ctx, imageShape)
@@ -117,11 +117,11 @@ class ComputedImage:
                     requiredArgCount, len(args), requiredArgCount
                 ))
         if requiredArgCount == len(args):
-            return list(map(self.tc.realType, args))
+            return list(map(self.typeConf.realType, args))
         if requiredArgCount - 1 == len(args) and skipIndex is not None:
-            return list(map(self.tc.realType, args[:skipIndex])) \
-                   + [self.tc.realType(0.0), ] \
-                   + list(map(self.tc.realType, args[skipIndex+1:]))
+            return list(map(self.typeConf.realType, args[:skipIndex])) \
+                   + [self.typeConf.realType(0.0), ] \
+                   + list(map(self.typeConf.realType, args[skipIndex + 1:]))
         # not enough args
         raise ValueError("Out of %d arguments, only %d were provided." % (requiredArgCount, len(args)))
 
