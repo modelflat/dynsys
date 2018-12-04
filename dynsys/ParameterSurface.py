@@ -1,6 +1,6 @@
 import numpy
 
-from .cl import ComputedImage, generateBoundsCode
+from .cl import ComputedImage, generateCode
 
 SOURCE = """
 kernel void fillParameterSurface(
@@ -17,8 +17,8 @@ class ParameterSurface(ComputedImage):
 
     def __init__(self, ctx, queue, imageShape, spaceShape, colorFunctionSource, typeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
+                         generateCode(typeConfig, boundsDims=2),
                          colorFunctionSource,
-                         generateBoundsCode(typeConfig, 2),
                          SOURCE,
                          typeConfig=typeConfig)
 

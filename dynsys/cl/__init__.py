@@ -4,6 +4,4 @@ from .Core import \
     ComputedImage, allocateImage, \
     Bounds
 
-from .CodeGen import generateParameterCode, generateVariableCode, generateBoundsCode, generateImageBoundsCode
-
-# TODO prettify
+from .CodeGen import generateCode

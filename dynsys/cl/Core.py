@@ -4,8 +4,6 @@ import sys
 
 from typing import Union
 
-from .CodeGen import makeSource
-
 
 def getEndianness(ctx: cl.Context):
     de = ((dev, dev.get_info(cl.device_info.ENDIAN_LITTLE)) for dev in ctx.get_info(cl.context_info.DEVICES))
@@ -109,8 +107,8 @@ class ComputedImage:
         self.imageShape = imageShape
         self.spaceShape = spaceShape
         self.hostImage, self.deviceImage = allocateImage(ctx, imageShape)
-        src = makeSource(*sources, typeConfig=typeConfig)
-        self.program = cl.Program(ctx, src).build(["-DDIM={}".format(len(imageShape))])
+        self.program = cl.Program(ctx, "\n".join(sources))\
+            .build(["-DDIM={}".format(len(imageShape))])
 
     def wrapArgs(self, requiredArgCount, *args, skipIndex=None):
         if requiredArgCount < len(args):

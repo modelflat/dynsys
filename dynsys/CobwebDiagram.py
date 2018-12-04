@@ -1,8 +1,7 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, \
-    generateBoundsCode, generateImageBoundsCode, generateParameterCode
+from .cl import ComputedImage, generateCode
 
 SOURCE = """
 
@@ -107,10 +106,11 @@ class CobwebDiagram(ComputedImage):
     def __init__(self, ctx, queue, imageShape, spaceShape, functionSource, paramCount, typeConfig):
         ComputedImage.__init__(self, ctx, queue, imageShape, spaceShape,
                                # sources
+                               generateCode(typeConfig,
+                                            parameterCount=paramCount,
+                                            boundsDims=2,
+                                            imageDims=2),
                                functionSource,
-                               generateParameterCode(typeConfig, paramCount),
-                               generateBoundsCode(typeConfig, 2),
-                               generateImageBoundsCode(2),
                                SOURCE,
                                #
                                typeConfig=typeConfig)

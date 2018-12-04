@@ -1,7 +1,7 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, generateParameterCode, generateBoundsCode
+from .cl import ComputedImage, generateCode
 
 
 UTILITY_SOURCE = r"""
@@ -117,7 +117,7 @@ kernel void drawAttractionMap(
     }
     
     const float ratio = (float)(color_idx) / (float)(attraction_points_count);
-    write_imagef(map, id, (float4)( hsv2rgb((float3)(240.0 * ratio, 1.0, 1.0)), 1 ));
+    write_imagef(map, id, (float4)( hsv2rgb((float3)(240.0 * ratio, 1.0, 1.0)), 1.0 ));
 }
 
 kernel void findAttraction(
@@ -132,7 +132,6 @@ kernel void findAttraction(
     }
     *result = p;
 }
-
 """
 
 
@@ -141,9 +140,10 @@ class BasinsOfAttraction(ComputedImage):
     def __init__(self, ctx, queue, imageShape, spaceShape, systemFunction, paramCount, typeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # sources
+                         generateCode(typeConfig,
+                                      parameterCount=paramCount,
+                                      boundsDims=len(imageShape)),
                          systemFunction,
-                         generateParameterCode(typeConfig, paramCount),
-                         generateBoundsCode(typeConfig, len(imageShape)),
                          SOURCE,
                          #
                          typeConfig=typeConfig)

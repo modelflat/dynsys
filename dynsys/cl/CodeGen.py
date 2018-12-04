@@ -259,5 +259,19 @@ def generateImageBoundsCode(dims: int) -> str:
     return IMAGE_BOUNDS_TEMPLATE
 
 
-def makeSource(*args, typeConfig):
-    return typeConfig.cl() + "\n" + COMMON_SOURCE + "\n" + "\n".join(args)
+def generateCode(typeConfig,
+                 boundsDims=None,
+                 variableCount=None,
+                 parameterCount=None,
+                 imageDims=None
+                 ):
+    code = [typeConfig.cl(), COMMON_SOURCE]
+    if boundsDims is not None:
+        code.append(generateBoundsCode(typeConfig, boundsDims))
+    if variableCount is not None:
+        code.append(generateVariableCode(typeConfig, variableCount))
+    if imageDims is not None:
+        code.append(generateImageBoundsCode(imageDims))
+    if parameterCount is not None:
+        code.append(generateParameterCode(typeConfig, parameterCount))
+    return "\n".join(code)

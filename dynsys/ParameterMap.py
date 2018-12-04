@@ -1,7 +1,7 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, generateBoundsCode, generateVariableCode
+from .cl import ComputedImage, generateCode
 
 
 UTILITY_SOURCE = r"""
@@ -154,9 +154,10 @@ class ParameterMap(ComputedImage):
     def __init__(self, ctx, queue, imageShape, spaceShape, mapFunctionSource, varCount, typeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # source
+                         generateCode(typeConfig,
+                                      variableCount=varCount,
+                                      boundsDims=len(imageShape)),
                          mapFunctionSource,
-                         generateVariableCode(typeConfig, varCount),
-                         generateBoundsCode(typeConfig, len(imageShape)),
                          SOURCE,
                          #
                          typeConfig=typeConfig)

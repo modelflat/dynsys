@@ -1,7 +1,7 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, generateParameterCode
+from .cl import ComputedImage, generateCode
 
 
 SOURCE = """
@@ -66,8 +66,9 @@ class BifurcationTree(ComputedImage):
     def __init__(self, ctx, queue, imageShape, mapFunctionSource, paramCount, typeConfig):
         ComputedImage.__init__(self, ctx, queue, imageShape, (),
                                # sources
+                               generateCode(typeConfig,
+                                            parameterCount=paramCount),
                                mapFunctionSource,
-                               generateParameterCode(typeConfig, paramCount),
                                SOURCE,
                                #
                                typeConfig=typeConfig)

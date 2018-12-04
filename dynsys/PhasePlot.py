@@ -1,8 +1,7 @@
 import numpy
 import pyopencl as cl
 
-from .cl import ComputedImage, TypeConfig,\
-    generateParameterCode, generateImageBoundsCode, generateBoundsCode, generateVariableCode
+from .cl import ComputedImage, TypeConfig, generateCode
 
 SOURCE = """
 #define user_SYSTEM system_fn
@@ -52,11 +51,12 @@ class PhasePlot(ComputedImage):
                  typeConfig: TypeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # sources
+                         generateCode(typeConfig,
+                                      imageDims=len(imageShape),
+                                      boundsDims=len(imageShape),
+                                      variableCount=len(imageShape),
+                                      parameterCount=paramCount),
                          systemSource,
-                         generateImageBoundsCode(len(imageShape)),
-                         generateBoundsCode(typeConfig, len(imageShape)),
-                         generateVariableCode(typeConfig, len(imageShape)),
-                         generateParameterCode(typeConfig, paramCount),
                          SOURCE,
                          #
                          typeConfig=typeConfig)
