@@ -91,8 +91,8 @@ class Ressler(SimpleApp):
         self.attractorUi.setFixedSize(512, 512)
 
         self.drawParameterSurface()
-        self.abSurfaceUi.setValue((.25, .115))
-        self.drawPhasePlot(.25, .155, 2.5)
+        self.abSurfaceUi.setValue((.25, .15))
+        self.drawPhasePlot(.25, .15, 2.5)
 
     def drawParameterSurface(self):
         self.abSurfaceUi.setImage(self.abSurface())

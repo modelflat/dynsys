@@ -153,8 +153,8 @@ class Image2D(ImageWidget):
     def setTargetReal(self, targetLocation: tuple) -> None:
         x, y = targetLocation
         x = (x - self._spaceShape[0]) / (self._spaceShape[1] - self._spaceShape[0])*self._textureShape[0]
-        y = self._textureShape[1] - (y - self._spaceShape[2]) /\
-            self._textureShape[1] * (self._spaceShape[3] - self._spaceShape[2])
+        y = self._textureShape[1] - \
+            (y - self._spaceShape[2]) / (self._spaceShape[3] - self._spaceShape[2])*self._textureShape[1]
         self._target.setPos((x, y))
         self.repaint()
 
