@@ -88,9 +88,11 @@ class Ressler(SimpleApp):
                 hStack(self.abSurfaceUi, self.attractorUi)
             )
         )
-        self.attractorUi.setFixedSize(512, 512)
+        self.attractorUi.setBaseSize(512, 512)
+        self.attractorUi.setMinimumSize(512, 512)
 
         self.drawParameterSurface()
+        self.abSurfaceUi.setFixedSize(256, 256)
         self.abSurfaceUi.setValue((.25, .15))
         self.drawPhasePlot(.25, .15, 2.5)
 
