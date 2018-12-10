@@ -13,7 +13,8 @@ def vec(*it, dtype=numpy.float):
 sig = 10
 b   = 8.0 / 3.0
 r   = 28
-x0 = vec(-3.16, -5.31, 13.31)
+# x0 = vec(-3.16, -5.31, 13.31)
+x0 = vec(1, 2, 20)
 
 
 def lorenz(x, t):
@@ -26,11 +27,11 @@ def lorenz(x, t):
 
 
 def rk4(F, v, t, h):
-    k1 = F(v, t)
-    k2 = F(v + k1 / 2, t + h / 2)
-    k3 = F(v + k2 / 2, t + h / 2)
-    k4 = F(v + k3, t + h)
-    return (k1 + 2*k2 + 2*k3 + k4) / 6.0 * h
+    k1 = h * F(v, t)
+    k2 = h * F(v + k1 / 2, t + h / 2)
+    k3 = h * F(v + k2 / 2, t + h / 2)
+    k4 = h * F(v + k3, t + h)
+    return (k1 + 2*k2 + 2*k3 + k4) / 6.0
 
 
 def stepSystem(F, t: float, xs: numpy.ndarray, h: float):
@@ -63,26 +64,28 @@ def LCE(F, x0: numpy.array, eps: float, tau: float, T: float, stepsInTau: int):
     S = numpy.zeros((3,), dtype=numpy.float)
     step = tau / stepsInTau
     xs2 = numpy.empty((int(T / tau), 3), dtype=numpy.float)
+    xs3 = numpy.empty((int(T / tau), 3), dtype=numpy.float)
     k = 0
     for t in numpy.arange(0, T, tau):
-        # for t_ in numpy.arange(t, t + tau, step):
-        print(xs)
-        xs = stepSystem(F, t, xs, tau)
+        # print(xs)
+        for t_ in numpy.arange(t, t + tau, step):
+            xs = stepSystem(F, t_, xs, tau)
         xs2[k] = xs[0]
+        xs3[k] = xs[1]
         xs[1:], norms = renormalize(xs[0], xs[1:], eps)
-        S += norms
+        S += numpy.log(norms)
         k += 1
 
     fig = pp.figure()
     ax = fig.gca(projection="3d")
-    ax.plot(*xs2.T, "r.")
+    ax.plot(*xs2.T, "r-")
+    ax.plot(*xs3.T, "y.")
 
     return S
 
 
-
 print(
-    LCE(lorenz, x0=x0, eps=1e-8, tau=1e-3, T=1, stepsInTau=10)
+    LCE(lorenz, x0=x0, eps=1e-4, tau=1e-2, T=10, stepsInTau=10)
 )
 
 pp.show()
