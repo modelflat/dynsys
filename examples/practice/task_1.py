@@ -1,15 +1,18 @@
-from dynsys import SimpleApp
+from dynsys import SimpleApp, allocateImage, QLabel, hStack
 import pyopencl as cl
 import numpy
 
-USER_SOURCE = """
+from dynsys.ui.ImageWidgets import toPixmap
+
+USER_SOURCE = r"""
 
 #define STEP (1e-2f)
+private float3 fn(float3, float, float, float);
 private float3 fn(float3 v, float a, float b, float r) {
     return v + STEP * (float3)(
-        v.x,
-        v.y,
-        v.z
+        -v.z - v.y, 
+        b + (v.x - r)*v.y,
+        v.x + a*v.z
     );
 }
 
@@ -17,17 +20,17 @@ private float3 fn(float3 v, float a, float b, float r) {
 
 REALLY_COMMON_SOURCE = r"""
 // get_global_linear_id available only in CL 2+
-#if (__OPENCL_VERSION__ > CL_VERSION_1_2)
+//#if (__OPENCL_VERSION__ < CL_VERSION_2_0)
 #define get_global_linear_id() \
     ((get_global_id(2) - get_global_offset(2)) * get_global_size(1) * get_global_size(0)) + \
     ((get_global_id(1) - get_global_offset(1)) * get_global_size (0)) + \
     (get_global_id(0) - get_global_offset(0))
-#endif
+//#endif
 
 #if (__OPENCL_VERSION__ >= CL_VERSION_2_0)
 #define UNROLL_LOOP(count) __attribute__((opencl_unroll_hint(count)))
 #else
-#define UNROLL_LOOP(count)
+#define UNROLL_LOOP(count) count;
 #endif
 
 """
@@ -80,12 +83,12 @@ kernel void computeTrajectories(
 
     PARAMETERS_FROM_BUFFER(parameters);
     
-    UNROLL_LOOP(UNROLL_HINT_SKIP)
+    //UNROLL_LOOP(UNROLL_HINT_SKIP)
     for (size_t i = 0; i < iterConf.s0; ++i) {
         point = USER_SYSTEM(point, PARAMETERS);
     }
     
-    UNROLL_LOOP(UNROLL_HINT_ITER)
+    //UNROLL_LOOP(UNROLL_HINT_ITER)
     for (size_t i = 0; i < iterConf.s1; ++i) {
         point = USER_SYSTEM(point, PARAMETERS);
         buffer[i] = point;
@@ -96,6 +99,9 @@ kernel void computeTrajectories(
 
 
 PHASE_SOURCE = r"""
+
+#define POINT_TYPE float3
+#define BOUNDS_TYPE float8
 
 #define CONVERT_XY(point, bounds, image) \
     convert_int2_rtz((float2)( \
@@ -113,12 +119,13 @@ PHASE_SOURCE = r"""
             ((point).z - (bounds).s4) / ((bounds).s5 - (bounds).s4)*get_image_height(image) ))
 
 #define CONVERT_XYZ(point, bounds, image) \
-    (int4)convert_int3_rtz((float3)( \
+    (int4)(convert_int3_rtz((float3)( \
             ((point).x - (bounds).s0) / ((bounds).s1 - (bounds).s0)*get_image_width (image), \
             ((point).y - (bounds).s2) / ((bounds).s3 - (bounds).s2)*get_image_height(image), \
-            ((point).z - (bounds).s4) / ((bounds).s5 - (bounds).s4)*get_image_depth (image) ))
+            ((point).z - (bounds).s4) / ((bounds).s5 - (bounds).s4)*get_image_depth (image) )), 0)
 
 
+float3 hsv2rgb(float3);
 float3 hsv2rgb(float3 hsv) {
     const float c = hsv.y * hsv.z;
     const float x = c * (1 - fabs(fmod( hsv.x / 60, 2 ) - 1));
@@ -139,24 +146,25 @@ float3 hsv2rgb(float3 hsv) {
     return (rgb + (hsv.z - c));
 }
 
+float4 colorForPoint(int, int, float3);
 float4 colorForPoint(int maxIter, int i, float3 point) {
-    return hsv2rgb((float)i / maxIter * 240.0, 0, 0);
+    return (float4)(hsv2rgb((float3)((float)(i) / maxIter * 240.0f, 0, 0)), 1.0f);
 }
 
 kernel void renderTrajectories(
     const global POINT_TYPE* buffer,
     const BOUNDS_TYPE bounds,
     const int iterations,
-    const char8 conf,
+    const char4 conf,
     write_only image2d_t imageXY,
     write_only image2d_t imageYZ,
-    write_inly image2d_t imageXZ,
+    write_only image2d_t imageXZ,
     write_only image3d_t imageXYZ
 ) {
     float3 point;
     float4 color;
-    buffer += get_global_id(0) * iterations;    
-    for (size_t i = 0; i < iterations; ++i) {
+    buffer += get_global_id(0) * iterations;
+    for (int i = 0; i < iterations; ++i) {
         point = buffer[i];
         color = colorForPoint(iterations, i, point);
         if (conf.s0) {
@@ -173,7 +181,6 @@ kernel void renderTrajectories(
         }
     }
 }
-    
 
 """
 
@@ -205,6 +212,13 @@ def wrapBounds(bounds, numpyType):
     raise NotImplementedError()
 
 
+def clearImage(queue, image, imageShape, color=(1.0,1.0,1.0,1.0)):
+    cl.enqueue_fill_image(
+        queue, image,
+        color=numpy.array(color, dtype=numpy.float32),
+        origin=(0,)*len(imageShape), region=imageShape
+    )
+
 class TrajectoryEvolution:
 
     def __init__(self, ctx, queue, spaceShape, userFnSource, parameterCount,
@@ -221,7 +235,7 @@ class TrajectoryEvolution:
                             "-DUSE_NATURAL_GRID" if useNaturalGrid else "",
                             "-DUNROLL_HINT_ITER={}".format(iterUnrollCount),
                             "-DUNROLL_HINT_SKIP={}".format(skipUnrollCount),
-                            "-cl-std=2.0"
+                            #"-cl-std=2.0"
                             ])
         self.realType = dataRealType
 
@@ -263,6 +277,14 @@ class TrajectoryEvolution:
         return outBuf
 
 
+def asyncCopy(queue, src, dest, shape):
+    cl.enqueue_copy(
+        queue, src, dest,
+        origin=(0,)*len(shape), region=shape,
+        # wait_for=False
+    )
+
+
 class PhasePlot:
 
     def __init__(self, ctx, queue, spaceShape, parameterCount):
@@ -270,16 +292,36 @@ class PhasePlot:
         self.spaceShape = spaceShape
         self.paramCount = parameterCount
         self.program = cl.Program(ctx, PHASE_SOURCE).build(
-            options=["-cl-std=2.0"]
+            # options=[]#["-cl-std=2.0"]
         )
 
-    def __call__(self, evolutionResults: cl.Buffer, resultsNPoints, resultsNIters):
+    def __call__(self, imageShapeXY, imageShapeYZ, imageShapeXZ, imageShapeXYZ,
+                 evolutionResults: cl.Buffer, resultsNPoints, resultsNIters):
+
+        xyHost, xyDev = allocateImage(self.ctx, dim=imageShapeXY)
+        clearImage(self.queue, xyDev, imageShapeXY)
+        yzHost, yzDev = allocateImage(self.ctx, dim=imageShapeYZ)
+        clearImage(self.queue, yzDev, imageShapeYZ)
+        xzHost, xzDev = allocateImage(self.ctx, dim=imageShapeXZ)
+        clearImage(self.queue, xzDev, imageShapeXZ)
+        xyzHost, xyzDev = allocateImage(self.ctx, dim=imageShapeXYZ)
+
         self.program.renderTrajectories(
             self.queue, (resultsNPoints,), None,
-            
+            evolutionResults,
+            wrapBounds(self.spaceShape, numpy.float32),
+            numpy.int32(resultsNIters),
+            numpy.array((True, True, True, True), dtype=numpy.int8),
+            xyDev, yzDev, xzDev, xyzDev
         )
 
+        asyncCopy(self.queue, xyHost, xyDev, imageShapeXY)
+        asyncCopy(self.queue, yzHost, yzDev, imageShapeYZ)
+        asyncCopy(self.queue, xzHost, xzDev, imageShapeXZ)
+        asyncCopy(self.queue, xyzHost, xyzDev, imageShapeXYZ)
+        self.queue.finish()
 
+        return xyHost, yzHost, xzHost, xyzHost
 
 
 class Test(SimpleApp):
@@ -287,9 +329,30 @@ class Test(SimpleApp):
     def __init__(self):
         super().__init__("Test")
 
-        self.test = TrajectoryEvolution(self.ctx, self.queue, (-1, 1, -1, 1, -1, 1), USER_SOURCE, 3)
+        self.test = TrajectoryEvolution(self.ctx, self.queue, (-6, 7, 0, 10, -6, 7), USER_SOURCE, 3)
+        res = self.test((.25, .15, 2.5), 0, 4096, gridShape=(20, 20, 20))
 
-        self.test((1, 1, 1), 256, 256, gridShape=(20, 20, 20))
+        resH = numpy.empty((10*10*10, 2048, 3), dtype=numpy.float32)
+
+        cl.enqueue_copy(self.queue, resH, res)
+        print(resH)
+
+        self.test2 = PhasePlot(self.ctx, self.queue, self.test.spaceShape, self.test.paramCount)
+        i1, i2, i3, i4 = self.test2((256, 256), (256, 256), (256, 256), (64, 64, 64), res, 20*20*20, 1024)
+
+        self.label1 = QLabel()
+        self.label1.setPixmap(toPixmap(i1))
+        self.label2 = QLabel()
+        self.label2.setPixmap(toPixmap(i2))
+        self.label3 = QLabel()
+        self.label3.setPixmap(toPixmap(i3))
+
+        #
+
+        self.setLayout(
+            hStack(self.label1, self.label2, self.label3)
+        )
+
 
 if __name__ == '__main__':
     Test().run()
