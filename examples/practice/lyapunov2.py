@@ -14,7 +14,7 @@ sig = 10
 b   = 8.0 / 3.0
 r   = 28
 # x0 = vec(-3.16, -5.31, 13.31)
-x0 = vec(1, 2, 20)
+x0 = vec(1, 2, 10)
 
 
 def lorenz(x, t):
@@ -50,9 +50,9 @@ def orthonormalize(v, p):
     return linalg.norm(u, axis=0), w
 
 
-def renormalize(pt, w, eps):
-    gamma, renormVectors = orthonormalize(w, 3)
-    return renormVectors * eps, gamma #vec(0, 0, 0) #gamma
+def renormalize(point, neighbourPoints, eps):
+    pass  # do the right thing here
+    return vec(1, 1, 1), neighbourPoints
 
 
 def LCE(F, x0: numpy.array, eps: float, tau: float, T: float, stepsInTau: int):
@@ -63,29 +63,27 @@ def LCE(F, x0: numpy.array, eps: float, tau: float, T: float, stepsInTau: int):
     xs[3] = x0 + vec(0, 0, eps)
     S = numpy.zeros((3,), dtype=numpy.float)
     step = tau / stepsInTau
-    xs2 = numpy.empty((int(T / tau), 3), dtype=numpy.float)
-    xs3 = numpy.empty((int(T / tau), 3), dtype=numpy.float)
+    xsHist = numpy.empty((int(T / tau), 3), dtype=numpy.float)
+    xsEpsHist = numpy.empty((int(T / tau), 3), dtype=numpy.float)
     k = 0
     for t in numpy.arange(0, T, tau):
-        # print(xs)
         for t_ in numpy.arange(t, t + tau, step):
             xs = stepSystem(F, t_, xs, tau)
-        xs2[k] = xs[0]
-        xs3[k] = xs[1]
-        xs[1:], norms = renormalize(xs[0], xs[1:], eps)
+        xsHist[k], xsEpsHist[k] = xs[0], xs[1]
+        norms, xs[1:] = renormalize(xs[0], xs[1:], eps)
         S += numpy.log(norms)
         k += 1
 
     fig = pp.figure()
     ax = fig.gca(projection="3d")
-    ax.plot(*xs2.T, "r-")
-    ax.plot(*xs3.T, "y.")
+    ax.plot(*xsHist.T, "r-")
+    ax.plot(*xsEpsHist.T, "b-")
 
     return S
 
 
 print(
-    LCE(lorenz, x0=x0, eps=1e-4, tau=1e-2, T=10, stepsInTau=10)
+    LCE(lorenz, x0=x0, eps=1e-4, tau=2e-3, T=5, stepsInTau=10)
 )
 
 pp.show()
