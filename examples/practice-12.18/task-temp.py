@@ -2,7 +2,8 @@ from dynsys import Bounds, SimpleApp, hStack, vStack, Qt, FLOAT, QLabel, \
     ParameterizedImageWidget, Image2D, Image3D, RealSlider, createSlider
 from dynsys.PhasePlotV2 import PhasePlot, OutputConfig
 
-from dynsys.ParameterMap import ParameterMap
+from PyQt5.QtWidgets import QGroupBox
+
 from dynsys.ParameterSurface import ParameterSurface
 
 parameterMapBoundsHG = Bounds(
@@ -19,7 +20,7 @@ phaseBounds = (
 )
 
 skip = 4 * 10**4
-iterations = skip + 256
+iterations = 512
 
 systemSource = r"""
 
@@ -27,7 +28,7 @@ systemSource = r"""
 
 real3 userFn(real3, real, real, real);
 real3 userFn(real3 v, real h, real g, real eps) {
-    #define STEP (real)(5e-3)
+    #define STEP (real)(1e-3)
     real3 p = (real3)(
         2.0f*h*v.x + v.y - g*v.z, 
         -v.x,
@@ -36,6 +37,10 @@ real3 userFn(real3 v, real h, real g, real eps) {
     return v + STEP*p;
 }
 #define DYNAMIC_COLOR
+#ifdef DEFAULT_ENTITY_COLOR
+//#undef DEFAULT_ENTITY_COLOR
+//#define DEFAULT_ENTITY_COLOR (float4)(0.0, 1.0, 0.0, 1.0)
+#endif
 #define GENERATE_COLORS
 """
 
@@ -62,18 +67,35 @@ class Task1(SimpleApp):
                                                         shape=(True, True),
                                                         textureShape=(256, 256))
 
-        # self.paramSurface2, self.paramSurfaceUi2 = self.makeParameterSurface(
-        #     source=parameterSurfaceSource,
-        #     spaceShape=parameterMapBoundsHEps,
-        #     withUi=True,
-        #     uiNames=("h", "eps"),
-        # )
-
         self.epsSlider, self.epsSliderWidget = createSlider("real", epsBounds,
                                       withLabel="Epsilon = {}",
                                       labelPosition="top",
                                       withValue=0.2,
                                       connectTo=self.drawAttractor)
+        self.x0Slider, self.x0SliderWidget = createSlider("real", epsBounds,
+                                                            withLabel="x0 = {}",
+                                                            labelPosition="top",
+                                                            withValue=0.2,
+                                                            connectTo=self.drawAttractor)
+        self.y0Slider, self.y0SliderWidget = createSlider("real", epsBounds,
+                                                            withLabel="y0 = {}",
+                                                            labelPosition="top",
+                                                            withValue=0.2,
+                                                            connectTo=self.drawAttractor)
+        self.z0Slider, self.z0SliderWidget = createSlider("real", epsBounds,
+                                                            withLabel="z0 = {}",
+                                                            labelPosition="top",
+                                                            withValue=0.2,
+                                                            connectTo=self.drawAttractor)
+
+        self.skipSlider, self.skipSliderWidget = createSlider(
+            "int", (0, 40000), labelPosition="top", withValue=skip, withLabel="skip = {}",
+            connectTo=self.drawAttractor
+        )
+        self.iterSlider, self.iterSliderWidget = createSlider(
+            "int", (0, 40000), labelPosition="top", withValue=iterations, withLabel="iter = {}",
+            connectTo=self.drawAttractor
+        )
 
         self.attr = PhasePlot(self.ctx, self.queue, (6, 6, 6), phaseBounds,
                               systemSource, 3, 3,
@@ -90,21 +112,11 @@ class Task1(SimpleApp):
         self.attrXYZ = Image3D(spaceShape=phaseBounds)
 
         self.paramSurfaceUi1.valueChanged.connect(self.drawAttractor)
-        # self.paramSurfaceUi2.valueChanged.connect(self.drawAttractor)
 
-        # def update1When2Changed(val):
-        #     _, g = self.paramSurfaceUi1.value()
-        #     self.paramSurfaceUi1.setValue((val[0], g))
-        #
-        # def update2When1Changed(val):
-        #     _, eps = self.paramSurfaceUi2.value()
-        #     self.paramSurfaceUi2.setValue((val[0], eps))
-
-        # self.paramSurfaceUi1.valueChanged.connect(update2When1Changed)
-        # self.paramSurfaceUi2.valueChanged.connect(update1When2Changed)
-        #
-
-        # self.paramSurfaceUi2.setValue((0.07, 0.2))
+        self.v0group = QGroupBox()
+        self.v0group.setLayout(
+            vStack(self.x0Slider, self.y0Slider, self.z0Slider)
+        )
 
         self.setLayout(
             vStack(
@@ -115,15 +127,18 @@ class Task1(SimpleApp):
                 ),
                 hStack(
                     vStack(
-                        self.paramSurfaceUi1, self.epsSliderWidget
+                        self.epsSliderWidget, self.paramSurfaceUi1,
+                        self.iterSlider, self.skipSlider,
                     ),
+                    # self.v0group,
+
                     self.attrXYZ
                 )
             )
         )
-        self.attrXYZ.setFixedSize(512, 420)
+        self.attrXYZ.setFixedSize(400, 400)
 
-        self.paramSurfaceUi1.setValue((0.07, 0.85))
+        self.paramSurfaceUi1.setValue((0.09, 0.87))
         self.drawParamSurface()
         self.drawAttractor()
 
@@ -132,8 +147,8 @@ class Task1(SimpleApp):
         # _, eps = self.paramSurfaceUi2.value()
         xy, yz, xz, xyz = self.attr(
             parameters=(h, g, self.epsSlider.value()),
-            iterations=iterations,
-            skip=skip,
+            iterations=self.skipSlider.value() + self.iterSlider.value(),
+            skip=self.skipSlider.value(),
         )
         self.attrXY.setTexture(xy)
         self.attrYZ.setTexture(yz)
@@ -142,7 +157,6 @@ class Task1(SimpleApp):
 
     def drawParamSurface(self):
         self.paramSurfaceUi1.setImage(self.paramSurface1())
-        # self.paramSurfaceUi2.setImage(self.paramSurface2())
 
 
 if __name__ == '__main__':

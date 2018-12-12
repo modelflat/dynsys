@@ -55,10 +55,10 @@ def plotDiagram(a=.25, b=.15):
 
     rRange = [r for r in numpy.arange(2, 5, 0.05)]
     rDiagramData = []
-    for r in rRange:
 
-        x, y, z = doPortret(a, b, r, evaluateNum=10000)
-        slicex, slicey, slicez = slicer(x, y, z)
+    for r in rRange:
+        x, y, z = doPortret(parameters=(a, b, r), evaluateNum=10000)
+        slicex, slicey, slicez = slicer(x, y, z, 2, "x")
         for y, z in zip(slicey, slicez):
             rDiagramData.append([r, y, z])
 
@@ -94,4 +94,4 @@ def doLyapunovIndex(f):
 if __name__ == '__main__':
     plotPhase()
     # plotSlice()
-    # plotDiagram()
+    plotDiagram()

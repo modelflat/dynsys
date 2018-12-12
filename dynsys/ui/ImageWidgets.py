@@ -188,28 +188,36 @@ class Image3D(ImageWidget):
     def __init__(self,
                  spaceShape: tuple = (-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
                  segmentShape: tuple = (8, 8, 8),
-                 swapRightAndLeftButtons=True):
+                 swapRightAndLeftButtons=True,
+                 useTheme=Q3DTheme.ThemeQt
+                 ):
         super().__init__()
 
         self._graph = Q3DScatter()
         if swapRightAndLeftButtons:
             self._graph.setActiveInputHandler(Custom3DInputHander())
         self._graph.setOrthoProjection(True)
-        self._graph.activeTheme().setType(Q3DTheme.ThemeQt)
-        self._graph.activeTheme().setBackgroundEnabled(False)
+        self._graph.activeTheme().setType(useTheme)
+        self._graph.activeTheme().setBackgroundEnabled(True)
         self._graph.setShadowQuality(QAbstract3DGraph.ShadowQualityNone)
         self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
         self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
         self._graph.scene().activeCamera().setZoomLevel(180)
-        # self._graph.axisX().setSegmentCount(segmentShape[0])
+        self._graph.axisX().setSegmentCount(1)#segmentShape[0])
         self._graph.axisX().setTitle("X")
         self._graph.axisX().setTitleVisible(True)
-        # self._graph.axisY().setSegmentCount(segmentShape[1])
+        self._graph.axisX().setAutoAdjustRange(True)
+
+        self._graph.axisY().setSegmentCount(1)#segmentShape[1])
         self._graph.axisY().setTitle("Z")
         self._graph.axisY().setTitleVisible(True)
-        # self._graph.axisZ().setSegmentCount(segmentShape[2])
+        self._graph.axisY().setAutoAdjustRange(True)
+
+        self._graph.axisZ().setSegmentCount(1)#segmentShape[2])
         self._graph.axisZ().setTitle("Y")
         self._graph.axisZ().setTitleVisible(True)
+        self._graph.axisZ().setAutoAdjustRange(True)
+
         # self._graph.setAspectRatio(1)
 
         self._volume = QCustom3DVolume()

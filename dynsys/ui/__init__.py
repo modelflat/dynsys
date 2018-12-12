@@ -35,8 +35,8 @@ class ParameterizedImageWidget(QWidget):
 
     def __init__(self, bounds: tuple, names: tuple, shape: tuple, targetColor: QColor = Qt.red, textureShape=(1,1)):
         super().__init__()
-        if len(bounds) != 4:
-            raise NotImplementedError("Only 2-D parameterized images are supported")
+        # if len(bounds) != 4:
+        #     raise NotImplementedError("Only 2-D parameterized images are supported")
 
         if names is None and shape is None:
             names = ("", "")

@@ -10,7 +10,7 @@ cobwebBounds = Bounds(
     -2, 2, -2, 2
 )
 
-lambdaRange = Bounds.x(
+lambdaRange = (
     1, 3
 )
 
@@ -83,7 +83,7 @@ class CubicMap(SimpleApp):
         self.bifTreeUi.setImage(self.bifTree(
             startPoint=self.x0.value(),
             paramIndex=0,
-            paramRange=lambdaRange.asTuple(),
+            paramRange=lambdaRange,
             otherParams=(),
             iterations=treeSamplesCount,
             skip=treeSkipCount,

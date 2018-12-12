@@ -109,6 +109,7 @@ class ComputedImage:
         opt = [*options, "-DDIM={}".format(len(imageShape))]
 
         self.program = cl.Program(ctx, "\n".join(sources)).build(opt)
+        print("\n".join(sources))
 
     def wrapArgs(self, requiredArgCount, *args, skipIndex=None):
         if requiredArgCount < len(args):
