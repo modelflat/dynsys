@@ -82,6 +82,8 @@ class Target2D:
 class Image2D(ImageWidget):
 
     def _onMouseEvent(self, event):
+        if not any(self._target._shape):
+            return
         left, right = mouseButtonsState(event)
         if left:
             self._target.setPos((event.x(), event.y()))
@@ -105,9 +107,11 @@ class Image2D(ImageWidget):
         super(ImageWidget, self).paintEvent(QPaintEvent)
         self._target.draw(self.width(), self.height(), QPainter(self))
 
-    def __init__(self, targetColor: QColor = QtCore.Qt.red,
+    def __init__(self,
+                 targetColor: QColor = QtCore.Qt.red,
                  targetShape: tuple = (True, True),
                  spaceShape: tuple = (-1.0, 1.0, -1.0, 1.0),
+                 textureShape: tuple = (1, 1),
                  invertY: bool = True
                  ):
         super().__init__()
@@ -115,7 +119,7 @@ class Image2D(ImageWidget):
         self._target = Target2D(targetColor, targetShape)
         self._spaceShape = spaceShape
         self._invertY = invertY
-        self._textureShape = (1, 1)
+        self._textureShape = textureShape
         self._textureDataReference = None
 
     def spaceShape(self) -> tuple:
@@ -197,16 +201,16 @@ class Image3D(ImageWidget):
         self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
         self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
         self._graph.scene().activeCamera().setZoomLevel(180)
-        self._graph.axisX().setSegmentCount(segmentShape[0])
+        # self._graph.axisX().setSegmentCount(segmentShape[0])
         self._graph.axisX().setTitle("X")
         self._graph.axisX().setTitleVisible(True)
-        self._graph.axisY().setSegmentCount(segmentShape[1])
+        # self._graph.axisY().setSegmentCount(segmentShape[1])
         self._graph.axisY().setTitle("Z")
         self._graph.axisY().setTitleVisible(True)
-        self._graph.axisZ().setSegmentCount(segmentShape[2])
+        # self._graph.axisZ().setSegmentCount(segmentShape[2])
         self._graph.axisZ().setTitle("Y")
         self._graph.axisZ().setTitleVisible(True)
-        self._graph.setAspectRatio(1)
+        # self._graph.setAspectRatio(1)
 
         self._volume = QCustom3DVolume()
         self._volume.setUseHighDefShader(True)
@@ -230,12 +234,14 @@ class Image3D(ImageWidget):
     def setSpaceShape(self, spaceShape):
         self._spaceShape = spaceShape
         boundingBox = min(spaceShape[::2]), max(spaceShape[1::2])
-        self._graph.axisX().setRange(*boundingBox)
-        self._graph.axisY().setRange(*boundingBox)
-        self._graph.axisZ().setRange(*boundingBox)
-        pos = (boundingBox[1] + boundingBox[0]) / 2.0
+        self._graph.axisX().setRange(*spaceShape[0:2])
+        self._graph.axisY().setRange(*spaceShape[2:4])
+        self._graph.axisZ().setRange(*spaceShape[4:6])
+        # pos = (boundingBox[1] + boundingBox[0]) / 2.0
         self._volume.setPosition(QVector3D(
-            pos, pos, pos
+            (spaceShape[0] + spaceShape[1]) / 2.0,
+            (spaceShape[2] + spaceShape[3]) / 2.0,
+            (spaceShape[4] + spaceShape[5]) / 2.0,
         ))
 
     def textureShape(self):

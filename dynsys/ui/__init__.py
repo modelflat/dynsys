@@ -33,7 +33,7 @@ class ParameterizedImageWidget(QWidget):
 
     valueChanged = Signal(tuple)
 
-    def __init__(self, bounds: tuple, names: tuple, shape: tuple, targetColor: QColor = Qt.red):
+    def __init__(self, bounds: tuple, names: tuple, shape: tuple, targetColor: QColor = Qt.red, textureShape=(1,1)):
         super().__init__()
         if len(bounds) != 4:
             raise NotImplementedError("Only 2-D parameterized images are supported")
@@ -52,7 +52,7 @@ class ParameterizedImageWidget(QWidget):
         self._names = names
         self._shape = shape
         self._positionLabel = QLabel()
-        self._imageWidget = Image2D(targetColor=targetColor, targetShape=shape, spaceShape=bounds)
+        self._imageWidget = Image2D(targetColor=targetColor, targetShape=shape, spaceShape=bounds, textureShape=textureShape)
 
         self._imageWidget.selectionChanged.connect(lambda val, _: self.valueChanged.emit(val))
         self._imageWidget.selectionChanged.connect(self.selectionChanged)
@@ -62,6 +62,10 @@ class ParameterizedImageWidget(QWidget):
             self._imageWidget,
             self._positionLabel
         ))
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        # self.updatePositionLabel(self._imageWidget._target.)
 
     def updatePositionLabel(self, value, buttons):
         self._positionLabel.setText("  |  ".join(

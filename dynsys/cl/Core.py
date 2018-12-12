@@ -101,13 +101,14 @@ class ComputedImage:
     def __init__(self, ctx: cl.Context, queue: cl.CommandQueue,
                  imageShape: Union[tuple, int], spaceShape: tuple,
                  *sources: str,
-                 typeConfig: TypeConfig):
+                 typeConfig: TypeConfig, options = tuple()):
         self.ctx, self.queue, self.typeConf = ctx, queue, typeConfig
         self.imageShape = imageShape
         self.spaceShape = spaceShape
         self.hostImage, self.deviceImage = allocateImage(ctx, imageShape)
-        self.program = cl.Program(ctx, "\n".join(sources))\
-            .build(["-DDIM={}".format(len(imageShape))])
+        opt = [*options, "-DDIM={}".format(len(imageShape))]
+
+        self.program = cl.Program(ctx, "\n".join(sources)).build(opt)
 
     def wrapArgs(self, requiredArgCount, *args, skipIndex=None):
         if requiredArgCount < len(args):

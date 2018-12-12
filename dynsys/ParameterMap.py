@@ -88,6 +88,7 @@ float3 color_for_count(int count, int total) {
 SOURCE = UTILITY_SOURCE + r"""
 
 kernel void computeMap(
+    const PARAMETERS_SIGNATURE,
     const BOUNDS bounds,
     VARIABLE_SIGNATURE,
     const int samples_count,
@@ -103,12 +104,20 @@ kernel void computeMap(
     
     VARIABLE_TYPE x = VARIABLE;
     for (int i = 0; i < skip; ++i) {
+#if (PARAM_COUNT == 2) 
         x = userFn(x, v.x, v.y);
+#elif (PARAM_COUNT != 2)
+        x = userFn(x, v.x, v.y, PARAMETERS);
+#endif
     }
 
     int uniques = 0;
     for (int i = 0; i < samples_count; ++i) {
+#if (PARAM_COUNT == 2) 
         x = userFn(x, v.x, v.y);
+#elif (PARAM_COUNT != 2)
+        x = userFn(x, v.x, v.y, PARAMETERS);
+#endif
         samples[i] = x;
         
         //if (VARIABLE_VECTOR_ANY_ISNAN(x) || VARIABLE_VECTOR_ANY_ABS_GREATER(x, DIVERGENCE_THRESHOLD)) {
@@ -148,19 +157,22 @@ kernel void computeMap(
 
 class ParameterMap(ComputedImage):
 
-    def __init__(self, ctx, queue, imageShape, spaceShape, mapFunctionSource, varCount, typeConfig):
+    def __init__(self, ctx, queue, imageShape, spaceShape, mapFunctionSource, varCount, parameterCount, typeConfig):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          # source
                          generateCode(typeConfig,
                                       variableCount=varCount,
+                                      parameterCount=(parameterCount - 2),
                                       boundsDims=len(imageShape)),
                          mapFunctionSource,
                          SOURCE,
                          #
-                         typeConfig=typeConfig)
+                         typeConfig=typeConfig, options=["-DPARAM_COUNT={}".format(parameterCount - 2)])
         self.varCount = varCount
+        self.extraParamCount = parameterCount - 2
+        # print(self.program.get_info(cl.program_info.SOURCE))
 
-    def __call__(self, variables, iterations, skip=0):
+    def __call__(self, variables, iterations, extraParams, skip=0):
         real, realSize = self.typeConf()
 
         samplesDevice = cl.Buffer(
@@ -170,6 +182,7 @@ class ParameterMap(ComputedImage):
 
         self.program.computeMap(
             self.queue, self.imageShape, None,
+            *self.wrapArgs(self.extraParamCount, *extraParams),
             numpy.array(self.spaceShape, dtype=self.typeConf.boundsType),
             numpy.array(variables, dtype=self.typeConf.varType),
             numpy.int32(iterations), numpy.int32(skip),
