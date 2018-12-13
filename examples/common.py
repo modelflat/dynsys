@@ -1,3 +1,5 @@
+import numpy
+
 fn_GeneratorKPR = r"""
 
 #define Fz(z) (8.592*(z) - 22*(z)*(z) + 14.408*(z)*(z)*(z))
@@ -16,6 +18,16 @@ real3 userFn(real3 v, real h, real g, real eps) {
 #define DYNAMIC_COLOR
 
 """
+
+
+def GeneratorKPR(v, h, g, eps):
+    x, y, z = v
+    return numpy.array((
+        2*h*x + y - g*z,
+        -x,
+        (x - (8.592*z - 22*z**2 + 14.408*z**3)) / eps,
+    ), dtype=numpy.float)
+
 
 fn_Ressler = r"""
 

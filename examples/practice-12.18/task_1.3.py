@@ -133,6 +133,7 @@ DRAW_SOURCE = r"""
     (((v) - (bs).s0) / ((bs).s1 - (bs).s0) * (size))
 
 kernel void drawBifurcationTree(
+    const float sliceX,
     const global float* samples,
     const int iterations,
     const float2 bounds, 
@@ -143,9 +144,11 @@ kernel void drawBifurcationTree(
     
     samples += id * iterations;
     
-    for (int i = 0; i < iterations; ++i) {
-        int2 coord = (int2)(id, height - TRANSLATE_BACK_1D(samples[i], bounds, height));
-        write_imagef(result, coord, TREE_COLOR);
+    for (int i = 1; i < iterations; ++i) {
+        if (samples[i - 1] < sliceX && samples[i] >= sliceX) {
+            int2 coord = (int2)(id, height - TRANSLATE_BACK_1D(samples[i], bounds, height));
+            write_imagef(result, coord, TREE_COLOR);
+        }
     }
 }
 
@@ -182,6 +185,7 @@ class BifurcationTree:
         return self.hostImage
 
     def __call__(self,
+                 sliceX: float,
                  startPoint: tuple,
                  varIndex: int,
                  paramIndex: int,
@@ -225,6 +229,7 @@ class BifurcationTree:
 
         self.program.drawBifurcationTree(
             self.queue, (self.imageShape[0],), None,
+            numpy.float32(sliceX),
             resultDevice,
             numpy.int32(iterations),
             numpy.array(minMax, dtype=numpy.float32),
@@ -289,12 +294,13 @@ class Task3(SimpleApp):
 
     def drawBifTree(self, *_):
         self.bifTreeWidget.setTexture(self.bifTree(
+            sliceX=1,
             startPoint=(self.slider1.value(), self.slider2.value(), self.slider3.value()),
             varIndex=0,
-            paramIndex=0,
-            paramRange=(0, 3),
+            paramIndex=2,
+            paramRange=(0, 2),
             otherParams=(0.2, 0.2, 2.5),
-            iterations=512, skip=self.sliderI.value(), maxAllowedValue=10
+            iterations=1024, skip=self.sliderI.value(), maxAllowedValue=1
         ))
 
 

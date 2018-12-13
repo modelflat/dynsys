@@ -28,7 +28,7 @@ systemSource = r"""
 
 real3 userFn(real3, real, real, real);
 real3 userFn(real3 v, real h, real g, real eps) {
-    #define STEP (real)(1e-3)
+    #define STEP (real)(2e-3)
     real3 p = (real3)(
         2.0f*h*v.x + v.y - g*v.z, 
         -v.x,
@@ -97,7 +97,7 @@ class Task1(SimpleApp):
             connectTo=self.drawAttractor
         )
 
-        self.attr = PhasePlot(self.ctx, self.queue, (6, 6, 6), phaseBounds,
+        self.attr = PhasePlot(self.ctx, self.queue, (8, 8, 8), phaseBounds,
                               systemSource, 3, 3,
                               typeConfig=FLOAT,
                               outputConf=OutputConfig(
