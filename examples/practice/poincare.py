@@ -15,7 +15,7 @@ def gen(v, h, g, eps):
     ), dtype=numpy.float)
 
 
-def computeTrajectory(fn, startAt=(0, .5, .1), params=(.07, .85, 0.2), iterCount: int = 100000):
+def computeTrajectory(fn, startAt=(0, 1, 0), params=(.07, .85, 0.2), iterCount: int = 100000):
     trajectory = numpy.empty((iterCount, 3), dtype=numpy.float)
     trajectory[0] = startAt
     for i in range(1, iterCount):
