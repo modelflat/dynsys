@@ -3,8 +3,8 @@ from matplotlib import pyplot as pp
 
 
 STEP = 1e-3
-PART_3 = True
-TIME = True
+PART_3 = False
+TIME = False
 
 if not TIME or PART_3:
     from mpl_toolkits.mplot3d import Axes3D
@@ -59,7 +59,7 @@ if __name__ == '__main__':
             ax = pp.figure().gca(projection="3d")
             poincare = findPoincare(*tuple(trajectory), .5, "x")
             ax.plot(*trajectory, "g-")
-            ax.plot(*poincare, "r-")
+            pp.plot(*poincare, "r-")
     else:
         ax = pp.figure().gca(projection="3d")
         points = computeBifDiagram(

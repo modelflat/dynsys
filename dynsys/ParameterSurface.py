@@ -4,7 +4,7 @@ from .cl import ComputedImage, generateCode
 
 SOURCE = """
 kernel void fillParameterSurface(
-    const BOUNDS_2D bounds, write_only image2d_t result
+    const float4 bounds, write_only image2d_t result
 ) {    
     const int2 id = ID_2D;
     const real2 v = TRANSLATE_2D(real2, id, SIZE_2D, bounds);
@@ -20,7 +20,11 @@ class ParameterSurface(ComputedImage):
                          generateCode(typeConfig, boundsDims=2),
                          colorFunctionSource,
                          SOURCE,
-                         typeConfig=typeConfig)
+                         typeConfig=typeConfig,
+                         options=[
+                             "-cl-std=CL1.0",
+                             "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])]
+                         )
 
     def __call__(self):
         self.program.fillParameterSurface(

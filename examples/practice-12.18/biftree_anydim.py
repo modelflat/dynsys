@@ -24,34 +24,27 @@ real3 userFn(real3 v, real h, real g, real eps) {
 
 COMMON_SOURCE = R"""
 #define real float
+#define real2 float2
 #define real3 float3
 """
 
+COMPUTE_SOURCE = r"""
 
-COMPUTE_SOURCE = R"""
-
-#define ID_1D get_global_id(0)
-
-#define SIZE_1D get_global_size(0)
-
-#define TRANSLATE_1D(id, size, bs) ((bs).s0 + (id)*((bs).s1 - (bs).s0)/(size))
+#define MAP_BOUNDS(bs) \
+    ((bs).s0 + (get_global_id(0))*((bs).s1 - (bs).s0)/(get_global_size(0)))
 
 kernel void computeBifurcationTree(
-    const float3 startPoint,
+    const real3 startPoint,
     float par0, float par1, float par2,
     const int activeAxisIdx,
+    const real2 hardBounds,
     const int activeParamIdx,
-    const float2 bounds,
-    const float maxAllowedValue,
-    const int skip,
-    const int iterations,
-    global float* result, 
-    global float2* resultMinMax
+    const real2 paramBounds,
+    const int2 iterConf,
+    global real3* result, 
+    global real2* resultMinMax
 ) {
-    const int id = ID_1D;
-    const float param = TRANSLATE_1D(id, SIZE_1D, bounds);
-
-    result += id * iterations;
+    const float param = MAP_BOUNDS(paramBounds);
     
     if        (activeParamIdx == 0) {
         par0 = param;
@@ -61,66 +54,47 @@ kernel void computeBifurcationTree(
         par2 = param;
     }
 
-    float3 x = startPoint;
-    
+    float3 point = startPoint;
     float min_;
     if        (activeAxisIdx == 0) {
-        min_ = x.s0;
+        min_ = point.s0;
     } else if (activeAxisIdx == 1) {
-        min_ = x.s1;
+        min_ = point.s1;
     } else if (activeAxisIdx == 2) {
-        min_ = x.s2;
-    } 
-    
+        min_ = point.s2;
+    }
     float max_;
     if (activeAxisIdx == 0) {
-        max_ = x.s0;
+        max_ = point.s0;
     } else if (activeAxisIdx == 1) {
-        max_ = x.s1;
+        max_ = point.s1;
     } else if (activeAxisIdx == 2) {
-        max_ = x.s2;
+        max_ = point.s2;
     }
     
-    for (int i = 0; i < skip; ++i) {
-        x = userFn(x, par0, par1, par2);
-        //if (get_global_id(0) == 7) {
-        //    printf("%.3f %.3f %.3f\n", x.s0, x.s1, x.s2);
-        //}
+    for (int i = 0; i < iterConf.s0; ++i) {
+        point = userFn(point, par0, par1, par2);
     }
 
-    for (int i = 0; i < iterations; ++i) {
-        x = userFn(x, par0, par1, par2);
+    result += get_global_id(0) * iterConf.s1;
+    for (int i = 0; i < iterConf.s1; ++i) {
+        point = userFn(point, par0, par1, par2);
         
-        if (activeAxisIdx == 0) {
-            const float v = x.s0;
-            if (v < min_ && v > -maxAllowedValue) 
-                min_ = v;
-            if (v > max_ && v <  maxAllowedValue) 
-                max_ = v;
+        if        (activeAxisIdx == 0) {
+            if (point.s0 < min_ && point.s0 > hardBounds.s0) min_ = point.s0;
+            if (point.s0 > max_ && point.s0 < hardBounds.s1) max_ = point.s0;
         } else if (activeAxisIdx == 1) {
-            const float v = x.s1;
-            if (v < min_ && v > -maxAllowedValue) 
-                min_ = v;
-            if (v > max_ && v <  maxAllowedValue) 
-                max_ = v;
+            if (point.s1 < min_ && point.s1 > hardBounds.s0) min_ = point.s1;
+            if (point.s1 > max_ && point.s1 < hardBounds.s1) max_ = point.s1;
         } else if (activeAxisIdx == 2) {
-            const float v = x.s2;
-            if (v < min_ && v > -maxAllowedValue) 
-                min_ = v;
-            if (v > max_ && v <  maxAllowedValue) 
-                max_ = v;
+            if (point.s2 < min_ && point.s2 > hardBounds.s0) min_ = point.s2;
+            if (point.s2 > max_ && point.s2 < hardBounds.s1) max_ = point.s2;
         }
         
-        if (activeAxisIdx == 0) {
-            result[i] = clamp(x.s0, -maxAllowedValue, maxAllowedValue);
-        } else if (activeAxisIdx == 1) {
-            result[i] = clamp(x.s1, -maxAllowedValue, maxAllowedValue);
-        } else if (activeAxisIdx == 2) {
-            result[i] = clamp(x.s2, -maxAllowedValue, maxAllowedValue);
-        }
+        result[i] = point;
     }
 
-    resultMinMax[id] = (float2)(min_, max_); // save min/max
+    resultMinMax[get_global_id(0)] = (float2)(min_, max_); // save min/max
 }
  
 """
@@ -133,11 +107,12 @@ DRAW_SOURCE = r"""
     (((v) - (bs).s0) / ((bs).s1 - (bs).s0) * (size))
 
 kernel void drawBifurcationTree(
-    const float sliceX,
-    const global float* samples,
+    const real sliceValue,
+    const int activeAxisIdx,
+    const global float3* samples,
     const int iterations,
-    const float2 bounds, 
-    const float height,
+    const real2 bounds, 
+    const real height,
     write_only image2d_t result
 ) {
     const int id = get_global_id(0);
@@ -145,8 +120,20 @@ kernel void drawBifurcationTree(
     samples += id * iterations;
     
     for (int i = 1; i < iterations; ++i) {
-        if (samples[i - 1] >= sliceX && samples[i] < sliceX) {
-            int2 coord = (int2)(id, height - TRANSLATE_BACK_1D(samples[i], bounds, height));
+        real v1, v2;
+        if (activeAxisIdx == 0) {
+            v1 = samples[i - 1].s0;
+            v2 = samples[i].s0;
+        } else if (activeAxisIdx == 1) {
+            v1 = samples[i - 1].s1;
+            v2 = samples[i].s1;
+        } else if (activeAxisIdx == 2) {
+            v1 = samples[i - 1].s2;
+            v2 = samples[i].s2;
+        }
+        
+        if (v2 < sliceValue && v1 >= sliceValue) {
+            int2 coord = (int2)(id, height - TRANSLATE_BACK_1D(v2, bounds, height));
             write_imagef(result, coord, TREE_COLOR);
         }
     }
@@ -185,7 +172,7 @@ class BifurcationTree:
         return self.hostImage
 
     def __call__(self,
-                 sliceX: float,
+                 sliceValue: float,
                  startPoint: tuple,
                  varIndex: int,
                  paramIndex: int,
@@ -210,16 +197,14 @@ class BifurcationTree:
             self.queue, (self.imageShape[0],), None,
             numpy.array(startPoint, dtype=numpy.float32), *params,
             numpy.int32(varIndex),
+            numpy.array((-maxAllowedValue, maxAllowedValue), dtype=numpy.float32),
             numpy.int32(paramIndex),
             numpy.array(paramRange, dtype=numpy.float32),
-            numpy.float32(maxAllowedValue),
-            numpy.int32(skip),
-            numpy.int32(iterations),
-            resultDevice,
-            resultMinMaxDevice
+            numpy.array((skip, iterations), dtype=numpy.int32),
+            resultDevice, resultMinMaxDevice
         )
 
-        resultMinMaxHost = numpy.empty((self.imageShape[0]*2,), dtype=numpy.float32)
+        resultMinMaxHost = numpy.empty((self.imageShape[0] * 2,), dtype=numpy.float32)
 
         cl.enqueue_copy(self.queue, resultMinMaxHost, resultMinMaxDevice)
 
@@ -229,7 +214,8 @@ class BifurcationTree:
 
         self.program.drawBifurcationTree(
             self.queue, (self.imageShape[0],), None,
-            numpy.float32(sliceX),
+            numpy.float32(sliceValue),
+            numpy.int32(varIndex),
             resultDevice,
             numpy.int32(iterations),
             numpy.array(minMax, dtype=numpy.float32),
@@ -246,7 +232,7 @@ class Task3(SimpleApp):
         super().__init__("Task 3")
 
         self.bifTree = BifurcationTree(
-            self.ctx, self.queue, (512, 512), fn_Ressler, 3, 3
+            self.ctx, self.queue, (512, 512), systemSource, 3, 3
         )
         self.bifTreeWidget = Image2D()
         self.slider1, self.slider1Ui = createSlider(
@@ -275,7 +261,6 @@ class Task3(SimpleApp):
             labelPosition="top"
         )
 
-
         self.slider1.valueChanged.connect(self.drawBifTree)
         self.slider2.valueChanged.connect(self.drawBifTree)
         self.slider3.valueChanged.connect(self.drawBifTree)
@@ -294,13 +279,14 @@ class Task3(SimpleApp):
 
     def drawBifTree(self, *_):
         self.bifTreeWidget.setTexture(self.bifTree(
-            sliceX=.5,
+            sliceValue=.5,
             startPoint=(self.slider1.value(), self.slider2.value(), self.slider3.value()),
             varIndex=0,
-            paramIndex=2,
-            paramRange=(0, 2),
-            otherParams=(0.2, 0.2, 2.5),
-            iterations=4096, skip=self.sliderI.value(), maxAllowedValue=1
+            paramIndex=1,
+            paramRange=(0.75, 0.95),
+            otherParams=(0.092, None, 0.2),
+            iterations=1024,
+            skip=self.sliderI.value()
         ))
 
 

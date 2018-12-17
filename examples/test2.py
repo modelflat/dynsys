@@ -43,7 +43,7 @@ def plotPhase():
     pyplot.show()
 
 
-def plotDiagram(h=.092, eps=.2, paramRange=numpy.arange(0.7, 1, 0.001)):
+def plotDiagram(h=.092, eps=.2, paramRange=numpy.arange(0.4, 1, 0.002)):
     rDiagramData = []
     for g in paramRange:
         trajectory = computeTrajectory(parameters=(h, eps, g), evaluateNum=12000)

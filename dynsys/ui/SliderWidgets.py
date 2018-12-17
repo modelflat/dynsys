@@ -53,7 +53,7 @@ def createSlider(sliderType: str, bounds: tuple,
 
     layout = None
     if withLabel is not None:
-        positions = {"left", "top"}
+        positions = {"left", "top", "right"}
         if labelPosition not in positions:
             raise ValueError("Label position must be one of: {}".format(positions))
         supportsValues = True
@@ -70,11 +70,15 @@ def createSlider(sliderType: str, bounds: tuple,
             slider.valueChanged.connect(setVal)
 
         if putToLayout is None:
-            layout = (QHBoxLayout if labelPosition == "left" else QVBoxLayout)()
+            layout = (QHBoxLayout if labelPosition in {"left", "right"} else QVBoxLayout)()
         else:
             layout = putToLayout
-        layout.addWidget(label)
-        layout.addWidget(slider)
+        if labelPosition in {"right"}:
+            layout.addWidget(slider)
+            layout.addWidget(label)
+        else:
+            layout.addWidget(label)
+            layout.addWidget(slider)
 
     if connectTo is not None:
         if isinstance(connectTo, Iterable):
