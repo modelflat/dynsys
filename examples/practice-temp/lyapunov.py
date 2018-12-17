@@ -1,8 +1,26 @@
-# computes lyapunov exponents for Lorenz attractor
-# original in MatLab: https://www.mathworks.com/matlabcentral/fileexchange/4628-calculation-lyapunov-exponents-for-ode
 import numpy
 import pyopencl as cl
-from dynsys import SimpleApp
+from dynsys import SimpleApp, allocateImage
+
+Fn = r"""
+#define userFn_SYSTEM(x, y, z, sig, bet, r) (real3)( \
+    (sig)*((y) - (x)), \
+    -(x)*(z) + (r)*(x) - (y), \
+    (x)*(y) - (bet)*(z)\
+)
+
+#define userFn_VARIATION(x, y, z, x_, y_, z_, sig, bet, r) (real3)( \
+    ((y_) - (x_)) * (sig), \
+    ((r) - (z))*(x_) - (y_) - (x)*(z_), \
+    (y)*(x_) + (x)*(y_) - (bet)*(z_) \
+)
+"""
+
+
+DEFS = r"""
+#define real double
+#define real3 double3
+"""
 
 
 SOURCE_RK4 = r"""
@@ -72,57 +90,62 @@ void rk4(int steps, real time, real tLast, MOD real3 y[N], MOD const real p[NP])
 """
 
 
-Fn = r"""
-#define real double
-#define real3 double3
+LYAPUNOV_KERNEL = r"""
 
-#define userFn_SYSTEM(x, y, z, sig, bet, r) (real3)( \
-    (sig)*((y) - (x)), \
-    -(x)*(z) + (r)*(x) - (y), \
-    (x)*(y) - (bet)*(z)\
-)
-
-#define userFn_VARIATION(x, y, z, x_, y_, z_, sig, bet, r) (real3)( \
-    ((y_) - (x_)) * (sig), \
-    ((r) - (z))*(x_) - (y_) - (x)*(z_), \
-    (y)*(x_) + (x)*(y_) - (bet)*(z_) \
-)
-"""
-
-
-KER = r"""
-
-kernel void testRk4(
-    real t0, real t1, int n, global real* params, global real* points
+void LCE(
+    real3 y[N], 
+    real3 param[N - 1], 
+    real tStart, real tStep, int iter, int stepIter, 
+    real L[N - 1]
 ) {
-    MOD real3 y[N];
-    for (int i = 0; i < N; ++i) {
-        y[i] = vload3(i, points);
+    real gsc[N - 1];
+    real norms[N - 1];
+    real S[N - 1];
+    real t = tStart;
+    
+    for (int i = 0; i < N - 1; ++i) {
+        S[i] = 0;
     }
-    MOD real p[NP];
-    for (int i = 0; i < NP; ++i) {
-        p[i] = params[i];
+    
+    for (int i = 0; i < iter; ++i) {
+        // Evolve solution for some time
+        rk4(stepIter, t, t + tStep, y, param);
+        
+        // Renormalize according to gram-schmidt
+        for (int j = 0; j < N - 1; ++j) {
+            for (int k = 0; k < j; ++k) {
+                gsc[k] = dot(y[j + 1], y[k + 1]);
+            }
+            for (int k = 0; k < j; ++k) {
+                y[j + 1] -= gsc[k] * y[k + 1];
+            }
+            norms[j] = length(y[j + 1]);
+            y[j + 1] /= norms[j];
+        }
+        
+        // Accumulate sum of log of norms
+        for (int j = 0; j < N - 1; ++j) {
+            S[j] += log(norms[j]);
+        }
+        
+        t += tStep;
     }
-    // ===
-    for (int i = 0; i < n; ++i) {
-        rk4(100, i, i + 1, y, p);
-    }
-    // ===
-    for (int i = 0; i < N; ++i) {
-        vstore3(y[i], i, points);
+    
+    for (int i = 0; i < N - 1; ++i) {
+        L[i] = S[i] / (t - tStart);
     }
 }
-"""
 
-
-LYAP_KERNEL = r"""
-kernel void lyapunov(
-    const global* 
-    real t0, real t1, int n, global real* params, global real* points
+kernel void computeLCESingle(
+    const global real* y0,
+    const global real* params,
+    real tStart, real tStep,
+    int iter, int stepIter,
+    global real* L
 ) {
     real3 y[N];
     for (int i = 0; i < N; ++i) {
-        y[i] = vload3(i, points);
+        y[i] = vload3(i, y0);
     }
     
     real p[NP];
@@ -130,14 +153,44 @@ kernel void lyapunov(
         p[i] = params[i];
     }
     
-    for (int i = 0; i < n; ++i) {
-        rk4(i, i + 1, y, p);
-    }
+    real L_[N - 1];
+    LCE(y, p, tStart, tStep, iter, stepIter, L_);
     
-    for (int i = 0; i < N; ++i) {
-        vstore3(y[i], i, points);
+    for (int i = 0; i < N - 1; ++i) {
+        L[i] = L_[i];
     }
 }
+
+kernel void computeLCEParamVarying(
+    const global real* y0,
+    const global real* params,
+    int paramId,
+    real paramMin, real paramMax,
+    real tStart, real tStep,
+    int iter, int stepIter,
+    global real* L
+) {
+    real3 y[N];
+    for (int i = 0; i < N; ++i) {
+        y[i] = vload3(i, y0);
+    }
+    
+    real p[NP];
+    for (int i = 0; i < NP; ++i) {
+        p[i] = params[i];
+    }
+    
+    p[paramId] = paramMin + get_global_id(0) * (paramMax - paramMin) / get_global_size(0);
+
+    real L_[N - 1];
+    LCE(y, p, tStart, tStep, iter, stepIter, L_);
+    
+    L += get_global_id(0) * (N - 1);
+    for (int i = 0; i < N - 1; ++i) {
+        L[i] = L_[i];
+    }
+}
+
 """
 
 
@@ -145,49 +198,131 @@ def dummyOption():
     return "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])
 
 
+class Lyapunov:
+
+    def __init__(self, ctx, queue, fn):
+        self.ctx, self.queue = ctx, queue
+        self.prg = cl.Program(self.ctx, "\n".join((DEFS, fn, SOURCE_RK4, LYAPUNOV_KERNEL))).build(
+            options=[dummyOption()]
+        )
+        self.type = numpy.float64
+
+    def __call__(self, y0: tuple, p1, p2, p3, t0, dt=1, t1=None, iter=2000, stepIter=200):
+        y = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                      hostbuf=numpy.array((*y0, *numpy.eye(3).flat), dtype=self.type))
+        param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                          hostbuf=numpy.array((p1, p2, p3), dtype=self.type))
+        lyapHost = numpy.empty((3,), dtype=self.type)
+        lyapDev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=lyapHost.nbytes)
+
+        self.prg.computeLCESingle(
+            self.queue, (1,), None,
+            y, param,
+            self.type(t0),
+            self.type(dt),
+            numpy.int32(iter),
+            numpy.int32(stepIter),
+            lyapDev
+        )
+
+        cl.enqueue_copy(self.queue, lyapHost, lyapDev)
+
+        return lyapHost
+
+
+class LyapunovSeries:
+
+    def __init__(self, ctx, queue, fn):
+        self.ctx, self.queue = ctx, queue
+        self.prg = cl.Program(self.ctx, "\n".join((DEFS, fn, SOURCE_RK4, LYAPUNOV_KERNEL))).build(
+            options=[dummyOption()]
+        )
+        self.type = numpy.float64
+
+    def __call__(self, y0: tuple, p1, p2, p3, paramId, paramBounds, paramTicks, t0, dt=1, t1=None, iter=2000, stepIter=200):
+        y = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                      hostbuf=numpy.array((*y0, *numpy.eye(3).flat), dtype=self.type))
+        param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                          hostbuf=numpy.array((p1, p2, p3), dtype=self.type))
+        lyapHost = numpy.empty((3,), dtype=self.type)
+        lyapDev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=lyapHost.nbytes)
+
+        self.prg.computeLCEParamVarying(
+            self.queue, (paramTicks,), None,
+            y, param,
+            numpy.int32(paramId),
+            self.type(paramBounds[0]),
+            self.type(paramBounds[1]),
+            self.type(t0),
+            self.type(dt),
+            numpy.int32(iter),
+            numpy.int32(stepIter),
+            lyapDev
+        )
+
+        cl.enqueue_copy(self.queue, lyapHost, lyapDev)
+
+        return lyapHost
+
+
+class LyapunovMap:
+
+    def __init__(self, ctx, queue, fn, imageShape):
+        self.ctx, self.queue = ctx, queue
+        self.prg = cl.Program(self.ctx, "\n".join((DEFS, fn, SOURCE_RK4, LYAPUNOV_KERNEL))).build(
+            options=[dummyOption()]
+        )
+        self.type = numpy.float64
+        self.imageShape = imageShape
+        self.hostImage, self.deviceImage = allocateImage(self.ctx, imageShape)
+
+    def clear(self, readBack=False, color=(1.0, 1.0, 1.0, 1.0)):
+        cl.enqueue_fill_image(
+            self.queue, self.deviceImage,
+            color=numpy.array(color, dtype=numpy.float32),
+            origin=(0,)*len(self.imageShape), region=self.imageShape
+        )
+        if readBack:
+            self.readFromDevice()
+
+    def readFromDevice(self):
+        cl.enqueue_copy(
+            self.queue, self.hostImage, self.deviceImage,
+            origin=(0,)*len(self.imageShape), region=self.imageShape
+        )
+        return self.hostImage
+
+    def __call__(self, y0: tuple, p1, p2, p3, t0, dt=1, t1=None, iter=2000, stepIter=200):
+        y = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                      hostbuf=numpy.array((*y0, *numpy.eye(3).flat), dtype=self.type))
+        param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                          hostbuf=numpy.array((p1, p2, p3), dtype=self.type))
+        lyapHost = numpy.empty((3,), dtype=self.type)
+        lyapDev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=lyapHost.nbytes)
+
+        self.prg.LCEmap(
+            self.queue, self.imageShape, None,
+            numpy.int32(iter),
+            numpy.int32(stepIter),
+            self.type(t0),
+            self.type(dt),
+            y, param, lyapDev
+        )
+
+        cl.enqueue_copy(self.queue, lyapHost, lyapDev)
+
+        return lyapHost
+
+
+
 class Test(SimpleApp):
 
     def __init__(self):
         super().__init__("123")
 
-        self.prg = cl.Program(self.ctx, "\n".join((Fn, SOURCE_RK4, KER))).build(
-            options=[dummyOption()]
-        )
+        self.lyap = LyapunovSeries(self.ctx, self.queue, Fn)
+        print(self.lyap((1, 2, 3), 10, 8/3, 28, 0, ))
 
-        tp = numpy.float64
-        n = 30
-
-        yHost = numpy.array((
-            1, 2, 3,
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1,
-        ), dtype=tp)
-        y2Host = yHost.reshape((4, 3)).copy()
-
-        for i in range(n):
-            y2Host = rk4(n, n + 1, y2Host.flat, Lorenz)
-
-        param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=numpy.array((
-            10, 8/3, 28
-        ), dtype=tp))
-        yDev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE | cl.mem_flags.COPY_HOST_PTR, hostbuf=yHost)
-
-        self.prg.testRk4(
-            self.queue, (1,), None,
-            tp(0),
-            tp(0),
-            numpy.int32(n),
-            param,
-            yDev
-        )
-
-        cl.enqueue_copy(self.queue, yHost, yDev)
-
-        print()
-
-        print(yHost.reshape((4, 3)))
-        print(y2Host.reshape((4, 3)))
         exit()
 
 

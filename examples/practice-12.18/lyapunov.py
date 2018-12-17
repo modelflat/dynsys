@@ -54,7 +54,7 @@ def lyapunov(n, fn, tStart, tStep, tEnd, y0):
                 gsc[k] = numpy.dot(w[j], w[k])
 
             for k in range(j):
-                w[j] -= numpy.dot(gsc[k], w[k])
+                w[j] -= gsc[k] * w[k]
 
             norms[j] = numpy.linalg.norm(w[j])
             w[j] /= norms[j]
