@@ -7,14 +7,21 @@ DEFS = r"""
 #define real double
 #define real2 double2
 #define real3 double3
-
-#define vec_t real3
 """
 
 
 SOURCE_RK4 = r"""
 
+#if (NP == 3)
 #define NL 3
+#define vec_t real3
+#define LOAD vload3
+#else
+#define NL 2
+#define vec_t real2
+#define LOAD vload2
+#endif
+
 #define N (NL + 1)
 
 #define R(v) (real)(v)
@@ -29,10 +36,18 @@ void fn_System(
     __modif const real p[NP]
 ) {
     (void)t;
-    y[1] = userFn_VARIATION(y[0].x, y[0].y, y[0].z, y[1].x, y[1].y, y[1].z, p[0], p[1], p[2]);
-    y[2] = userFn_VARIATION(y[0].x, y[0].y, y[0].z, y[2].x, y[2].y, y[2].z, p[0], p[1], p[2]);
-    y[3] = userFn_VARIATION(y[0].x, y[0].y, y[0].z, y[3].x, y[3].y, y[3].z, p[0], p[1], p[2]);
+    for (int i = 1; i < N; ++i) {
+#if (NP == 3) 
+        y[i] = userFn_VARIATION(y[0].x, y[0].y, y[0].z, y[i].x, y[i].y, y[i].z, p[0], p[1], p[2]);
+#else
+        y[i] = userFn_VARIATION(y[0].x, y[0].y, y[i].x, y[i].y, p[0], p[1]);
+#endif
+    }
+#if (NP == 3)
     y[0] = userFn_SYSTEM(y[0].x, y[0].y, y[0].z, p[0], p[1], p[2]);
+#else
+    y[0] = userFn_SYSTEM(y[0].x, y[0].y, p[0], p[1]);
+#endif
 }
 
 
@@ -45,8 +60,8 @@ void rk4(
     __modif const real p[NP]
 ) {
     real h = (tLast - time) / steps;
-    __modif real3 k[N];
-    __modif real3 r[N];
+    __modif vec_t k[N];
+    __modif vec_t r[N];
     
     for (int i = 0; i < steps; ++i) {
         for (int j = 0; j < N; ++j) {
@@ -90,6 +105,12 @@ void rk4(
 
 
 SOURCE_LYAP = r"""
+void LCE(
+    vec_t y[N], 
+    real param[N - 1], 
+    real tStart, real tStep, int iter, int stepIter, 
+    real L[N - 1]
+);
 void LCE(
     vec_t y[N], 
     real param[N - 1], 
@@ -147,7 +168,7 @@ kernel void computeLCESingle(
 ) {
     vec_t y[N];
     for (int i = 0; i < N; ++i) {
-        y[i] = vload3(i, y0);
+        y[i] = LOAD(i, y0);
     }
     
     real p[NP];
@@ -199,14 +220,38 @@ kernel void computeLCEParamVarying(
 
 
 LYAPMAP_KERNEL = r"""
+
+float3 hsv2rgb(float3);
+float3 hsv2rgb(float3 hsv) {
+    const float c = hsv.y * hsv.z;
+    const float x = c * (1 - fabs(fmod( hsv.x / 60, 2 ) - 1));
+    float3 rgb;
+    if      (0 <= hsv.x && hsv.x < 60) {
+        rgb = (float3)(c, x, 0);
+    } else if (60 <= hsv.x && hsv.x < 120) {
+        rgb = (float3)(x, c, 0);
+    } else if (120 <= hsv.x && hsv.x < 180) {
+        rgb = (float3)(0, c, x);
+    } else if (180 <= hsv.x && hsv.x < 240) {
+        rgb = (float3)(0, x, c);
+    } else if (240 <= hsv.x && hsv.x < 300) {
+        rgb = (float3)(x, 0, c);
+    } else {
+        rgb = (float3)(c, 0, x);
+    }
+    return (rgb + (hsv.z - c));
+}
+
 kernel void computeLCEMap(
     const global real* y0,
-    const global real* params,
     int lyapIndex,
-    real fixedParamValue,
     const real2 param1Bounds,
     const real2 param2Bounds,
-    
+    real param3Value,
+    real tStart, 
+    real tStep, 
+    int iter, int stepIter,
+    global real* result
 ) {
     vec_t y[N];
     for (int i = 0; i < N; ++i) {
@@ -214,20 +259,25 @@ kernel void computeLCEMap(
     }
     
     real p[NP];
-    for (int i = 0; i < NP; ++i) {
-        p[i] = params[i];
-    }
-    
     p[0] = param1Bounds.s0 + get_global_id(0) * (param1Bounds.s1 - param1Bounds.s0) / get_global_size(0);
     p[1] = param2Bounds.s0 + get_global_id(1) * (param2Bounds.s1 - param2Bounds.s0) / get_global_size(1);
-    p[2] = fixedParamValue;
+    p[2] = param3Value;
 
     real L_[N - 1];
     LCE(y, p, tStart, tStep, iter, stepIter, L_);
-    
-    real v = L_[lyapIndex];
-    
-    
+    result += get_global_id(1) * get_global_size(0) + get_global_id(0);
+    *result = L_[lyapIndex];
+}
+
+kernel void colorMap(
+    const global real* result,
+    real min_, real max_,
+    write_only image2d_t output
+) {
+    result += get_global_id(1) * get_global_size(0) + get_global_id(0);
+    real v = (*result - min_) / (max_ - min_);
+    float4 color = (float4)(hsv2rgb((float3)(v * 240, 1.0, 1.0)), 1.0);
+    write_imagef(output, (int2)(get_global_id(0), get_global_id(1)), color);
 }
 
 """
@@ -335,23 +385,36 @@ class LyapunovMap:
         )
         return self.hostImage
 
-    def __call__(self, y0: tuple, p1, p2, p3, t0, dt=1, t1=None, iter=2000, stepIter=200):
+    def __call__(self, y0: tuple, lyapIndex: int,
+                 param1Bounds: tuple, param2Bounds: tuple, param3Value: float,
+                 t0=0, dt=1, t1=None, iter=2000, stepIter=200):
         y = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                       hostbuf=numpy.array((*y0, *numpy.eye(3).flat), dtype=self.type))
-        param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                          hostbuf=numpy.array((p1, p2, p3), dtype=self.type))
-        lyapHost = numpy.empty((3,), dtype=self.type)
-        lyapDev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=lyapHost.nbytes)
 
-        self.prg.LCEmap(
+        resultHost = numpy.empty(self.imageShape, dtype=self.type)
+        resultDev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=resultHost.nbytes)
+
+        self.prg.computeLCEMap(
             self.queue, self.imageShape, None,
-            numpy.int32(iter),
-            numpy.int32(stepIter),
+            y,
+            numpy.int32(lyapIndex),
+            numpy.array(param1Bounds, dtype=self.type),
+            numpy.array(param2Bounds, dtype=self.type),
+            self.type(param3Value),
             self.type(t0),
             self.type(dt),
-            y, param, lyapDev
+            numpy.int32(iter),
+            numpy.int32(stepIter),
+            resultDev
         )
 
-        cl.enqueue_copy(self.queue, lyapHost, lyapDev)
+        cl.enqueue_copy(self.queue, resultHost, resultDev)
+        min_, max_ = min(resultHost.flat), max(resultHost.flat)
+        print(min_, max_)
 
-        return lyapHost
+        self.prg.colorMap(
+            self.queue, self.imageShape, None,
+            resultDev, min_, max_, self.deviceImage
+        )
+
+        return self.readFromDevice(), min_, max_
