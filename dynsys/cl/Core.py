@@ -107,9 +107,7 @@ class ComputedImage:
         self.spaceShape = spaceShape
         self.hostImage, self.deviceImage = allocateImage(ctx, imageShape)
         opt = [*options, "-DDIM={}".format(len(imageShape))]
-
         self.program = cl.Program(ctx, "\n".join(sources)).build(opt)
-        print("\n".join(sources))
 
     def wrapArgs(self, requiredArgCount, *args, skipIndex=None):
         if requiredArgCount < len(args):
