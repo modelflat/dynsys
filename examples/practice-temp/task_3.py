@@ -87,22 +87,23 @@ kernel void homoclinic_plot(
     
     for(int i = 0; idx < count; ++idx){
         x_f[idx*count+i] = fp.x;        
-        y_b[idx*count+i] = fp.y;
+        y_f[idx*count+i] = fp.y;
         
         fp = forward_fun(fp, a, b);
     }
     
     for(int i = 0; idx < count; ++idx){
-        x_b[idx*count+i] = bp.x;        
+        x_b[idx*count+i] = bp.x;
         y_b[idx*count+i] = bp.y;
         
-        fp = backward_fun(fp, a, b);
+        bp = backward_fun(bp, a, b);
     }
 }
 """
 
 
 class MainWindow(QWidget):
+
     def __init__(self):
         super().__init__()
 
@@ -237,14 +238,16 @@ class MainWindow(QWidget):
         self.context, self.queue = createContextAndQueue()
 
         try:
-            self.program = cl.Program(self.context, "\n".join((self.equation_text.toPlainText(), phase_src))).build(
-                options=[dummyOption()]
-            )
+            self.program = cl.Program(
+                self.context,
+                "\n".join((self.equation_text.toPlainText(), phase_src))
+            ).build(options=[dummyOption()])
         except cl.RuntimeError as err:
             print("Error:", err.routine)
             print("Error code:", err.code)
             print("Build log:\n", self.program.get_build_info(self.device, cl.program_build_info.LOG))
             print("Build status:\n", self.program.get_build_info(self.device, cl.program_build_info.STATUS))
+            raise err
 
         resolution = int(self.resolution_sb.value())
         count = int(self.count.value())
@@ -271,8 +274,10 @@ class MainWindow(QWidget):
         )
 
         rnd = Random()
-        init_f_vec = np.empty((count, 2), dtype=np.float32)
-        init_b_vec = np.empty((count, 2), dtype=np.float32)
+
+        init_f_vec = np.empty((resolution, 2), dtype=np.float32)
+        init_b_vec = np.empty((resolution, 2), dtype=np.float32)
+
         for idx in range(count):
             fx = rnd.uniform(
                 float(self.stable_x.value()) - float(self.forward_rad.value()),
