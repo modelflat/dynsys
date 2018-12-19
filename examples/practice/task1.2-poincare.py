@@ -32,7 +32,10 @@ def findPoincare(x, y, z, section: float, axis: str):
 if __name__ == '__main__':
     trajectory = computeTrajectory(gen)
     poincare = findPoincare(*tuple(trajectory), .5, "x")
-    ax = pp.figure().gca(projection="3d")
-    ax.plot(*trajectory, "g-")
-    ax.plot(*poincare, "r-")
+    fig = pp.figure()
+    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    ax1.plot(*trajectory, "g-")
+    ax1.plot(*poincare, "r-")
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.plot(*poincare[1:])
     pp.show()

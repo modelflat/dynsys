@@ -4,21 +4,20 @@ import numpy
 
 from examples.common import *
 
+
 systemSource = r"""
 #define Fz(z) (8.592*(z) - 22*(z)*(z) + 14.408*(z)*(z)*(z))
 
 real3 userFn(real3, real, real, real);
-real3 userFn(real3 v, real h, real g, real eps) {
+real3 userFn(real3 v, real a, real b, real r) {
     #define STEP (real)(1e-3)
     real3 p = (real3)(
-        2.0f*h*v.x + v.y - g*v.z, 
-        -v.x,
-        (v.x - Fz(v.z)) / eps
+        a*(v.y - v.x), 
+        r*v.x - v.y - v.x*v.z,
+        -b*v.z + v.y*v.x
     );
     return v + STEP*p;
 }
-#define DYNAMIC_COLOR
-#define GENERATE_COLORS
 
 """
 
@@ -83,9 +82,6 @@ kernel void computeBifurcationTree(
     
     for (int i = 0; i < skip; ++i) {
         x = userFn(x, par0, par1, par2);
-        //if (get_global_id(0) == 7) {
-        //    printf("%.3f %.3f %.3f\n", x.s0, x.s1, x.s2);
-        //}
     }
 
     for (int i = 0; i < iterations; ++i) {
@@ -124,6 +120,7 @@ kernel void computeBifurcationTree(
 }
  
 """
+
 
 DRAW_SOURCE = r"""
 
@@ -246,27 +243,9 @@ class Task3(SimpleApp):
         super().__init__("Task 3")
 
         self.bifTree = BifurcationTree(
-            self.ctx, self.queue, (512, 512), fn_Ressler, 3, 3
+            self.ctx, self.queue, (768, 512), fn_Ressler, 3, 3
         )
         self.bifTreeWidget = Image2D()
-        self.slider1, self.slider1Ui = createSlider(
-            "real", (-10, 10),
-            labelPosition="top",
-            withLabel="x = {}",
-            withValue=-.5
-        )
-        self.slider2, self.slider2Ui = createSlider(
-            "real", (-10, 10),
-            labelPosition="top",
-            withLabel="y = {}",
-            withValue=3
-        )
-        self.slider3, self.slider3Ui = createSlider(
-            "real", (-10, 10),
-            labelPosition="top",
-            withLabel="z = {}",
-            withValue=8
-        )
 
         self.sliderI, self.sliderIUi = createSlider(
             "int", (0, 10000),
@@ -275,19 +254,10 @@ class Task3(SimpleApp):
             labelPosition="top"
         )
 
-
-        self.slider1.valueChanged.connect(self.drawBifTree)
-        self.slider2.valueChanged.connect(self.drawBifTree)
-        self.slider3.valueChanged.connect(self.drawBifTree)
         self.sliderI.valueChanged.connect(self.drawBifTree)
 
         self.setLayout(
-            vStack(self.bifTreeWidget,
-                   self.slider1Ui,
-                   self.slider2Ui,
-                   self.slider3Ui,
-                   self.sliderIUi
-                   )
+            vStack(self.bifTreeWidget, self.sliderIUi)
         )
 
         self.drawBifTree()
@@ -295,12 +265,12 @@ class Task3(SimpleApp):
     def drawBifTree(self, *_):
         self.bifTreeWidget.setTexture(self.bifTree(
             sliceX=.5,
-            startPoint=(self.slider1.value(), self.slider2.value(), self.slider3.value()),
+            startPoint=(1, 1, 1),
             varIndex=0,
             paramIndex=2,
-            paramRange=(0, 2),
-            otherParams=(0.2, 0.2, 2.5),
-            iterations=4096, skip=self.sliderI.value(), maxAllowedValue=1
+            paramRange=(0, 150),
+            otherParams=(10, 8/3, 2.5),
+            iterations=8192, skip=self.sliderI.value(), maxAllowedValue=10
         ))
 
 
