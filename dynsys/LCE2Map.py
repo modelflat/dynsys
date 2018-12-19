@@ -206,7 +206,7 @@ kernel void colorMap(
 ) {
     result += get_global_id(1) * get_global_size(0) + get_global_id(0);
     if (isnan(*result)) {
-        write_imagef(output, (int2)(get_global_id(0), get_global_size(1) - get_global_id(1)), (float4)(0.0));
+        write_imagef(output, (int2)(get_global_id(0), get_global_size(1) - get_global_id(1)), (float4)(0, 0, 0, 1.0));
     } else if (*result > 0) {
         real v = *result / max_;
         float4 color = (float4)(hsv2rgb((float3)(60 * (1 - v), 0.25 + 0.75 * v, 0.90)), 1.0);

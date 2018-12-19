@@ -207,7 +207,7 @@ kernel void computeLCEParamVarying(
     }
     
     p[paramId] = paramMin + get_global_id(0) * (paramMax - paramMin) / get_global_size(0);
-
+    
     real L_[N - 1];
     LCE(y, p, tStart, tStep, iter, stepIter, L_);
     
@@ -275,11 +275,18 @@ kernel void colorMap(
     write_only image2d_t output
 ) {
     result += get_global_id(1) * get_global_size(0) + get_global_id(0);
-    real v = (*result - min_) / (max_ - min_);
-    float4 color = (float4)(hsv2rgb((float3)(v * 240, 1.0, 1.0)), 1.0);
-    write_imagef(output, (int2)(get_global_id(0), get_global_id(1)), color);
+    if (isnan(*result)) {
+        write_imagef(output, (int2)(get_global_id(0), get_global_size(1) - get_global_id(1)), (float4)(0, 0, 0, 1.0));
+    } else if (*result > 0) {
+        real v = *result / max_;
+        float4 color = (float4)(hsv2rgb((float3)(60 * (1 - v), 0.25 + 0.75 * v, 0.90)), 1.0);
+        write_imagef(output, (int2)(get_global_id(0), get_global_size(1) - get_global_id(1)), color);
+    } else {
+        real v = -(*result - min_) / min_; // max == 0
+        float4 color = (float4)(hsv2rgb((float3)(240, 0.25 + 0.75*(1 - v), 1.0)), 1.0);
+        write_imagef(output, (int2)(get_global_id(0), get_global_size(1) - get_global_id(1)), color);
+    }
 }
-
 """
 
 
@@ -409,8 +416,7 @@ class LyapunovMap:
         )
 
         cl.enqueue_copy(self.queue, resultHost, resultDev)
-        min_, max_ = min(resultHost.flat), max(resultHost.flat)
-        print(min_, max_)
+        min_, max_ = numpy.nanmin(resultHost.flat), numpy.nanmax(resultHost.flat)
 
         self.prg.colorMap(
             self.queue, self.imageShape, None,
