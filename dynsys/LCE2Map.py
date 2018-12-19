@@ -259,23 +259,23 @@ class Lyapunov:
 
 class LyapunovSeries:
 
-    def __init__(self, ctx, queue, fn, paramCount):
+    def __init__(self, ctx, queue, fn):
         self.ctx, self.queue = ctx, queue
         self.prg = cl.Program(self.ctx, "\n".join((DEFS, fn, SOURCE_RK4, SOURCE_LYAP, LYAPSERIES_KERNEL))).build(
             options=[dummyOption()]
         )
         self.type = numpy.float64
-        self.paramCount = paramCount
+        self.paramCount = 2
 
-    def __call__(self, y0: tuple, params, paramId, paramLinspace, t0, dt=1, t1=None, iter=2000, stepIter=200):
+    def __call__(self, y0: tuple, params, paramId, paramLinspace, iter=2000):
         y = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                      hostbuf=numpy.array((*y0, *numpy.eye(3).flat), dtype=self.type))
+                      hostbuf=numpy.array((*y0, *numpy.eye(2).flat), dtype=self.type))
 
         assert self.paramCount == len(params)
 
         param = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                           hostbuf=numpy.array(params, dtype=self.type))
-        lyapHost = numpy.empty((paramLinspace.shape[0], 3), dtype=self.type)
+        lyapHost = numpy.empty((paramLinspace.shape[0], 2), dtype=self.type)
         lyapDev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=lyapHost.nbytes)
 
         self.prg.computeLCEParamVarying(
@@ -284,10 +284,10 @@ class LyapunovSeries:
             numpy.int32(paramId),
             self.type(paramLinspace[0]),
             self.type(paramLinspace[-1]),
-            self.type(t0),
-            self.type(dt),
+            self.type(0),
+            self.type(1),
             numpy.int32(iter),
-            numpy.int32(stepIter),
+            numpy.int32(1),
             lyapDev
         )
 
