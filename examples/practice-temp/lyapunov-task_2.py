@@ -54,13 +54,10 @@ class DiscreteMapLyapunov(SimpleApp):
 
     def __init__(self):
         super().__init__("Discrete")
-        self.lyapIkeda()
 
         self.figure = Figure()
         self.lyapSeriesIkeda(self.figure)
-
         self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)
 
         lyapId = 0
         res, min_, max_ = self.lyapMapIkeda(lyapId)
@@ -70,7 +67,7 @@ class DiscreteMapLyapunov(SimpleApp):
         self.label.setTexture(res)
         self.setLayout(
             hStack(
-                vStack(self.canvas, self.toolbar),
+                vStack(self.canvas),
                 vStack(self.label2, self.label)
             )
         )
@@ -84,7 +81,7 @@ class DiscreteMapLyapunov(SimpleApp):
         lyap = LCE2Map.LyapunovMap(self.ctx, self.queue, Fn_Ikeda, (400, 256))
         t = time.perf_counter()
         res, min_, max_ = lyap((-.8, .8), lyapId, (1.0, 6.0), (0.0, 0.3), iter=100)
-        print("%.3f s" % (time.perf_counter() - t))
+        print("Series %.3f s" % (time.perf_counter() - t))
         return res, min_, max_
 
     def lyapSeriesIkeda(self, fig):
@@ -94,7 +91,7 @@ class DiscreteMapLyapunov(SimpleApp):
         par = numpy.linspace(1.0, 6.0, 512)
         t = time.perf_counter()
         res = lyap((-.8, .8), (2.0, 0.3), 0, par, iter=600)
-        print("%.3f s" % (time.perf_counter() - t))
+        print("Map %.3f s" % (time.perf_counter() - t))
         sub.plot(par, res.T[0], "r-", par, res.T[1], "g-")
 
 
