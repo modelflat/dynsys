@@ -1,4 +1,4 @@
-from dynsys import SimpleApp, allocateImage, Image2D, vStack
+from dynsys import SimpleApp, allocateImage, Image2D, vStack, ParameterizedImageWidget, hStack
 import pyopencl as cl
 import numpy
 from matplotlib import pyplot
@@ -24,7 +24,11 @@ Fn_Rossler = r"""
 
 Fn_KPR = r"""
 
-
+#define userFn_SYSTEM(x, y, z, h, g, eps) (vec_t)( \
+    2*h*x + y - g*z, \
+    -x, \
+    (x - 8.592*z + 22*z*z - 14.408*z*z*z) / eps \
+)
 
 """
 
@@ -139,10 +143,10 @@ int poincareTree(
         if (varId == 0) {
             if (y.x < varSlice && yPrev.x >= varSlice) {
                 real v = y.y;
-                if (v >= xMin && v <= xMax) {
-                    real coord = (v - xMin) / (xMax - xMin) * (get_image_height(output));
+                int coord = convert_int_rtz((v - xMin) / (xMax - xMin) * (get_image_height(output)));
+                if (coord > 0 && coord <= get_image_height(output)) {
                     write_imagef(output, 
-                        (int2)(xCoord, get_image_height(output) - (int)coord),
+                        (int2)(xCoord, get_image_height(output) - coord),
                         (float4)(0, 0, 0, 1.0)
                     );
                 }
@@ -171,7 +175,8 @@ kernel void drawBifurcationTree(
         par[i] = params[i];
     }
     par[paramIdx] = paramMin + (paramMax - paramMin) * (real)get_global_id(0) / (real)get_global_size(0);
-    poincareTree(t0, t1, y0, par, 0, xSlice, skip, iter, get_global_id(0), xMin, xMax, result);
+    int c = poincareTree(t0, t1, y0, par, 0, xSlice, skip, iter, get_global_id(0), xMin, xMax, result);
+    // printf("%d\n", c);
 }
 
 """
@@ -271,6 +276,18 @@ class Test(SimpleApp):
 
     def __init__(self):
         super().__init__("123")
+        self.label = Image2D()
+
+        # self.sel = ParameterizedImageWidget(
+        #     bounds=(0, 1, 0.2, 0.3), names=("g", "eps"),
+        #     shape=(512, 512)
+        # )
+        # self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
+        # self.sel.valueChanged.connect(self.computeTree)
+
+        self.setLayout(hStack(#self.sel,
+                              self.label))
+
         self.computeTree()
 
     def computePoincare(self):
@@ -280,19 +297,20 @@ class Test(SimpleApp):
         pyplot.show()
 
     def computeTree(self):
-        p = PoincareBifTree(self.ctx, self.queue, Fn_Rossler, (768, 512))
+        p = PoincareBifTree(self.ctx, self.queue, Fn_KPR, (512, 512))
+        g, eps = 0.8, 0.3
         res = p(
-            startPoint=(0, 1, 0),
-            params=(0.2, 0.1, 5.7),
-            t0=0, t1=1000,
-            xSlice=0.0,
-            paramIdx=1, paramMin=0, paramMax=2,
-            xMin=0, xMax=10,
-            skip=50000, iter=100000
+            startPoint=(0.3, 0.3, 0.3),
+            params=(0.1, g, eps),
+            t0=0, t1=500,
+            xSlice=0.5,
+            paramIdx=0, paramMin=0.05, paramMax=.2,
+            xMin=0, xMax=1,
+            skip=40000, iter=20000
         )
-        self.label = Image2D()
+
         self.label.setTexture(res)
-        self.setLayout(vStack(self.label))
+
         return res
 
 

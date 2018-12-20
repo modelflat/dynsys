@@ -15,13 +15,19 @@ SOURCE = r"""
     y + eps*((u - x)*y - x*x) \
 )
 
+
+//xn+1 = x + eps*(y + eps*((u - x)*y - x*x))
+//yn+1 = y + eps*((u - x)*y - x*x)
+//
+//xn-1 = 
+
 #define userFn_SOURCE_b(x, y, u, eps) (real2)( \
     x + eps*y, \
     y + eps*((u - x)*y + x*x) \
 )
 
 kernel void evolve(
-    const global real2* startingPoints,
+    const global real* startingPoints,
     const real p1, const real p2,
     const real4 bounds,
     const int iteration,
@@ -29,8 +35,19 @@ kernel void evolve(
     global real2* endPoints,
     write_only image2d_t output
 ) {
-    real2 point = startingPoints[get_global_id(0)];
+    real2 point = vload2(get_global_id(0), startingPoints);
+    const int skip = 0;//iteration / 4;
     for (int i = 0; i < iteration; ++i) {
+        if (i == 0) {
+            int2 coord = (int2)(
+                (point.x - bounds.s0) / (bounds.s1 - bounds.s0) * get_image_width(output),
+                (1 - (point.y - bounds.s2) / (bounds.s3 - bounds.s2)) * get_image_height(output)
+            );
+            if (coord.x >= 0 && coord.x < get_image_width(output) && coord.y >= 0 && coord.y < get_image_height(output)) {
+                write_imagef(output, coord, (float4)(1, 0, 0, 1));
+            }
+        }
+    
         if (isForward) {
             point = userFn_SOURCE_f(point.x, point.y, p1, p2);
         } else {
@@ -41,7 +58,7 @@ kernel void evolve(
             (point.x - bounds.s0) / (bounds.s1 - bounds.s0) * get_image_width(output),
             (1 - (point.y - bounds.s2) / (bounds.s3 - bounds.s2)) * get_image_height(output)
         );
-        if (coord.x >= 0 && coord.x < get_image_width(output) && coord.y >= 0 && coord.y < get_image_height(output)) {
+        if (i > skip && coord.x >= 0 && coord.x < get_image_width(output) && coord.y >= 0 && coord.y < get_image_height(output)) {
             write_imagef(output, coord, (float4)(0, 0, 0, 1));
         }
     }
@@ -55,15 +72,15 @@ def generatePointsInEps(stablePoint: tuple, eps: tuple, pointCount: int, dtype=n
     return numpy.array((
         numpy.random.uniform(
             low=stablePoint[0] - eps[0],
-            high=stablePoint[1] + eps[1],
+            high=stablePoint[0] + eps[0],
             size=pointCount
         ),
         numpy.random.uniform(
-            low=stablePoint[0] - eps[0],
+            low=stablePoint[1] - eps[1],
             high=stablePoint[1] + eps[1],
             size=pointCount
         )
-    ), dtype=dtype).T
+    ), dtype=dtype).T.copy()
 
 
 class Homoclinic:
@@ -96,6 +113,7 @@ class Homoclinic:
 
     def __call__(self, stablePoint, eps, pointCount, p1, p2, iterations):
         points = generatePointsInEps(stablePoint, eps, pointCount, self.type)
+        print(points)
         pointsDev = cl.Buffer(self.ctx, cl.mem_flags.COPY_HOST_PTR | cl.mem_flags.READ_ONLY, hostbuf=points)
 
         end = numpy.empty(points.shape, dtype=self.type)
@@ -103,6 +121,7 @@ class Homoclinic:
 
         self.clear()
 
+        # forward
         self.prg.evolve(
             self.queue, (pointCount,), None,
             pointsDev,
@@ -112,6 +131,17 @@ class Homoclinic:
             numpy.int32(1),
             endDev, self.deviceImage
         )
+
+        # #backward
+        # self.prg.evolve(
+        #     self.queue, (pointCount,), None,
+        #     pointsDev,
+        #     self.type(p1), self.type(p2),
+        #     numpy.array(self.spaceShape, dtype=self.type),
+        #     numpy.int32(iterations),
+        #     numpy.int32(0),
+        #     endDev, self.deviceImage
+        # )
 
         return self.readFromDevice()
 
@@ -123,7 +153,7 @@ class Test(SimpleApp):
         self.homo = Homoclinic(self.ctx, self.queue, (-2, 2, -2, 2))
 
         self.sel = ParameterizedImageWidget(
-            bounds=(0, 2, 0, 2), names=("u", "eps"),
+            bounds=(-1, 1, -1, 1), names=("u", "eps"),
             shape=(512, 512)
         )
         self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
@@ -140,7 +170,7 @@ class Test(SimpleApp):
     def draw(self):
         u, eps = self.sel.value()
         self.lab.setTexture(
-            self.homo((1, 1), (1e-3, 1e-3), 256, u, eps, 1000)
+            self.homo((1, 0), (1e-3, 1e-3), 1024, u, eps, 1000)
         )
 
 
