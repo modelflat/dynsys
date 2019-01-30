@@ -4,7 +4,8 @@ import pyopencl as cl
 from dynsys import allocateImage, SimpleApp, Image2D, vStack, ParameterizedImageWidget, hStack
 from dynsys.LCE import dummyOption
 
-SOURCE = r"""
+
+BOGDANOV = r"""
 
 #define real double
 #define real2 double2
@@ -15,16 +16,14 @@ SOURCE = r"""
     y + eps*((u - x)*y - x*x) \
 )
 
-
-//xn+1 = x + eps*(y + eps*((u - x)*y - x*x))
-//yn+1 = y + eps*((u - x)*y - x*x)
-//
-//xn-1 = 
-
 #define userFn_SOURCE_b(x, y, u, eps) (real2)( \
-    x + eps*y, \
-    y + eps*((u - x)*y + x*x) \
+    x - eps*y, \
+    (y + eps*(1 + (x - eps*y)*(x - eps*y))) / (1 + eps *(u - x + eps*y)) \
 )
+
+"""
+
+SOURCE = r"""
 
 kernel void evolve(
     const global real* startingPoints,
@@ -36,7 +35,7 @@ kernel void evolve(
     write_only image2d_t output
 ) {
     real2 point = vload2(get_global_id(0), startingPoints);
-    const int skip = 0;//iteration / 4;
+    const int skip = 0; //iteration / 4;
     for (int i = 0; i < iteration; ++i) {
         if (i == 0) {
             int2 coord = (int2)(
@@ -47,6 +46,7 @@ kernel void evolve(
                 write_imagef(output, coord, (float4)(1, 0, 0, 1));
             }
         }
+        
     
         if (isForward) {
             point = userFn_SOURCE_f(point.x, point.y, p1, p2);
@@ -59,7 +59,11 @@ kernel void evolve(
             (1 - (point.y - bounds.s2) / (bounds.s3 - bounds.s2)) * get_image_height(output)
         );
         if (i > skip && coord.x >= 0 && coord.x < get_image_width(output) && coord.y >= 0 && coord.y < get_image_height(output)) {
-            write_imagef(output, coord, (float4)(0, 0, 0, 1));
+            if (isForward){
+                write_imagef(output, coord, (float4)(1, 0, 0, 1));
+            } else{
+                write_imagef(output, coord, (float4)(0, 1, 0, 1));
+            }
         }
     }
     endPoints[get_global_id(0)] = point;
@@ -88,7 +92,7 @@ class Homoclinic:
     def __init__(self, ctx, queue, spaceShape, imageShape=(512, 512)):
         self.ctx, self.queue = ctx, queue
         self.prg = cl.Program(self.ctx, "\n".join(
-            (SOURCE,)
+            (BOGDANOV, SOURCE,)
         )).build(options=[dummyOption()])
         self.spaceShape = spaceShape
         self.type = numpy.float64
@@ -132,16 +136,16 @@ class Homoclinic:
             endDev, self.deviceImage
         )
 
-        # #backward
-        # self.prg.evolve(
-        #     self.queue, (pointCount,), None,
-        #     pointsDev,
-        #     self.type(p1), self.type(p2),
-        #     numpy.array(self.spaceShape, dtype=self.type),
-        #     numpy.int32(iterations),
-        #     numpy.int32(0),
-        #     endDev, self.deviceImage
-        # )
+        #backward
+        self.prg.evolve(
+            self.queue, (pointCount,), None,
+            pointsDev,
+            self.type(p1), self.type(p2),
+            numpy.array(self.spaceShape, dtype=self.type),
+            numpy.int32(iterations),
+            numpy.int32(0),
+            endDev, self.deviceImage
+        )
 
         return self.readFromDevice()
 
@@ -150,7 +154,35 @@ class Test(SimpleApp):
 
     def __init__(self):
         super().__init__("123")
-        self.homo = Homoclinic(self.ctx, self.queue, (-2, 2, -2, 2))
+        self.homo = Homoclinic(self.ctx, self.queue, (-5, 5, -5, 5))
+
+        self.sel = ParameterizedImageWidget(
+            bounds=(-1, 1, -1, 1), names=("u", "eps"),
+            shape=(512, 512)
+        )
+        self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
+        self.sel.valueChanged.connect(self.draw)
+
+        self.lab = Image2D()
+        self.setLayout(
+            hStack(self.sel, self.lab)
+        )
+
+        self.draw()
+
+
+    def draw(self):
+        u, eps = self.sel.value()
+        self.lab.setTexture(
+            self.homo((1, 0), (1e-3, 1e-3), 1024, u, eps, 1000)
+        )
+
+
+class Henon(SimpleApp):
+
+    def __init__(self):
+        super().__init__("123")
+        self.homo = Homoclinic(self.ctx, self.queue, (-5, 5, -5, 5))
 
         self.sel = ParameterizedImageWidget(
             bounds=(-1, 1, -1, 1), names=("u", "eps"),

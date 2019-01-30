@@ -37,5 +37,5 @@ if __name__ == '__main__':
     ax1.plot(*trajectory, "g-")
     ax1.plot(*poincare, "r-")
     ax2 = fig.add_subplot(1, 2, 2)
-    ax2.plot(*poincare[1:])
+    ax2.plot(*poincare[1:], "r.")
     pp.show()

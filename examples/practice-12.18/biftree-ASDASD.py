@@ -1,4 +1,4 @@
-from dynsys import SimpleApp, allocateImage, Image2D, vStack, ParameterizedImageWidget, hStack
+from dynsys import SimpleApp, allocateImage, Image2D, vStack, ParameterizedImageWidget, hStack, RealSlider, createSlider
 import pyopencl as cl
 import numpy
 from matplotlib import pyplot
@@ -24,10 +24,12 @@ Fn_Rossler = r"""
 
 Fn_KPR = r"""
 
-#define userFn_SYSTEM(x, y, z, h, g, eps) (vec_t)( \
-    2*h*x + y - g*z, \
+#define H(x) (x <= 0 ? 0.0: 1.0)
+
+#define userFn_SYSTEM(x, y, z, m, g, _) (vec_t)( \
+    m*x + y - x*z, \
     -x, \
-    (x - 8.592*z + 22*z*z - 14.408*z*z*z) / eps \
+    -g*x + H(x)*x*x \
 )
 
 """
@@ -285,16 +287,22 @@ class Test(SimpleApp):
         #     shape=(512, 512)
         # )
         # self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
+        self.s, self.s1 = createSlider("real",
+            bounds=(-1, 10)
+        )
+        self.s.valueChanged.connect(self.computeTreeKPR)
         # self.sel.valueChanged.connect(self.computeTree)
 
-        self.setLayout(hStack(#self.sel,
+        self.setLayout(vStack(#self.sel,
+            self.s1,
                               self.label))
 
-        self.computeTreeKPR()
+        # self.computeTreeKPR()
+        self.computePoincare()
 
     def computePoincare(self):
-        p = Poincare(self.ctx, self.queue, Fn_Rossler)
-        res = p((0, 1, 0), (0.1, 0.1, 14), 0, 1000, xSlice=0.1, skip=100000, iter=4096)
+        p = Poincare(self.ctx, self.queue, Fn_KPR)
+        res = p((0, 1, 0), (0.8, 0.4, 14), 0, 1000, xSlice=0.0, skip=512, iter=512)
         pyplot.plot(res.T[1], res.T[2], "r.")
         pyplot.show()
 
@@ -311,21 +319,21 @@ class Test(SimpleApp):
             skip=40000, iter=20000
         )
 
-        self.label.setTexture(res)
+        self.label.setImage(res)
 
         return res
 
     def computeTreeKPR(self):
-        p = PoincareBifTree(self.ctx, self.queue, Fn_KPR, (768, 512))
-        g, eps = .2, .2
+        p = PoincareBifTree(self.ctx, self.queue, Fn_KPR, (256, 256))
+        g = .5
         res = p(
             startPoint=(1, 1, 1),
-            params=(0.09, g, eps),
+            params=(0., 0,4, 0),
             t0=0, t1=1000,
-            xSlice=0.5,
-            paramIdx=1, paramMin=.5, paramMax=1,
-            xMin=-1, xMax=-.4,
-            skip=100000, iter=50000
+            xSlice=self.s.value(),
+            paramIdx=0, paramMin=-1, paramMax=10,
+            xMin=-5, xMax=5,
+            skip=0, iter=4000
         )
 
         self.label.setImage(res)

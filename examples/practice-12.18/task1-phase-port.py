@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QGroupBox
 from dynsys.ParameterSurface import ParameterSurface
 
 parameterMapBoundsHG = Bounds(
-    .06, .15, .75, .95
+    .09, .15, .5638, .95
 )
 
 epsBounds = 0, .5

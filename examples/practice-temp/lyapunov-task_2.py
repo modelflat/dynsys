@@ -11,7 +11,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
-from dynsys import LCE2Map
+from dynsys import LCE2Map, ParameterizedImageWidget
 from dynsys import SimpleApp, vStack, QLabel, Image2D, hStack
 
 
@@ -62,9 +62,10 @@ class DiscreteMapLyapunov(SimpleApp):
         lyapId = 0
         res, min_, max_ = self.lyapMapIkeda(lyapId)
 
-        self.label = Image2D(targetShape=(False, False))
+        self.label = ParameterizedImageWidget(
+            bounds=(1, 6, 0, .3), names=("A", "B"), shape=(512, 512))
         self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
-        self.label.setTexture(res)
+        self.label.setImage(res)
         self.setLayout(
             hStack(
                 vStack(self.canvas),

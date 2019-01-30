@@ -3,11 +3,12 @@ import sys
 import numpy
 import os
 import pyopencl as cl
+from PyQt5.QtWidgets import QCheckBox
 
 from dynsys import SimpleApp, ComputedImage, FLOAT, ParameterizedImageWidget, vStack, createSlider, hStack
 
-spaceShape = (-1, 1, -1, 1)
-hBounds = (-10, 10)
+spaceShape = (-1.5, 1.5, -1.5, 1.5)
+hBounds = (-2, 2)
 alphaBounds = (0, 1)
 
 
@@ -17,21 +18,20 @@ float3 userFn(real2 v);
 float3 userFn(real2 v) {
     real h = v.x;
     real alpha = v.y;
-    if (fabs(h - 3.333) < 2 && fabs(alpha - 0.666) < .08) {
-        return (float3)(0.5, 0.0, 0.0);
-    }
-    if (h < -1 && alpha < .7) {
-        const real h_ = (h + 10) / 11;
-        const real alpha_ = alpha - .206; 
-        if (h_*h_ < alpha_) {
-            return (float3)(0.0, 0.0, 0.5);
+    if (h > 0 && alpha > 0.5) {
+        if (get_global_id(0) % 2 == 0 && get_global_id(1) % 2 == 0) {
+            return 0.0f;
         }
-        return (float3)(0.0, 0.5, 0.0);
     }
-    if (h < 1 && h > 0.4 && alpha < 0.6 && alpha > 0.35) {
-        return (float3)(0.3, 0.3, 0.3);
-    }   
-
+    if (fabs(alpha - 1) < 0.002 && h < 0) {
+        return (float3)(1, 0, 0);
+    }
+    if (length(v - (real2)(1.0, 0.0)) < 0.01) {
+        return (float3)(1, 0, 0);
+    }
+    if (length(v - (real2)(-1.0, 0.0)) < 0.01) {
+        return (float3)(1, 0, 0);
+    }
     return 1.0f;
 }
 
@@ -57,7 +57,7 @@ class IFSFractal(ComputedImage):
                          typeConfig=FLOAT)
         self.staticColor = staticColor
 
-    def __call__(self, alpha: float, h: float, c: complex, pointCount: int, iterCount: int, skip: int, mode: bool):
+    def __call__(self, alpha: float, h: float, c: complex, pointCount: int, iterCount: int, skip: int):
         colorBuf = cl.Buffer(self.ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                              hostbuf=numpy.array(self.staticColor, dtype=numpy.float32))
 
@@ -65,15 +65,13 @@ class IFSFractal(ComputedImage):
 
         self.program.newton_fractal(
             self.queue, (pointCount,), None,
-            *tuple(map(numpy.float64, self.spaceShape)),
+            numpy.array(self.spaceShape, dtype=numpy.float64),
             numpy.array((c.real, c.imag), dtype=numpy.float64),
-            numpy.int32(int(mode)),
             numpy.float64(alpha),
             numpy.float64(h),
             numpy.int32(iterCount),
             numpy.int32(skip),
             numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
-            colorBuf,
             self.deviceImage
         )
 
@@ -135,8 +133,6 @@ class CourseWork(SimpleApp):
             connectTo=setAlphaValue
         )
 
-        
-
         self.setLayout(
             hStack(
                 self.alphaHParamSurfUi,
@@ -147,7 +143,6 @@ class CourseWork(SimpleApp):
                 )
             )
         )
-
         self.alphaHParamSurfUi.setImage(self.alphaHParamSurf())
         self.draw()
 
@@ -156,11 +151,10 @@ class CourseWork(SimpleApp):
         self.ifsfUi.setImage(self.ifsf(
             alpha=alpha,
             h=h,
-            c=complex(.5, -.5),
-            pointCount=512,
-            iterCount=512,
-            skip=256,
-            mode=False
+            c=complex(-0.5, 0.5),
+            pointCount=32,
+            iterCount=4096,
+            skip=1024
         ))
 
 

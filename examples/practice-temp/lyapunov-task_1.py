@@ -74,7 +74,7 @@ class ContinuousMapLyapunov(SimpleApp):
         self.figure = Figure()
         self.lyapSeries(
             h=0.1,#numpy.linspace(0.05, 0.15, 500),
-            g=numpy.linspace(0.0, 1.0, 500),
+            g=numpy.linspace(0.75, 0.95, 500),
             fig=self.figure
         )
         self.canvas = FigureCanvas(self.figure)
@@ -111,11 +111,11 @@ class ContinuousMapLyapunov(SimpleApp):
         print("Series %.3f s" % (time.perf_counter() - t))
         sub.plot(parLin, res.T[0], "r-", label="L0")
         sub.plot(parLin, res.T[1], "g-", label="L1")
-        sub.plot(parLin, res.T[2], "b-", label="L2")
+        #sub.plot(parLin, res.T[2], "b-", label="L2")
         sub.legend()
 
     def lyapMap(self, hBounds, gBounds, lyapId):
-        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (256, 256))
+        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (1, 1))
         t = time.perf_counter()
         res, min_, max_ = lyap(startPoint, lyapId, hBounds, gBounds, eps, t0=0, dt=1, iter=1000, stepIter=15)
         print("Map %.3f s" % (time.perf_counter() - t))
@@ -138,8 +138,8 @@ class ContinuousMapRossler(SimpleApp):
         lyapId = 0
         res, min_, max_ = self.lyapMap((0.06, 0.15), (0.75, 0.95), lyapId)
 
-        self.label = Image2D(targetShape=(False, False))
-        self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
+        self.label = Image2D(targetShape=(True, True))
+        # self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
         self.label.setTexture(res)
         self.setLayout(
             hStack(
@@ -170,3 +170,4 @@ class ContinuousMapRossler(SimpleApp):
 
 if __name__ == '__main__':
     ContinuousMapLyapunov().run()
+    #ContinuousMapRossler().run()
