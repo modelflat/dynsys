@@ -24,18 +24,28 @@ float3 hsv2rgb(float3 hsv) {
 
 #define RANDOM_ROOT(rngState) ((as_uint(random(rngState)) >> 7) % 3)
 
-real2 cCoef(real2 z, real2 c, real A);
-real2 cCoef(real2 z, real2 c, real B) {
+inline real2 cCoef(real2 z, real2 c, real B) {
     return B / (1 + B) * c;
 }
 
-real2 aCoef(real2 z, real2 c, real A, real B);
-real2 aCoef(real2 z, real2 c, real A, real B) {
+inline real2 aCoef(real2 z, real2 c, real A, real B) {
     return -(z + A*(z + cdiv(c, csq(z)))) / (1 + B);
 }
 
-real2 nextPoint(real2 z, real2 c, real A, real B, uint2* rngState) {
+inline real2 next_point(real2 z, real2 c, real A, real B, uint2* rngState) {
     const uint rootNumber = RANDOM_ROOT(rngState);
+    real2 roots[3];
+    solve_cubic_newton_fractal_optimized(
+        aCoef(z, c, A, B), cCoef(z, c, B), 1e-8, rootNumber, roots
+    );
+    return roots[rootNumber];
+}
+
+inline real2 next_point_with_seq(real2 z, real2 c, real A, real B, int seq_size, int* seq_pos, const global int* seq) {
+    if (*(seq_pos) >= seq_size) {
+        *(seq_pos) = 0;
+    }
+    const int rootNumber = seq[(*seq_pos)++];
     real2 roots[3];
     solve_cubic_newton_fractal_optimized(
         aCoef(z, c, A, B), cCoef(z, c, B), 1e-8, rootNumber, roots
@@ -54,6 +64,8 @@ kernel void newton_fractal(
     // iteration config
     const int iterations, const int skip,
     // seed - seed value for pRNG; see "random.clh"
+    const int root_seq_size,
+    const global int* root_seq,
     const ulong seed,
     // image buffer for output
     write_only image2d_t out_image)
@@ -73,15 +85,25 @@ kernel void newton_fractal(
     const real A = h * alpha / 3.0;
     const real B = -h * (1 - alpha) / 3.0;
 
+    int seq_pos = 0;
+
     for (int i = 0; i < skip; ++i) {
-        point = nextPoint(point, c, A, B, &rng_state);
+        if (root_seq_size > 0) {
+            point = next_point_with_seq(point, c, A, B, root_seq_size, &seq_pos, root_seq);
+        } else {
+            point = next_point(point, c, A, B, &rng_state);
+        }
     }
 
     const int imageW = get_image_width (out_image);
     const int imageH = get_image_height(out_image);
 
     for (int i = skip, frozen = 0; i < iterations; ++i) {
-        point = nextPoint(point, c, A, B, &rng_state);
+        if (root_seq_size > 0) {
+            point = next_point_with_seq(point, c, A, B, root_seq_size, &seq_pos, root_seq);
+        } else {
+            point = next_point(point, c, A, B, &rng_state);
+        }
 
         const int2 coord = (int2)(
             (point.x - bounds.s0) / span_x * imageW,

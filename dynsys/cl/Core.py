@@ -14,7 +14,7 @@ def getEndianness(ctx: cl.Context):
     return "both"
 
 
-def allocateImage(ctx: cl.Context, dim: tuple, flags=cl.mem_flags.WRITE_ONLY):
+def allocateImage(ctx: cl.Context, dim: tuple, flags=cl.mem_flags.READ_WRITE):
     endianness = getEndianness(ctx)
     if endianness == "both":
         raise RuntimeError("Context has both little and big endian devices, which is not currently supported")

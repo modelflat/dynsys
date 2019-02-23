@@ -4,11 +4,12 @@ import pyopencl as cl
 from .cl import ComputedImage, TypeConfig, generateCode
 
 SOURCE = """
-kernel void drawPhasePlot(
+kernel void phase(
     const PARAMETERS_SIGNATURE,
     const BOUNDS bounds, 
     const IMAGE_BOUNDS image_bounds,
-    const int skip, const int iterations,
+    const int skip,
+    const int iterations,
     write_only IMAGE_TYPE result
 ) {
     const COORD_TYPE id = ID;
@@ -70,7 +71,7 @@ class PhasePlot(ComputedImage):
         image = tuple(self.imageShape[i] if i < len(self.imageShape) else 0
                       for i in range(ceilToPow2(len(self.imageShape))))
 
-        self.program.drawPhasePlot(
+        self.program.phase(
             self.queue, tuple(map(lambda x: x // gridSparseness + 1, self.imageShape)), None,
             *self.wrapArgs(self.paramCount, *parameters),
             numpy.array(space, dtype=self.typeConf.boundsType),

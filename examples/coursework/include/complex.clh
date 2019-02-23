@@ -11,6 +11,7 @@
     #define PI M_PI
     #define COMPL_ONE_2nd_ROOT_REAL -0.5
     #define COMPL_ONE_2nd_ROOT_IMAG 0.866025403784438596
+    #define TWO 2.0
 #else
     // TODO figure out caveats in using floats (very barely tested)
     #define real  float
@@ -19,6 +20,7 @@
     #define PI M_PI_F
     #define COMPL_ONE_2nd_ROOT_REAL -0.5f
     #define COMPL_ONE_2nd_ROOT_IMAG 0.86603f
+    #define TWO 2.0f
 #endif
 
 #define COMPL_ONE_3rd_ROOT_REAL COMPL_ONE_2nd_ROOT_REAL
@@ -93,8 +95,8 @@ int solve_cubic(real2 a, real2 b, real2 c, real precision, int root, real2* root
     };
     real modulus = length(D);
     real2 first_root_of_D = {
-        sqrt((D.x + modulus) / 2.0),
-        sign(D.y) * sqrt((modulus - D.x) / 2.0)
+        sqrt((D.x + modulus) / TWO),
+        sign(D.y) * sqrt((modulus - D.x) / TWO)
     };
     real2 base_alpha = {
         -q.x / 2.0 - first_root_of_D.x,
@@ -128,7 +130,7 @@ int solve_cubic(real2 a, real2 b, real2 c, real precision, int root, real2* root
     // now corresponding beta is found for alpha[0]. other betas can be inferred from it
     if (root <= 0) {
         // alpha_1 + beta_1 - a/3
-        roots[0] = alpha[0] + beta[idx] - a / 3.0;
+        roots[0] = alpha[0] + beta[idx] - a / 3.0f;
     }
     if (root == 1 || root == -1) {
         // alpha_2 + beta_3 - a/3

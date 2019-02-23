@@ -3,7 +3,11 @@ import sys
 import numpy
 import os
 import pyopencl as cl
-from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtCore import Qt
+from PyQt5.Qt import QPalette
+from PyQt5.QtWidgets import QLabel, QTextEdit, QLineEdit, QCheckBox, QPushButton
+
+from fbc.boxcount_original import *
 
 from dynsys import SimpleApp, ComputedImage, FLOAT, ParameterizedImageWidget, vStack, createSlider, hStack
 
@@ -57,9 +61,17 @@ class IFSFractal(ComputedImage):
                          typeConfig=FLOAT)
         self.staticColor = staticColor
 
-    def __call__(self, alpha: float, h: float, c: complex, pointCount: int, iterCount: int, skip: int):
-        colorBuf = cl.Buffer(self.ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                             hostbuf=numpy.array(self.staticColor, dtype=numpy.float32))
+    def __call__(self, alpha: float, h: float, c: complex, pointCount: int, iterCount: int, skip: int,
+                 rootSeq=None):
+
+        if rootSeq is None:
+            rootSequence = numpy.empty((1,), dtype=numpy.int32)
+            rootSequence[0] = -1
+        else:
+            rootSequence = numpy.array(rootSeq, dtype=numpy.int32)
+
+        rootSeqBuf = cl.Buffer(self.ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                               hostbuf=rootSequence)
 
         self.clear()
 
@@ -71,11 +83,13 @@ class IFSFractal(ComputedImage):
             numpy.float64(h),
             numpy.int32(iterCount),
             numpy.int32(skip),
+            numpy.int32(rootSequence.size if rootSeq is not None else 0),
+            rootSeqBuf,
             numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
             self.deviceImage
         )
 
-        return self.readFromDevice()
+        return self.readFromDevice(), rootSequence
 
 
 class CourseWork(SimpleApp):
@@ -133,9 +147,27 @@ class CourseWork(SimpleApp):
             connectTo=setAlphaValue
         )
 
+        self.dLabel = QLabel("D = ???")
+        self.rootSeqEdit = QLineEdit()
+        self.rootSeqEditPalette = QPalette()
+        self.rootSeqEditPalette.setColor(QPalette.Text, Qt.black)
+        self.rootSeqEdit.setPalette(self.rootSeqEditPalette)
+
+        self.genRandom = QPushButton("Generate random (input length)")
+        self.genRandom.clicked.connect(self.genRandomSeqFn)
+        self.randomSeq = None
+
+        self.resetRandomSeq = QPushButton("Reset")
+        self.resetRandomSeq.clicked.connect(self.resetRandomSeqFn)
+
         self.setLayout(
             hStack(
-                self.alphaHParamSurfUi,
+                vStack(
+                    self.alphaHParamSurfUi,
+                    self.dLabel,
+                    hStack(self.genRandom, self.resetRandomSeq),
+                    self.rootSeqEdit
+                ),
                 vStack(
                     self.ifsfUi,
                     self.alphaSliderUi,
@@ -143,19 +175,56 @@ class CourseWork(SimpleApp):
                 )
             )
         )
+
+        self.count = FastBoxCounting(self.ctx)
+
         self.alphaHParamSurfUi.setImage(self.alphaHParamSurf())
         self.draw()
 
+    def resetRandomSeqFn(self, *_):
+        self.randomSeq = None
+        self.dLabel.setText("[-1]")
+
+    def genRandomSeqFn(self, *_):
+        try:
+            rootSeqSize = int(self.rootSeqEdit.text())
+            self.randomSeq = numpy.random.randint(0, 2 + 1, size=rootSeqSize, dtype=numpy.int32)
+        except:
+            pass
+
+    def parseRootSequence(self):
+        raw = self.rootSeqEdit.text()
+        if self.randomSeq is not None:
+            return self.randomSeq
+        else:
+            l = list(map(int, raw.split()))
+            if len(l) == 0 or not all(map(lambda x: x <= 2, l)):
+                return None
+            else:
+                return l
+
     def draw(self, *_):
         h, alpha = self.alphaHParamSurfUi.value()
-        self.ifsfUi.setImage(self.ifsf(
+
+        try:
+            seq = self.parseRootSequence()
+        except:
+            seq = None
+
+        image, rootSeq = self.ifsf(
             alpha=alpha,
             h=h,
-            c=complex(-0.5, 0.5),
+            c=complex(-0.0, 0.5),
             pointCount=32,
             iterCount=4096,
-            skip=1024
-        ))
+            skip=1024,
+            rootSeq=seq
+        )
+        # d = self.count.count_for_image(self.queue, (512, 512), self.ifsf.deviceImage)
+        d = 1
+        # self.dLabel.setText("D = {:6.3f}".format(d))
+        self.dLabel.setText("Root sequence: {}".format(str(rootSeq)))
+        self.ifsfUi.setImage(image)
 
 
 if __name__ == '__main__':
