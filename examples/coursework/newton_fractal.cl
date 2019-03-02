@@ -24,6 +24,8 @@ float3 hsv2rgb(float3 hsv) {
 
 #define RANDOM_ROOT(rngState) ((as_uint(random(rngState)) >> 7) % 3)
 
+#define POINT_RADIUS 1
+
 inline real2 cCoef(real2 z, real2 c, real B) {
     return B / (1 + B) * c;
 }
@@ -53,6 +55,20 @@ inline real2 next_point_with_seq(real2 z, real2 c, real A, real B, int seq_size,
     return roots[rootNumber];
 }
 
+
+inline int2 to_size(real2 point, const real4 bounds, const int2 size) {
+    point = (point - bounds.s02) / (bounds.s13 - bounds.s02);
+    return (int2)(
+        (int)(point.x * size.x),
+        size.y - (int)(point.y * size.y)
+    );
+}
+
+inline bool in_image(const int2 coord, const int2 size) {
+    return coord.x < size.x && coord.y < size.y && coord.x >= 0 && coord.y >= 0;
+}
+
+
 #define COLOR (float4)(0.0, 0.0, 0.0, 1.0)
 
 // Draws newton fractal
@@ -68,7 +84,7 @@ kernel void newton_fractal(
     const global int* root_seq,
     const ulong seed,
     // image buffer for output
-    write_only image2d_t out_image)
+    write_only image2d_t out)
 {
     uint2 rng_state;
     init_state(seed, &rng_state);
@@ -95,8 +111,7 @@ kernel void newton_fractal(
         }
     }
 
-    const int imageW = get_image_width (out_image);
-    const int imageH = get_image_height(out_image);
+    const int2 image_size = (int2)(get_image_width(out), get_image_height(out));
 
     for (int i = skip, frozen = 0; i < iterations; ++i) {
         if (root_seq_size > 0) {
@@ -104,18 +119,28 @@ kernel void newton_fractal(
         } else {
             point = next_point(point, c, A, B, &rng_state);
         }
+        const int2 coord = to_size(point, bounds, image_size);
 
-        const int2 coord = (int2)(
-            (point.x - bounds.s0) / span_x * imageW,
-            imageH - 1 - (int)((point.y - bounds.s2) / span_y * imageH)
-        );
-
-        if (coord.x < imageW && coord.y < imageH && coord.x >= 0 && coord.y >= 0) {
-            write_imagef(out_image, coord, COLOR);
+        if (in_image(coord, image_size)) {
+            // brute-force non-zero radius for point
+            if (POINT_RADIUS > 0) {
+                for (int x = -POINT_RADIUS; x <= POINT_RADIUS; ++x) {
+                    for (int y = -POINT_RADIUS; y <= POINT_RADIUS; ++y) {
+                        const int2 coord_new = (int2)(coord.x + x, coord.y + y);
+                        if (in_image(coord_new, image_size)) {
+                            if (x*x + y*y <= POINT_RADIUS*POINT_RADIUS) {
+                                write_imagef(out, coord_new, COLOR);
+                            }
+                        }
+                    }
+                }
+            } else {
+                write_imagef(out, coord, COLOR);
+            }
             frozen = 0;
         } else {
             if (++frozen > 15) {
-                // this generally means that solution is going to approach infinity
+                // this likely means that solution is going to approach infinity
                 // printf("[OCL] error at slave %d: frozen!\n", get_global_id(0));
                 break;
             }

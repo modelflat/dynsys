@@ -217,7 +217,7 @@ class CourseWork(SimpleApp):
             c=complex(-0.0, 0.5),
             pointCount=32,
             iterCount=4096,
-            skip=1024,
+            skip=0,
             rootSeq=seq
         )
         # d = self.count.count_for_image(self.queue, (512, 512), self.ifsf.deviceImage)
