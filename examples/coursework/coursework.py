@@ -11,7 +11,7 @@ from fbc.boxcount_original import *
 
 from dynsys import SimpleApp, ComputedImage, FLOAT, ParameterizedImageWidget, vStack, createSlider, hStack
 
-spaceShape = (-1.5, 1.5, -1.5, 1.5)
+spaceShape = (-1., 1., -1., 1.)
 hBounds = (-2, 2)
 alphaBounds = (0, 1)
 
@@ -56,12 +56,12 @@ class IFSFractal(ComputedImage):
     def __init__(self, ctx, queue, imageShape, spaceShape, fractalSource, options=[], staticColor=(0.0, 0.0, 0.0, 1.0)):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          fractalSource,
-                         options=[*options,
+                         options=[*options, "-w",
                                   "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])],
                          typeConfig=FLOAT)
         self.staticColor = staticColor
 
-    def __call__(self, alpha: float, h: float, c: complex, pointCount: int, iterCount: int, skip: int,
+    def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
                  rootSeq=None):
 
         if rootSeq is None:
@@ -76,16 +76,21 @@ class IFSFractal(ComputedImage):
         self.clear()
 
         self.program.newton_fractal(
-            self.queue, (pointCount,), None,
-            numpy.array(self.spaceShape, dtype=numpy.float64),
-            numpy.array((c.real, c.imag), dtype=numpy.float64),
-            numpy.float64(alpha),
-            numpy.float64(h),
-            numpy.int32(iterCount),
+            self.queue, (grid_size, grid_size), None,
             numpy.int32(skip),
+            numpy.int32(iterCount),
+
+            numpy.array(self.spaceShape, dtype=numpy.float64),
+
+            numpy.array((c.real, c.imag), dtype=numpy.float64),
+            numpy.float64(h),
+            numpy.float64(alpha),
+
+            numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
+
             numpy.int32(rootSequence.size if rootSeq is not None else 0),
             rootSeqBuf,
-            numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
+
             self.deviceImage
         )
 
@@ -215,8 +220,8 @@ class CourseWork(SimpleApp):
             alpha=alpha,
             h=h,
             c=complex(-0.0, 0.5),
-            pointCount=32,
-            iterCount=4096,
+            grid_size=32,
+            iterCount=512,
             skip=0,
             rootSeq=seq
         )
