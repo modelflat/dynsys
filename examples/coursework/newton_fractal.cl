@@ -35,7 +35,7 @@ inline real2 next_point(
         }
         root = seq[(*seq_pos)++];
     } else {
-        root = RANDOM_ROOT(&rng_state);
+        root = RANDOM_ROOT(rng_state);
     }
 
     return next_point_(z, c, A, B, root);

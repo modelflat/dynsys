@@ -11,7 +11,7 @@ from fbc.boxcount_original import *
 
 from dynsys import SimpleApp, ComputedImage, FLOAT, ParameterizedImageWidget, vStack, createSlider, hStack
 
-spaceShape = (-1., 1., -1., 1.)
+spaceShape = (-3., 3., -3., 3.)
 hBounds = (-2, 2)
 alphaBounds = (0, 1)
 
@@ -62,7 +62,7 @@ class IFSFractal(ComputedImage):
         self.staticColor = staticColor
 
     def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
-                 rootSeq=None):
+                 rootSeq=None, clear_image=True):
 
         if rootSeq is None:
             rootSequence = numpy.empty((1,), dtype=numpy.int32)
@@ -73,7 +73,8 @@ class IFSFractal(ComputedImage):
         rootSeqBuf = cl.Buffer(self.ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                                hostbuf=rootSequence)
 
-        self.clear()
+        if clear_image:
+            self.clear()
 
         self.program.newton_fractal(
             self.queue, (grid_size, grid_size), None,
@@ -165,6 +166,12 @@ class CourseWork(SimpleApp):
         self.resetRandomSeq = QPushButton("Reset")
         self.resetRandomSeq.clicked.connect(self.resetRandomSeqFn)
 
+        self.refreshButton = QPushButton("Refresh")
+        self.refreshButton.clicked.connect(self.draw)
+
+        self.shouldClear = QCheckBox("Clear image")
+        self.shouldClear.setChecked(True)
+
         self.setLayout(
             hStack(
                 vStack(
@@ -175,6 +182,7 @@ class CourseWork(SimpleApp):
                 ),
                 vStack(
                     self.ifsfUi,
+                    hStack(self.refreshButton, self.shouldClear),
                     self.alphaSliderUi,
                     self.hSliderUi,
                 )
@@ -220,10 +228,11 @@ class CourseWork(SimpleApp):
             alpha=alpha,
             h=h,
             c=complex(-0.0, 0.5),
-            grid_size=32,
-            iterCount=512,
+            grid_size=2,
+            iterCount=8192 << 2,
             skip=0,
-            rootSeq=seq
+            rootSeq=seq,
+            clear_image=self.shouldClear.isChecked()
         )
         # d = self.count.count_for_image(self.queue, (512, 512), self.ifsf.deviceImage)
         d = 1

@@ -21,12 +21,11 @@ void init_state(ulong seed, uint2* state);
 void init_state(ulong seed, uint2* state) {
     int id = get_global_id(0) + 1;
     uint2 s = as_uint2(seed);
-//    (*state) = (uint2)(
-//         create a mixture of id and two seeds
-//        (id + s.x & 0xFFFF) * s.y,
-//        (id ^ (s.y & 0xFFFF0000)) ^ s.x
-//    );
-    (*state) = s;
+    (*state) = (uint2)(
+        // create a mixture of id and two seeds
+        (id + s.x & 0xFFFF) * s.y,
+        (id ^ (s.y & 0xFFFF0000)) ^ s.x
+    );
 }
 
 // retrieve random float in range [0.0; 1.0] (both inclusive)
