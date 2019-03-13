@@ -64,7 +64,7 @@ inline real2 point_from_id(const real4 bounds) {
 
 inline void put_point(write_only image2d_t image, const int2 coord, const int2 image_size) {
     // brute-force non-zero radius for point
-    if (POINT_RADIUS > 0) {
+    if (POINT_RADIUS > 1) {
         for (int x = -POINT_RADIUS; x <= POINT_RADIUS; ++x) {
             for (int y = -POINT_RADIUS; y <= POINT_RADIUS; ++y) {
                 const int2 coord_new = (int2)(coord.x + x, coord.y + y);
@@ -72,6 +72,27 @@ inline void put_point(write_only image2d_t image, const int2 coord, const int2 i
                     write_imagef(image, coord_new, COLOR);
                 }
             }
+        }
+    } else if (POINT_RADIUS == 1) {
+        int2 coord_new = (int2)(coord.x, coord.y);
+        write_imagef(image, coord_new, COLOR);
+
+        coord_new.x = coord.x - 1;
+        if (in_image(coord_new, image_size)) {
+            write_imagef(image, coord_new, COLOR);
+        }
+        coord_new.x = coord.x + 1;
+        if (in_image(coord_new, image_size)) {
+            write_imagef(image, coord_new, COLOR);
+        }
+        coord_new.x = coord.x;
+        coord_new.y = coord.y - 1;
+        if (in_image(coord_new, image_size)) {
+            write_imagef(image, coord_new, COLOR);
+        }
+        coord_new.y = coord.y + 1;
+        if (in_image(coord_new, image_size)) {
+            write_imagef(image, coord_new, COLOR);
         }
     } else {
         write_imagef(image, coord, COLOR);
@@ -135,4 +156,90 @@ kernel void newton_fractal(
 
         point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
     }
+}
+
+// Computes samples for parameter map
+kernel void compute_points(
+    const real2 z0,
+    const real2 c,
+
+    const real4 bounds,
+
+    const int skip,
+    const int iter,
+    const float tol,
+
+    // root selection
+    // seed
+    const ulong seed,
+
+    // root sequence size and contents
+    const int seq_size,
+    const global int* seq,
+
+    global int* result
+) {
+    uint2 rng_state;
+    init_state(seed, &rng_state);
+
+    const int2 coord = { get_global_id(0), get_global_size(1) - get_global_id(1) - 1 };
+    result += 2 * (coord.y * get_global_size(0) + coord.x) * iter;
+
+    const real2 param = point_from_id(bounds);
+    const real A = param.x * param.y / 3.0;
+    const real B = -param.x * (1 - param.y) / 3.0;
+
+    int seq_pos = 0;
+
+    real2 point = z0;
+
+    for (int i = 0; i < skip; ++i) {
+        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+    }
+
+    for (int i = 0; i < iter; ++i) {
+        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+        vstore2(convert_int2_rtz(point / tol), i, result);
+    }
+}
+
+//
+inline bool check_cycle(int period, int a_size, local int2* a) {
+    bool has_cycle = false;
+    for (int i = 0; i < a_size; ++i) {
+        if (i + period >= a_size) {
+            break;
+        }
+        if (a[i].x == a[i + period].x && a[i].y == a[i + period].y) {
+            has_cycle = true;
+        } else {
+            has_cycle = false;
+        }
+    }
+    return has_cycle;
+}
+
+//
+kernel void draw_periods(
+    const int period_min,
+    const int period_max,
+    const int num_points,
+    const global float* color_scheme,
+    const global int* points,
+    local int2* a,
+    write_only image2d_t out
+) {
+    const int2 coord = { get_global_id(0), get_global_size(1) - get_global_id(1) - 1 };
+    points += 2 * (coord.y * get_global_size(0) + coord.x) * num_points;
+
+    int2 point;
+    for (int i = 0; i < num_points; ++i) {
+        a[i] = vload2(num_points, points);
+    }
+
+    for (int p = period_min; p <= period_max; ++p) {
+        a[p] += 1;
+    }
+
+//    write_imagef()
 }
