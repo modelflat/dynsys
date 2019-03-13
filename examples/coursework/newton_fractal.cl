@@ -158,6 +158,51 @@ kernel void newton_fractal(
     }
 }
 
+inline ulong intercalate(uint2 coord) {
+    ulong v = 0;
+    // todo unroll
+    for (uint i = 0, mask = 1; i < 16; mask <<= 1, ++i) {
+        v |= (((coord.x & mask) << (i + 1)) | (coord.y & mask) << i);
+    }
+    return v;
+}
+
+inline void make_heap(global ulong* data, int n, int i) {
+    while (true) {
+        int smallest = i;
+        int l = (i << 1) + 1;
+        int r = (i << 1) + 2;
+
+        ulong sm = data[smallest];
+
+        if (l < n && data[l] < sm) {
+            smallest = l;
+        }
+        if (r < n && data[r] < sm) {
+            smallest = r;
+        }
+        if (smallest == i) {
+            return; // already smallest
+        }
+
+        ulong t = *(data + i); *(data + i) = *(data + smallest); *(data + smallest) = t;
+
+        i = smallest;
+    }
+}
+
+void heap_sort(global ulong*, int);
+void heap_sort(global ulong* data, int n) {
+    for (int i = n / 2 - 1; i >= 0; --i) {
+        make_heap(data, n, i);
+    }
+
+    for (int i = n - 1; i >= 0; --i) {
+        ulong t = *(data); *(data) = *(data + i); *(data + i) = t;
+        make_heap(data, i, 0);
+    }
+}
+
 // Computes samples for parameter map
 kernel void compute_points(
     const real2 z0,
@@ -177,13 +222,13 @@ kernel void compute_points(
     const int seq_size,
     const global int* seq,
 
-    global int* result
+    global ulong* result
 ) {
     uint2 rng_state;
     init_state(seed, &rng_state);
 
     const int2 coord = { get_global_id(0), get_global_size(1) - get_global_id(1) - 1 };
-    result += 2 * (coord.y * get_global_size(0) + coord.x) * iter;
+    result += (coord.y * get_global_size(0) + coord.x) * iter;
 
     const real2 param = point_from_id(bounds);
     const real A = param.x * param.y / 3.0;
@@ -199,47 +244,66 @@ kernel void compute_points(
 
     for (int i = 0; i < iter; ++i) {
         point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
-        vstore2(convert_int2_rtz(point / tol), i, result);
+        result[i] = intercalate(as_uint2(convert_int2_rtz(point / tol)));
     }
 }
 
-//
-inline bool check_cycle(int period, int a_size, local int2* a) {
-    bool has_cycle = false;
-    for (int i = 0; i < a_size; ++i) {
-        if (i + period >= a_size) {
-            break;
-        }
-        if (a[i].x == a[i + period].x && a[i].y == a[i + period].y) {
-            has_cycle = true;
-        } else {
-            has_cycle = false;
+int count_unique(global ulong*, int);
+int count_unique(global ulong* data, int n) {
+    heap_sort(data, n);
+    ulong prev = data[0];
+    int uniques = 1;
+    for (int i = 1; i < n; ++i) {
+        ulong next = data[i];
+        if (prev != next) {
+            prev = next;
+            ++uniques;
         }
     }
-    return has_cycle;
+    return uniques;
+}
+
+float3 color_for_count(int, int);
+float3 color_for_count(int count, int total) {
+    if (count == total) {
+        return 0.0;
+    }
+    const float d = count < 8 ? 1.0 : .5;
+    switch(count % 8) {
+        case 1:
+            return (float3)(1.0, 0.0, 0.0)*d;
+        case 2:
+            return (float3)(0.0, 1.0, 0.0)*d;
+        case 3:
+            return (float3)(0.0, 0.0, 1.0)*d;
+        case 4:
+            return (float3)(1.0, 0.0, 1.0)*d;
+        case 5:
+            return (float3)(1.0, 1.0, 0.0)*d;
+        case 6:
+            return (float3)(0.0, 1.0, 1.0)*d;
+        case 7:
+            return (float3)(0.5, 0.0, 0.0)*d;
+        default:
+            return count == 8 ? .5 : 0;
+    }
 }
 
 //
 kernel void draw_periods(
-    const int period_min,
-    const int period_max,
     const int num_points,
     const global float* color_scheme,
-    const global int* points,
-    local int2* a,
+    global ulong* points,
     write_only image2d_t out
 ) {
     const int2 coord = { get_global_id(0), get_global_size(1) - get_global_id(1) - 1 };
-    points += 2 * (coord.y * get_global_size(0) + coord.x) * num_points;
+    points += (coord.y * get_global_size(0) + coord.x) * num_points;
 
-    int2 point;
-    for (int i = 0; i < num_points; ++i) {
-        a[i] = vload2(num_points, points);
-    }
+    int unique = count_unique(points, num_points);
 
-    for (int p = period_min; p <= period_max; ++p) {
-        a[p] += 1;
-    }
+    float3 color = color_for_count(unique, num_points);
 
-//    write_imagef()
+    //float val = unique / (float)num_points;
+
+    write_imagef(out, coord, (float4)(color, 1.0));
 }

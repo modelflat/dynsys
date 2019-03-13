@@ -1,20 +1,15 @@
 import os
 
+import numpy
+import pyopencl as cl
 import sys
-from PyQt5.Qt import QPalette
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QCheckBox, QPushButton
 
-from dynsys import SimpleApp, ComputedImage, FLOAT, ParameterizedImageWidget, vStack, createSlider, hStack
-from fbc.boxcount_original import *
+from dynsys import ComputedImage, FLOAT, ParameterizedImageWidget, ParameterSurface
 
-spaceShape = (-1., 1., -1., 1.)
-hBounds = (-2, 2)
-alphaBounds = (0, 1)
+SCRIPT_DIR = os.path.abspath(sys.path[0])
 
 
-
-paramSurfaceMap = r"""
+param_surface_map = r"""
 
 float3 userFn(real2 v);
 float3 userFn(real2 v) {
@@ -40,11 +35,7 @@ float3 userFn(real2 v) {
 """
 
 
-SCRIPT_DIR = os.path.abspath(sys.path[0])
-print(SCRIPT_DIR)
-
-
-def readFile(path):
+def read_file(path):
     with open(path) as file:
         return file.read()
 
@@ -64,6 +55,9 @@ def prepare_root_seq(ctx, root_seq):
     return seq.size if root_seq is not None else 0, seq_buf
 
 
+SOURCE = read_file(os.path.join(SCRIPT_DIR, "newton_fractal.cl"))
+
+
 class IFSFractalParameterMap(ComputedImage):
 
     def __init__(self, ctx, queue, imageShape, spaceShape, fractalSource, options=[]):
@@ -76,11 +70,11 @@ class IFSFractalParameterMap(ComputedImage):
 
     def compute_points(self, z0: complex, c: complex, skip: int, iter: int, tol: float, root_seq=None,
                        wait=False):
-        reqd_size = 2 * iter * numpy.prod(self.imageShape)
+        reqd_size = iter * numpy.prod(self.imageShape)
 
         if self.points is None or self.points.size != reqd_size:
             self.points = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
-                                    size=reqd_size * 4)
+                                    size=reqd_size * 8)
 
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
@@ -110,21 +104,38 @@ class IFSFractalParameterMap(ComputedImage):
         if wait:
             self.queue.finish()
 
-    def display(self, period_range: tuple, num_points: int):
+    def display(self, num_points: int):
         color_scheme = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=4)
 
         self.program.draw_periods(
-            self.queue, self.imageShape, (1, 1),
-            numpy.int32(period_range[0]),
-            numpy.int32(period_range[1]),
+            self.queue, self.imageShape, None,
             numpy.int32(num_points),
             color_scheme,
             self.points,
-            cl.LocalMemory(2 * 4 * num_points),
+            # cl.LocalMemory(2 * 4 * num_points),
             self.deviceImage
         )
 
-        self.queue.finish()
+        return self.readFromDevice()
+
+
+def make_parameter_map(ctx, queue, image_shape, h_bounds, alpha_bounds):
+    pm = IFSFractalParameterMap(
+        ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
+        fractalSource=SOURCE,
+        options=[
+            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+        ]
+    )
+
+    pmw = ParameterizedImageWidget(
+        bounds=(*h_bounds, *alpha_bounds),
+        names=("h", "alpha"),
+        shape=(True, True),
+        textureShape=image_shape
+    )
+
+    return pm, pmw
 
 
 class IFSFractal(ComputedImage):
@@ -167,189 +178,24 @@ class IFSFractal(ComputedImage):
         return self.readFromDevice()
 
 
-class CourseWork(SimpleApp):
+def make_phase_plot(ctx, queue, image_shape, space_shape,):
 
-    def __init__(self):
-        super().__init__("Coursework")
+    fr = IFSFractal(
+        ctx, queue, image_shape, space_shape,
+        fractalSource=SOURCE,
+        options=[
+            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+        ]
+    )
 
-        source = readFile(os.path.join(SCRIPT_DIR, "newton_fractal.cl"))
+    frw = ParameterizedImageWidget(
+        space_shape, ("z_real", "z_imag"), shape=(True, True)
+    )
 
-        self.ifsf = IFSFractal(self.ctx, self.queue,
-                               imageShape=(512, 512),
-                               spaceShape=spaceShape,
-                               fractalSource=source,
-                               options=["-I{}".format(os.path.join(SCRIPT_DIR, "include")),
-                                        "-cl-std=CL1.0",
-                                        ]
-                               )
-        self.ifsfUi = ParameterizedImageWidget(spaceShape, names=("z_real", "z_imag"), shape=(True, True),
-                                               textureShape=(512, 512))
-
-        self.alphaHParamSurf, self.alphaHParamSurfUi = self.makeParameterSurface(
-            paramSurfaceMap, spaceShape=(*hBounds, *alphaBounds),
-            imageShape=(510, 510),
-            uiNames=("h", "alpha"), uiShape=(True, True),
-        )
-
-        self.param_map = IFSFractalParameterMap(self.ctx, self.queue,
-                                                imageShape=(64, 64),
-                                                spaceShape=(*hBounds, *alphaBounds),
-                                                fractalSource=source,
-                                                options=["-I{}".format(os.path.join(SCRIPT_DIR, "include")),
-                                                         "-cl-std=CL1.0",
-                                                         ]
-                                                )
-
-        def setSlidersAndDraw(val):
-            self.draw()
-            self.hSlider.setValue(val[0])
-            self.alphaSlider.setValue(val[1])
-
-        self.alphaHParamSurfUi.valueChanged.connect(setSlidersAndDraw)
-
-        def setHValue(h):
-            _, alpha = self.alphaHParamSurfUi.value()
-            self.alphaHParamSurfUi.setValue((h, alpha))
-            self.draw()
-
-        self.hSlider, self.hSliderUi = createSlider(
-            "real", hBounds,
-            withLabel="h = {:2.3f}",
-            labelPosition="top",
-            withValue=.5,
-            connectTo=setHValue
-        )
-
-        def setAlphaValue(alpha):
-            h, _ = self.alphaHParamSurfUi.value()
-            self.alphaHParamSurfUi.setValue((h, alpha))
-            self.draw()
-
-        self.alphaSlider, self.alphaSliderUi = createSlider(
-            "real", alphaBounds,
-            withLabel="alpha = {:2.3f}",
-            labelPosition="top",
-            withValue=0.0,
-            connectTo=setAlphaValue
-        )
-
-        self.dLabel = QLabel("D = ???")
-        self.rootSeqEdit = QLineEdit()
-        self.rootSeqEditPalette = QPalette()
-        self.rootSeqEditPalette.setColor(QPalette.Text, Qt.black)
-        self.rootSeqEdit.setPalette(self.rootSeqEditPalette)
-
-        self.genRandom = QPushButton("Generate random (input length)")
-        self.genRandom.clicked.connect(self.genRandomSeqFn)
-        self.randomSeq = None
-
-        self.resetRandomSeq = QPushButton("Reset")
-        self.resetRandomSeq.clicked.connect(self.resetRandomSeqFn)
-
-        self.refreshButton = QPushButton("Refresh")
-        self.refreshButton.clicked.connect(self.draw)
-
-        self.shouldClear = QCheckBox("Clear image")
-        self.shouldClear.setChecked(True)
-
-        self.setLayout(
-            hStack(
-                vStack(
-                    self.alphaHParamSurfUi,
-                    self.dLabel,
-                    hStack(self.genRandom, self.resetRandomSeq),
-                    self.rootSeqEdit
-                ),
-                vStack(
-                    self.ifsfUi,
-                    hStack(self.refreshButton, self.shouldClear),
-                    self.alphaSliderUi,
-                    self.hSliderUi,
-                )
-            )
-        )
-
-        self.count = FastBoxCounting(self.ctx)
-
-        self.recompute_param_map()
-
-        self.alphaHParamSurfUi.setImage(self.alphaHParamSurf())
-        self.draw()
-
-    def resetRandomSeqFn(self, *_):
-        self.randomSeq = None
-        self.dLabel.setText("[-1]")
-
-    def genRandomSeqFn(self, *_):
-        try:
-            rootSeqSize = int(self.rootSeqEdit.text())
-            self.randomSeq = numpy.random.randint(0, 2 + 1, size=rootSeqSize, dtype=numpy.int32)
-        except:
-            pass
-
-    def parseRootSequence(self):
-        raw = self.rootSeqEdit.text()
-        if self.randomSeq is not None:
-            return self.randomSeq
-        else:
-            l = list(map(int, raw.split()))
-            if len(l) == 0 or not all(map(lambda x: x <= 2, l)):
-                return None
-            else:
-                return l
-
-    def recompute_param_map(self, *_):
-
-        n_iter = 64
-        n_skip = 256
-
-        import time
-        print("Start computing parameter map")
-        t = time.perf_counter()
-        self.param_map.compute_points(
-            z0=complex(0.0, 0.0),
-            c=complex(0.0, 0.5),
-            skip=n_skip,
-            iter=n_iter,
-            tol=0.005,
-            root_seq=None,
-            wait=True
-        )
-        t = time.perf_counter() - t
-        print("Computed parameter map in {:.3f} s".format(t))
-        print("Trying to draw")
-        t = time.perf_counter()
-        self.param_map.display(
-            period_range=(2, 64),
-            num_points=n_iter
-        )
-        t = time.perf_counter() - t
-        print("Drawn in {:.3f} s".format(t))
-
-    def draw(self, *_):
-        h, alpha = self.alphaHParamSurfUi.value()
-
-        try:
-            seq = self.parseRootSequence()
-        except:
-            seq = None
-
-        image = self.ifsf(
-            alpha=alpha,
-            h=h,
-            c=complex(-0.0, 0.5),
-            grid_size=2,
-            iterCount=8192 << 2,
-            skip=0,
-            root_seq=seq,
-            clear_image=self.shouldClear.isChecked()
-        )
-        # d = self.count.count_for_image(self.queue, (512, 512), self.ifsf.deviceImage)
-        d = 1
-        # self.dLabel.setText("D = {:6.3f}".format(d))
-        # self.dLabel.setText("Root sequence: {}".format(str(rootSeq)))
-        self.ifsfUi.setImage(image)
+    return fr, frw
 
 
-if __name__ == '__main__':
-    CourseWork().run()
+def make_simple_param_surface(ctx, queue, image_shape, h_bounds, alpha_bounds):
+    pm = ParameterSurface(ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
+                          colorFunctionSource=param_surface_map, typeConfig=FLOAT)
+    return pm
