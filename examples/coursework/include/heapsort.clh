@@ -1,0 +1,54 @@
+#ifndef __HEAPSORT_CLH
+#define __HEAPSORT_CLH
+
+void make_heap(global ulong*, int, int);
+void make_heap(global ulong* data, int n, int i) {
+    while (true) {
+        int smallest = i;
+        int l = (i << 1) + 1;
+        int r = (i << 1) + 2;
+
+        if (l < n && data[l] > data[smallest]) {
+            smallest = l;
+        }
+        if (r < n && data[r] > data[smallest]) {
+            smallest = r;
+        }
+        if (smallest == i) {
+            return; // already smallest
+        }
+
+        ulong t = *(data + i); *(data + i) = *(data + smallest); *(data + smallest) = t;
+
+        i = smallest;
+    }
+}
+
+void heap_sort(global ulong*, int);
+void heap_sort(global ulong* data, int n) {
+    for (int i = n / 2 - 1; i >= 0; --i) {
+        make_heap(data, n, i);
+    }
+
+    for (int i = n - 1; i >= 0; --i) {
+        ulong t = *(data); *(data) = *(data + i); *(data + i) = t;
+        make_heap(data, i, 0);
+    }
+}
+
+int count_unique(global ulong*, int);
+int count_unique(global ulong* data, int n) {
+    heap_sort(data, n);
+    ulong prev = data[0];
+    int uniques = 1;
+    for (int i = 1; i < n; ++i) {
+        ulong next = data[i];
+        if (prev != next) {
+            prev = next;
+            ++uniques;
+        }
+    }
+    return uniques;
+}
+
+#endif // __HEAPSORT_CLH

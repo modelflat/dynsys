@@ -4,6 +4,8 @@ import numpy
 import pyopencl as cl
 import sys
 
+from PyQt5.QtCore import Qt
+
 from dynsys import ComputedImage, FLOAT, ParameterizedImageWidget, ParameterSurface
 
 SCRIPT_DIR = os.path.abspath(sys.path[0])
@@ -107,16 +109,21 @@ class IFSFractalParameterMap(ComputedImage):
     def display(self, num_points: int):
         color_scheme = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=4)
 
+        periods = numpy.empty(self.imageShape, dtype=numpy.int32)
+        periods_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=periods.nbytes)
+
         self.program.draw_periods(
             self.queue, self.imageShape, None,
             numpy.int32(num_points),
             color_scheme,
             self.points,
-            # cl.LocalMemory(2 * 4 * num_points),
+            periods_device,
             self.deviceImage
         )
 
-        return self.readFromDevice()
+        cl.enqueue_copy(self.queue, periods, periods_device)
+
+        return self.readFromDevice(), periods
 
 
 def make_parameter_map(ctx, queue, image_shape, h_bounds, alpha_bounds):
@@ -132,7 +139,8 @@ def make_parameter_map(ctx, queue, image_shape, h_bounds, alpha_bounds):
         bounds=(*h_bounds, *alpha_bounds),
         names=("h", "alpha"),
         shape=(True, True),
-        textureShape=image_shape
+        textureShape=image_shape,
+        targetColor=Qt.gray
     )
 
     return pm, pmw
@@ -149,7 +157,7 @@ class IFSFractal(ComputedImage):
         self.staticColor = staticColor
 
     def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
-                 root_seq=None, clear_image=True):
+                 z0=None, root_seq=None, clear_image=True):
 
         if clear_image:
             self.clear()
@@ -157,7 +165,7 @@ class IFSFractal(ComputedImage):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
         self.program.newton_fractal(
-            self.queue, (grid_size, grid_size), None,
+            self.queue, (grid_size, grid_size) if z0 is None else (1, 1), None,
             numpy.int32(skip),
             numpy.int32(iterCount),
 
@@ -171,6 +179,9 @@ class IFSFractal(ComputedImage):
 
             numpy.int32(seq_size),
             seq,
+
+            numpy.int32(z0 is not None),
+            numpy.array((0, 0) if z0 is None else (z0.real, z0.imag), dtype=numpy.float64),
 
             self.deviceImage
         )

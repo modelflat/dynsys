@@ -1,0 +1,50 @@
+#ifndef __NEWTON_CLH
+#define __NEWTON_CLH
+
+#include "random.clh"
+#include "complex.clh"
+#include "newton_opt.clh"
+
+//#define USE_OPTIMIZED_SOLVER
+
+#define RANDOM_ROOT(rngState) ((as_uint(random(rngState)) >> 3) % 3)
+
+inline real2 c_coef(real2 z, real2 c, real B) {
+    return B / (1 + B) * c;
+}
+
+inline real2 a_coef(real2 z, real2 c, real A, real B) {
+    return -(z + A*(z + cdiv(c, csq(z)))) / (1 + B);
+}
+
+real2 next_point(
+    real2 z, real2 c, real A, real B,
+    uint2* rng_state, int* seq_pos, const int seq_size, const global int* seq
+) {
+    int root;
+
+    if (seq_size > 0) {
+        if ((*seq_pos) >= seq_size) {
+            (*seq_pos) = 0;
+        }
+        root = seq[(*seq_pos)++];
+    } else {
+        root = RANDOM_ROOT(rng_state);
+    }
+
+#ifdef USE_OPTIMIZED_SOLVER
+    real2 roots;
+    solve_cubic_newton_fractal_optimized(
+        a_coef(z, c, A, B), c_coef(z, c, B), 1e-8, root, &roots
+    );
+    return roots;
+#else
+    real2 roots[3];
+    solve_cubic(
+        a_coef(z, c, A, B), (real2)(0, 0), c_coef(z, c, B), 1e-8, root, roots
+    );
+    return roots[root];
+#endif
+}
+
+#endif // __NEWTON_CLH

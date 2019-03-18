@@ -1,0 +1,64 @@
+#include "complex.clh"
+
+// uses cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0
+// params:
+// a, b, c is the coefficients
+// precision - is the required precision of floating points comparisons
+// root - which (0, 1, 2) root to compute; -1 if want all roots
+// roots - [out] computed roots; if only one root is specified,
+// returns 0 if equation was successfully solved, 1 otherwise
+int solve_cubic_optimized(real2 a, real2 b, real2 c, real precision, int root, real2* roots);
+int solve_cubic_optimized(real2 a, real2 b, real2 c, real precision, int root, real2* roots) {
+    real2 p = {
+        -(a.x*a.x - a.y*a.y) / 3.0,
+        -a.x*a.y * (2.0 / 3.0)
+    };
+    real2 q = {
+        c.x + a.x * (a.x*a.x - 3*a.y*a.y) * (2.0 / 27),
+        c.y + a.y * (3*a.x*a.x - a.y*a.y) * (2.0 / 27)
+    };
+    real2 D = {
+        (q.x*q.x - q.y*q.y) / 4 + p.x * (p.x*p.x - 3*p.y*p.y) / 27,
+        q.x*q.y / 2 + p.y * (3*p.x*p.x - p.y*p.y) / 27
+    };
+    real modulus = length(D);
+    real2 first_root_of_D = {
+        sqrt((D.x + modulus) / 2),
+        sign(D.y) * sqrt((modulus - D.x) / 2)
+    };
+    real2 alpha[3];
+    ccbrt(-q / 2 - first_root_of_D, alpha);
+    real2 beta[3];
+    ccbrt(-q / 2 + first_root_of_D, beta);
+    // now we have alpha & beta values, lets combine them such as:
+    // alpha[0]*beta[i] = -p / 3;
+    int idx;
+    for (idx = 0; idx < 3; ++idx) {
+        if (fabs( alpha[0].x*beta[idx].x - alpha[0].y*beta[idx].y + p.x / 3 ) < precision &&
+            fabs( alpha[0].y*beta[idx].x + alpha[0].x*beta[idx].y + p.y / 3 ) < precision) {
+            goto beta_found;
+        }
+    }
+    // cannot find b, such that alpha*beta = p/3 (although it should always exists);
+    return 1;
+
+beta_found:
+
+    // now corresponding beta is found for alpha[0]. other betas can be inferred from it
+    if (root <= 0) {
+        // alpha_1 + beta_1 - a/3
+        roots[0] = alpha[0] + beta[idx] - a / 3.0f;
+    }
+    if (root == 1 || root == -1) {
+        // alpha_2 + beta_3 - a/3
+        roots[1].x = alpha[1].x - a.x / 3.0 + UNIT_R3_REAL*beta[idx].x - UNIT_R3_IMAG*beta[idx].y;
+        roots[1].y = alpha[1].y - a.y / 3.0 + UNIT_R3_REAL*beta[idx].y + UNIT_R3_IMAG*beta[idx].x;
+    }
+    if (root == 2 || root == -1) {
+        // alpha_3 + beta_2 - a/3
+        roots[2].x = alpha[2].x - a.x / 3.0 + UNIT_R2_REAL*beta[idx].x - UNIT_R2_IMAG*beta[idx].y;
+        roots[2].y = alpha[2].y - a.y / 3.0 + UNIT_R2_REAL*beta[idx].y + UNIT_R2_IMAG*beta[idx].x;
+    }
+
+    return 0;
+}

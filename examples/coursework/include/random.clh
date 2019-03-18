@@ -15,8 +15,6 @@ uint MWC64X(uint2 *state) {
     return res;                        // Return the next result
 }
 
-// ! this rng does not take into account local id, but it can
-// be mixed in one of seed values if needed
 void init_state(ulong seed, uint2* state);
 void init_state(ulong seed, uint2* state) {
     int id = get_global_id(0) + 1;
@@ -29,9 +27,8 @@ void init_state(ulong seed, uint2* state) {
 }
 
 // retrieve random float in range [0.0; 1.0] (both inclusive)
-float random(uint2* state);
-float random(uint2* state) {
+inline float random(uint2* state) {
     return ((float)MWC64X(state)) / (float)0xffffffff;
 }
 
-#endif
+#endif // __RANDOM_CLH
