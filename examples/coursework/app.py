@@ -47,11 +47,10 @@ class CourseWork(SimpleApp):
         self.root_seq_edit = QLineEdit()
 
         self.random_seq = None
+        self.do_draw_basins = True
 
         self.setup_layout()
         self.connect_everything()
-
-        self.do_draw_basins = True
 
         self.draw_param_placeholder()
         if self.do_draw_basins:
@@ -115,8 +114,7 @@ class CourseWork(SimpleApp):
                     self.root_seq_edit
                 ),
                 vStack(
-                    # self.phase_wgt,
-                    self.basins_wgt,
+                    self.basins_wgt if self.do_draw_basins else self.phase_wgt,
                     hStack(self.refresh_btn, self.clear_cb, self.period_label),
                     self.alpha_slider_wgt,
                     self.h_slider_wgt,

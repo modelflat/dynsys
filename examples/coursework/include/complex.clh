@@ -68,15 +68,18 @@ inline real2 ccb(real2 z) {
     );
 }
 
+#ifndef SOLVE_CUBIC_ALPHA_FIT_PRECISION
+#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-8)
+#endif
+
 // uses cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0
 // params:
-// a, b, c is the coefficients
-// precision - is the required precision of floating points comparisons
+// a, b, c are the coefficients
 // root - which (0, 1, 2) root to compute; -1 if want all roots
 // roots - [out] computed roots; if only one root is specified,
 // returns 0 if equation was successfully solved, 1 otherwise
-int solve_cubic(real2 a, real2 b, real2 c, real precision, int root, real2* roots);
-int solve_cubic(real2 a, real2 b, real2 c, real precision, int root, real2* roots) {
+int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots);
+int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots) {
     real2 p = {
         b.x - (a.x*a.x - a.y*a.y) / 3.0,
         b.y - a.x*a.y * (2.0 / 3.0)
@@ -110,8 +113,8 @@ int solve_cubic(real2 a, real2 b, real2 c, real precision, int root, real2* root
     // alpha[0]*beta[i] = -p / 3;
     int idx = -1;
     for (int i = 0; i < 3; ++i) {
-        if (fabs( alpha[0].x*beta[i].x - alpha[0].y*beta[i].y + p.x / 3 ) < precision &&
-            fabs( alpha[0].y*beta[i].x + alpha[0].x*beta[i].y + p.y / 3 ) < precision) {
+        if (fabs( alpha[0].x*beta[i].x - alpha[0].y*beta[i].y + p.x / 3 ) < SOLVE_CUBIC_ALPHA_FIT_PRECISION &&
+            fabs( alpha[0].y*beta[i].x + alpha[0].x*beta[i].y + p.y / 3 ) < SOLVE_CUBIC_ALPHA_FIT_PRECISION) {
             idx = i;
             break;
         }

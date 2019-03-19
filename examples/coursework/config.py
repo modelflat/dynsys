@@ -1,7 +1,7 @@
 ## general parameters
 
 # range for varying `h`
-h_bounds = (-2, 2)
+h_bounds = (-1, 1)
 
 # range for varying `alpha`
 alpha_bounds = (0.0, 1.0)
@@ -36,16 +36,16 @@ phase_shape = (-1, 1, -1, 1)
 phase_image_shape = (512, 512)
 
 # skip iters on phase plot
-phase_skip = param_map_skip
+phase_skip = 0
 
 # iters on phase plot
-phase_iter = param_map_iter
+phase_iter = 1024 # param_map_iter
 
 # grid size for phase plot
-phase_grid_size = 2
+phase_grid_size = 8
 
 # z0 to use when in single-point mode
-phase_z0 = param_map_z0
+phase_z0 = None #param_map_z0
 
 
 ## basins params

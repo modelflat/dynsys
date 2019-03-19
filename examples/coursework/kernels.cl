@@ -37,21 +37,16 @@ kernel void newton_fractal(
     uint2 rng_state;
     init_state(seed, &rng_state);
 
-    real2 point = use_single_point ? z0 : point_from_id(bounds) / 3;
-
-    const real A =  h * alpha / 3;
-    const real B = -h * (1 - alpha) / 3;
-
-    int seq_pos = 0;
+    INIT_VARIABLES(use_single_point ? z0 : point_from_id(bounds) / 3, c, h, alpha);
 
     for (int i = 0; i < skip; ++i) {
-        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+        NEXT_POINT(c, seq_size, &rng_state);
     }
 
     const int2 image_size = (int2)(get_image_width(out), get_image_height(out));
 
     for (int i = 0, frozen = 0; i < iter; ++i) {
-        const int2 coord = to_size(point, bounds, image_size);
+        const int2 coord = to_size(Z_VAR, bounds, image_size);
 
         if (in_image(coord, image_size)) {
             put_point(out, coord, image_size);
@@ -64,7 +59,7 @@ kernel void newton_fractal(
             }
         }
 
-        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+        NEXT_POINT(c, seq_size, &rng_state);
     }
 }
 
@@ -93,24 +88,18 @@ kernel void compute_points(
     init_state(seed, &rng_state);
 
     const int2 coord = { get_global_id(0), get_global_id(1) };
-    const real2 param = point_from_id_dense(bounds);
-
-    const real A = param.x * param.y / 3.0;
-    const real B = -param.x * (1 - param.y) / 3.0;
-
-    int seq_pos = 0;
-    int mul = convert_int_rtz(1.0 / tol);
-
-    real2 point = z0;
     result += (coord.y * get_global_size(0) + coord.x) * iter;
 
+    const real2 param = point_from_id_dense(bounds);
+    INIT_VARIABLES(z0, c, param.x, param.y);
+
     for (int i = 0; i < skip; ++i) {
-        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+        NEXT_POINT(c, seq_size, &rng_state);
     }
 
     for (int i = 0; i < iter; ++i) {
-        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
-        result[i] = as_ulong(convert_int2_rtz(point / tol));
+        NEXT_POINT(c, seq_size, &rng_state);
+        result[i] = as_ulong(convert_int2_rtz(Z_VAR / tol));
     }
 }
 
@@ -157,18 +146,14 @@ kernel void compute_basins(
     init_state(seed, &rng_state);
 
     const int2 coord = { get_global_id(0), get_global_id(1) };
-    const real A =  h * alpha / 3;
-    const real B = -h * (1 - alpha) / 3;
 
-    real2 point = point_from_id_dense(bounds);
-
-    int seq_pos = 0;
+    INIT_VARIABLES(point_from_id_dense(bounds), c, h, alpha);
 
     for (int i = 0; i < skip; ++i) {
-        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+        NEXT_POINT(c, seq_size, &rng_state);
     }
 
-    vstore2(point, coord.y * get_global_size(0) + coord.x, endpoints);
+    vstore2(Z_VAR, coord.y * get_global_size(0) + coord.x, endpoints);
 }
 
 //
