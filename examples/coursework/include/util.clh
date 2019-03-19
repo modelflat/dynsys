@@ -51,6 +51,14 @@ inline real2 point_from_id(const real4 bounds) {
     return bounds.s02 + uv * (bounds.s13 - bounds.s02);
 }
 
+inline real2 point_from_id_dense(const real4 bounds) {
+    const real2 uv = {
+        (real)(get_global_id(0)) / (real)(get_global_size(0) - 1),
+        1.0 - (real)(get_global_id(1)) / (real)(get_global_size(1) - 1)
+    };
+    return bounds.s02 + uv * (bounds.s13 - bounds.s02);
+}
+
 inline void put_point(write_only image2d_t image, const int2 coord, const int2 image_size) {
     // brute-force non-zero radius for point
     if (POINT_RADIUS > 1) {

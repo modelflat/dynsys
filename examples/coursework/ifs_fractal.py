@@ -11,7 +11,29 @@ from dynsys import ComputedImage, FLOAT, ParameterizedImageWidget, ParameterSurf
 SCRIPT_DIR = os.path.abspath(sys.path[0])
 
 
-param_surface_map = r"""
+def read_file(path):
+    with open(path) as file:
+        return file.read()
+
+
+def random_seed():
+    return numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
+
+
+def prepare_root_seq(ctx, root_seq):
+    if root_seq is None:
+        seq = numpy.empty((1,), dtype=numpy.int32)
+        seq[0] = -1
+    else:
+        seq = numpy.array(root_seq, dtype=numpy.int32)
+
+    seq_buf = cl.Buffer(ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=seq)
+    return seq.size if root_seq is not None else 0, seq_buf
+
+
+def make_simple_param_surface(ctx, queue, image_shape, h_bounds, alpha_bounds):
+    pm = ParameterSurface(ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
+                          colorFunctionSource=r"""
 
 float3 userFn(real2 v);
 float3 userFn(real2 v) {
@@ -34,30 +56,70 @@ float3 userFn(real2 v) {
     return 1.0f;
 }
 
-"""
+""", typeConfig=FLOAT)
+    return pm
 
 
-def read_file(path):
-    with open(path) as file:
-        return file.read()
+SOURCE = read_file(os.path.join(SCRIPT_DIR, "kernels.cl"))
 
 
-def random_seed():
-    return numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
+class IFSFractal(ComputedImage):
+
+    def __init__(self, ctx, queue, imageShape, spaceShape, fractalSource, options=[]):
+        super().__init__(ctx, queue, imageShape, spaceShape,
+                         fractalSource,
+                         options=[*options, "-w",
+                                  "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])],
+                         typeConfig=FLOAT)
+
+    def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
+                 z0=None, root_seq=None, clear_image=True):
+
+        if clear_image:
+            self.clear()
+
+        seq_size, seq = prepare_root_seq(self.ctx, root_seq)
+
+        self.program.newton_fractal(
+            self.queue, (grid_size, grid_size) if z0 is None else (1, 1), None,
+            numpy.int32(skip),
+            numpy.int32(iterCount),
+
+            numpy.array(self.spaceShape, dtype=numpy.float64),
+
+            numpy.array((c.real, c.imag), dtype=numpy.float64),
+            numpy.float64(h),
+            numpy.float64(alpha),
+
+            numpy.random.randint(low=0, high=0xFFFF_FFFF_FFFF_FFFF, dtype=numpy.uint64),
+
+            numpy.int32(seq_size),
+            seq,
+
+            numpy.int32(z0 is not None),
+            numpy.array((0, 0) if z0 is None else (z0.real, z0.imag), dtype=numpy.float64),
+
+            self.deviceImage
+        )
+
+        return self.readFromDevice()
 
 
-def prepare_root_seq(ctx, root_seq):
-    if root_seq is None:
-        seq = numpy.empty((1,), dtype=numpy.int32)
-        seq[0] = -1
-    else:
-        seq = numpy.array(root_seq, dtype=numpy.int32)
+def make_phase_plot(ctx, queue, image_shape, space_shape,):
 
-    seq_buf = cl.Buffer(ctx, flags=cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=seq)
-    return seq.size if root_seq is not None else 0, seq_buf
+    fr = IFSFractal(
+        ctx, queue, image_shape, space_shape,
+        fractalSource=SOURCE,
+        options=[
+            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+        ]
+    )
 
+    frw = ParameterizedImageWidget(
+        space_shape, ("z_real", "z_imag"), shape=(True, True)
+    )
 
-SOURCE = read_file(os.path.join(SCRIPT_DIR, "newton_fractal.cl"))
+    return fr, frw
 
 
 class IFSFractalParameterMap(ComputedImage):
@@ -146,28 +208,25 @@ def make_parameter_map(ctx, queue, image_shape, h_bounds, alpha_bounds):
     return pm, pmw
 
 
-class IFSFractal(ComputedImage):
+class IFSFractalBasinsOfAttraction(ComputedImage):
 
-    def __init__(self, ctx, queue, imageShape, spaceShape, fractalSource, options=[], staticColor=(0.0, 0.0, 0.0, 1.0)):
+    def __init__(self, ctx, queue, imageShape, spaceShape, fractalSource, options=[]):
         super().__init__(ctx, queue, imageShape, spaceShape,
                          fractalSource,
                          options=[*options, "-w",
                                   "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])],
                          typeConfig=FLOAT)
-        self.staticColor = staticColor
+        self.points = numpy.empty((numpy.prod(imageShape) * 2,), dtype=numpy.float64)
+        self.points_dev = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=self.points.nbytes)
 
-    def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
-                 z0=None, root_seq=None, clear_image=True):
-
-        if clear_image:
-            self.clear()
-
+    def compute_points(self, alpha: float, h: float, c: complex, skip: int, root_seq=None,
+                       return_points=False):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
-        self.program.newton_fractal(
-            self.queue, (grid_size, grid_size) if z0 is None else (1, 1), None,
+        self.program.compute_basins(
+            self.queue, self.imageShape, None,
+
             numpy.int32(skip),
-            numpy.int32(iterCount),
 
             numpy.array(self.spaceShape, dtype=numpy.float64),
 
@@ -180,18 +239,31 @@ class IFSFractal(ComputedImage):
             numpy.int32(seq_size),
             seq,
 
-            numpy.int32(z0 is not None),
-            numpy.array((0, 0) if z0 is None else (z0.real, z0.imag), dtype=numpy.float64),
+            self.points_dev
+        )
 
+        if return_points:
+            cl.enqueue_copy(self.queue, self.points, self.points_dev)
+            return self.points
+
+    def draw_points(self, points=None):
+        self.clear()
+
+        if points is None:
+            points_dev = self.points_dev
+
+        self.program.draw_basins(
+            self.queue, self.imageShape, (1, 1),
+            numpy.array(self.spaceShape, dtype=numpy.float64),
+            points_dev,
             self.deviceImage
         )
 
         return self.readFromDevice()
 
 
-def make_phase_plot(ctx, queue, image_shape, space_shape,):
-
-    fr = IFSFractal(
+def make_basins(ctx, queue, image_shape, space_shape):
+    fr = IFSFractalBasinsOfAttraction(
         ctx, queue, image_shape, space_shape,
         fractalSource=SOURCE,
         options=[
@@ -204,9 +276,3 @@ def make_phase_plot(ctx, queue, image_shape, space_shape,):
     )
 
     return fr, frw
-
-
-def make_simple_param_surface(ctx, queue, image_shape, h_bounds, alpha_bounds):
-    pm = ParameterSurface(ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
-                          colorFunctionSource=param_surface_map, typeConfig=FLOAT)
-    return pm

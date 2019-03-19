@@ -1,18 +1,12 @@
-import os
+from multiprocessing import Lock
+
 import numpy
-import sys
 import time
+from PyQt5.QtWidgets import QLabel, QLineEdit, QCheckBox, QPushButton
 
-from PyQt5.Qt import QPalette
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QCheckBox, QPushButton, QProgressBar
-
-from ifs_fractal import make_parameter_map, make_phase_plot, make_simple_param_surface
-from dynsys import SimpleApp, ParameterSurface, vStack, createSlider, hStack
-
-
-from multiprocessing import Lock, pool
 import config as cfg
+from dynsys import SimpleApp, vStack, createSlider, hStack
+from ifs_fractal import make_parameter_map, make_phase_plot, make_simple_param_surface, make_basins
 
 
 class CourseWork(SimpleApp):
@@ -23,6 +17,9 @@ class CourseWork(SimpleApp):
 
         self.phase, self.phase_wgt = \
             make_phase_plot(self.ctx, self.queue, cfg.phase_image_shape, cfg.phase_shape)
+
+        self.basins, self.basins_wgt = \
+            make_basins(self.ctx, self.queue, cfg.basins_image_shape, cfg.phase_shape)
 
         self.param, self.param_wgt = \
             make_parameter_map(self.ctx, self.queue, cfg.param_map_image_shape, cfg.h_bounds, cfg.alpha_bounds)
@@ -54,12 +51,25 @@ class CourseWork(SimpleApp):
         self.setup_layout()
         self.connect_everything()
 
+        self.do_draw_basins = True
+
         self.draw_param_placeholder()
-        self.draw_phase()
+        if self.do_draw_basins:
+            self.compute_and_draw_basins()
+        else:
+            self.draw_phase()
 
     def connect_everything(self):
+
+        def draw():
+            # print("Draw call!!!")
+            if self.do_draw_basins:
+                self.compute_and_draw_basins()
+            else:
+                self.draw_phase()
+
         def set_sliders_and_draw(val):
-            self.draw_phase()
+            draw()
             self.h_slider.setValue(val[0])
             self.alpha_slider.setValue(val[1])
         self.param_wgt.valueChanged.connect(set_sliders_and_draw)
@@ -67,13 +77,13 @@ class CourseWork(SimpleApp):
         def set_h_value(h):
             _, alpha = self.param_wgt.value()
             self.param_wgt.setValue((h, alpha))
-            self.draw_phase()
+            # self.param_wgt.valueChanged.emit((h, alpha))
         self.h_slider.valueChanged.connect(set_h_value)
 
         def set_alpha_value(alpha):
             h, _ = self.param_wgt.value()
             self.param_wgt.setValue((h, alpha))
-            self.draw_phase()
+            # draw()
         self.alpha_slider.valueChanged.connect(set_alpha_value)
 
         def gen_random_seq_fn(*_):
@@ -91,7 +101,7 @@ class CourseWork(SimpleApp):
             self.random_seq = None
         self.random_seq_reset_btn.clicked.connect(reset_random_seq_fn)
 
-        self.refresh_btn.clicked.connect(self.draw_phase)
+        self.refresh_btn.clicked.connect(draw)
         self.param_map_compute_btn.clicked.connect(self.compute_param_map)
         self.param_map_draw_btn.clicked.connect(self.draw_param_map)
 
@@ -105,7 +115,8 @@ class CourseWork(SimpleApp):
                     self.root_seq_edit
                 ),
                 vStack(
-                    self.phase_wgt,
+                    # self.phase_wgt,
+                    self.basins_wgt,
                     hStack(self.refresh_btn, self.clear_cb, self.period_label),
                     self.alpha_slider_wgt,
                     self.h_slider_wgt,
@@ -128,6 +139,26 @@ class CourseWork(SimpleApp):
     def draw_param_placeholder(self):
         with self.compute_lock:
             self.param_wgt.setImage(self.param_placeholder())
+
+    def compute_and_draw_basins(self, *_):
+        h, alpha = self.param_wgt.value()
+
+        try:
+            seq = self.parse_root_sequence()
+        except:
+            seq = None
+
+        with self.compute_lock:
+            self.basins.compute_points(
+                alpha=alpha,
+                h=h,
+                c=cfg.C,
+                skip=cfg.basins_skip,
+                root_seq=seq
+            )
+            image = self.basins.draw_points()
+
+            self.basins_wgt.setImage(image)
 
     def compute_param_map(self, *_):
         with self.compute_lock:
@@ -185,7 +216,8 @@ class CourseWork(SimpleApp):
                 iterCount=cfg.phase_iter,
                 skip=cfg.phase_skip,
                 root_seq=seq,
-                clear_image=self.clear_cb.isChecked()
+                clear_image=self.clear_cb.isChecked(),
+                z0=cfg.phase_z0
             )
             self.phase_wgt.setImage(image)
 

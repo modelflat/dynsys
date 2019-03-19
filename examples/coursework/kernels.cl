@@ -93,8 +93,7 @@ kernel void compute_points(
     init_state(seed, &rng_state);
 
     const int2 coord = { get_global_id(0), get_global_id(1) };
-    const real2 uv = convert_real2(coord) / convert_real2((int2)(get_global_size(0), get_global_size(1)));
-    const real2 param = bounds.s02 + uv * (bounds.s13 - bounds.s02);
+    const real2 param = point_from_id_dense(bounds);
 
     const real A = param.x * param.y / 3.0;
     const real B = -param.x * (1 - param.y) / 3.0;
@@ -136,4 +135,108 @@ kernel void draw_periods(
 
     periods[(get_global_size(1) - coord.y - 1) * get_global_size(0) + coord.x] = unique;
     write_imagef(out, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
+}
+
+// Compute where points would be after N iterations
+kernel void compute_basins(
+    const int skip,
+
+    const real4 bounds,
+
+    const real2 c,
+    const real h,
+    const real alpha,
+
+    const ulong seed,
+    const int seq_size,
+    const global int* seq,
+
+    global real* endpoints
+) {
+    uint2 rng_state;
+    init_state(seed, &rng_state);
+
+    const int2 coord = { get_global_id(0), get_global_id(1) };
+    const real A =  h * alpha / 3;
+    const real B = -h * (1 - alpha) / 3;
+
+    real2 point = point_from_id_dense(bounds);
+
+    int seq_pos = 0;
+
+    for (int i = 0; i < skip; ++i) {
+        point = next_point(point, c, A, B, &rng_state, &seq_pos, seq_size, seq);
+    }
+
+    vstore2(point, coord.y * get_global_size(0) + coord.x, endpoints);
+}
+
+//
+kernel void draw_basins(
+    const real4 bounds,
+    const global real* endpoints,
+    write_only image2d_t image
+) {
+    const int2 coord = { get_global_id(0), get_global_id(1) };
+    const real2 origin = point_from_id_dense(bounds);
+    const real2 end = vload2(coord.y * get_global_size(0) + coord.x, endpoints);
+
+    real x_gran = (real)(1) / (get_global_size(0) - 1);
+    real y_gran = (real)(1) / (get_global_size(1) - 1);
+    real av_len = 0.0;
+    float edge = 1.0;
+
+    if (coord.x > 0) {
+        const real2 west_end = vload2(coord.y * get_global_size(0) + coord.x - 1, endpoints);
+        av_len += length(west_end - end);
+        if (length(west_end - end) > x_gran) {
+            edge -= 0.25f;
+        }
+    }
+
+    if (coord.x < get_global_size(1) - 1) {
+        const real2 east_end = vload2(coord.y * get_global_size(0) + coord.x + 1, endpoints);
+        av_len += length(east_end - end);
+        if (length(east_end - end) > x_gran) {
+            edge -= 0.25f;
+        }
+    }
+
+    if (coord.y > 0) {
+        const real2 north_end = vload2((coord.y - 1) * get_global_size(0) + coord.x, endpoints);
+        av_len += length(north_end - end);
+        if (length(north_end - end) > y_gran) {
+            edge -= 0.25f;
+        }
+    }
+
+    if (coord.y < get_global_size(1) - 1) {
+        const real2 south_end = vload2((coord.y + 1) * get_global_size(0) + coord.x, endpoints);
+        av_len += length(south_end - end);
+        if (length(south_end - end) > y_gran) {
+            edge -= 0.25f;
+        }
+    }
+
+    av_len /= 4;
+
+    float mod = 0.005 / length(end - origin);
+//    float mod = length(end - origin);
+
+    float col = 240;
+
+    if (mod > 1) {
+//        printf("STABLE: %.6f, %.6f\n", origin.x, origin.y);
+        col = 0;
+    }
+
+    float3 color = hsv2rgb((float3)(
+        col,
+        mod,
+        edge
+    ));
+
+//    write_imagef(image, coord, (float4)(color, 1.0));
+    write_imagef(image, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
+//    write_imagef(image, (int2)(get_global_size(1) - coord.y - 1, coord.x), (float4)(color, 1.0));
 }

@@ -5,7 +5,7 @@
 #include "complex.clh"
 #include "newton_opt.clh"
 
-//#define USE_OPTIMIZED_SOLVER
+// #define USE_OPTIMIZED_SOLVER
 
 #define RANDOM_ROOT(rngState) ((as_uint(random(rngState)) >> 3) % 3)
 
@@ -33,11 +33,11 @@ real2 next_point(
     }
 
 #ifdef USE_OPTIMIZED_SOLVER
-    real2 roots;
-    solve_cubic_newton_fractal_optimized(
-        a_coef(z, c, A, B), c_coef(z, c, B), 1e-8, root, &roots
+    real2 roots[3];
+    solve_cubic_optimized(
+        a_coef(z, c, A, B), (real2)(0, 0), c_coef(z, c, B), 1e-8, root, &roots
     );
-    return roots;
+    return roots[root];
 #else
     real2 roots[3];
     solve_cubic(
