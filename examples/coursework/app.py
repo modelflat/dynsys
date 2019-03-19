@@ -81,7 +81,6 @@ class CourseWork(SimpleApp):
 
         if cfg.param_map_draw_on_select and cfg.param_map_select_z0_from_phase:
             def select_z0(*_):
-                print("asdasd")
                 self.compute_and_draw_param_map()
             self.phase_wgt.valueChanged.connect(select_z0)
             self.basins_wgt.valueChanged.connect(select_z0)
@@ -147,6 +146,11 @@ class CourseWork(SimpleApp):
     def compute_and_draw_basins(self, *_):
         h, alpha = self.param_wgt.value()
 
+        # TODO why? probably some bug in parameter computation
+        # alpha = cfg.alpha_bounds[1] - alpha
+
+        # print(h, alpha)
+
         try:
             seq = self.parse_root_sequence()
         except:
@@ -193,8 +197,6 @@ class CourseWork(SimpleApp):
             t = time.perf_counter() - t
         print("Computed parameter map in {:.3f} s".format(t))
 
-        if self.param.points is None:
-            self.compute_param_map()
         with self.compute_lock:
             image, periods = self.param.display(num_points=cfg.param_map_iter,
                                                 resolution=cfg.param_map_resolution)

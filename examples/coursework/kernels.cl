@@ -180,32 +180,36 @@ kernel void draw_basins(
 
     if (coord.x > 0) {
         const real2 west_end = vload2(coord.y * size_x + coord.x - 1, endpoints);
-        av_len += length(west_end - end);
-        if (length(west_end - end) > x_gran) {
+        const real dst = length(west_end - end);
+        av_len += dst;
+        if (dst > x_gran) {
             edge -= 0.25f;
         }
     }
 
     if (coord.x < get_global_size(1) - 1) {
         const real2 east_end = vload2(coord.y * size_x + coord.x + 1, endpoints);
-        av_len += length(east_end - end);
-        if (length(east_end - end) > x_gran) {
+        const real dst = length(east_end - end);
+        av_len += dst;
+        if (dst > x_gran) {
             edge -= 0.25f;
         }
     }
 
     if (coord.y > 0) {
         const real2 north_end = vload2((coord.y - 1) * size_x + coord.x, endpoints);
-        av_len += length(north_end - end);
-        if (length(north_end - end) > y_gran) {
+        const real dst = length(north_end - end);
+        av_len += dst;
+        if (dst > y_gran) {
             edge -= 0.25f;
         }
     }
 
     if (coord.y < get_global_size(1) - 1) {
         const real2 south_end = vload2((coord.y + 1) * size_x + coord.x, endpoints);
-        av_len += length(south_end - end);
-        if (length(south_end - end) > y_gran) {
+        const real dst = length(south_end - end);
+        av_len += dst;
+        if (dst > y_gran) {
             edge -= 0.25f;
         }
     }

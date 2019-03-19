@@ -21,7 +21,7 @@ param_map_image_shape = (512, 512)
 param_map_skip = 128
 
 # iters on param map
-param_map_iter = 16
+param_map_iter = 64
 
 # same point detection tol
 param_map_tolerance = 1e-8
@@ -65,6 +65,6 @@ phase_z0 = param_map_z0
 # basins_image_shape = (64, 64)
 basins_image_shape = phase_image_shape
 
-basins_resolution = 4
+basins_resolution = 2
 
-basins_skip = 128
+basins_skip = 16
