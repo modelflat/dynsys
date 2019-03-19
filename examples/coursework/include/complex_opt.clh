@@ -50,9 +50,9 @@ inline void csqrt(real2 a, real2 roots[]) {
 
 // cube root of a for complex a
 inline void ccbrt(real2 a, real2 roots[]) {
-    real cbrt_abs_a = cbrt(length(a));
-    real phi = atan2(a.y, a.x) / 3;
-    real temp = 0;
+    const real cbrt_abs_a = cbrt(length(a));
+    const real phi = atan2(a.y, a.x) / 3;
+    real temp;
     roots[0].y = sincos(phi, &temp) * cbrt_abs_a;
     roots[0].x = temp * cbrt_abs_a;
     roots[1].y = sincos(phi + 2*PI/3, &temp) * cbrt_abs_a;
@@ -74,28 +74,32 @@ inline real2 ccb(real2 z) {
     );
 }
 
+// Compile-time settings:
+// #define SOLVE_CUBIC_B_IS_ZERO - b is considered to be zero. Optimizes out a few multiplications
+// #define SOLVE_CUBIC_AVOID_BRANCHES - all roots are always computed
+// #define SOLVE_CUBIC_ALPHA_FIT_PRECISION <precision> - set precision for detecting matching alpha/beta
+
 #ifndef SOLVE_CUBIC_ALPHA_FIT_PRECISION
 #define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-8)
 #endif
 
-
-// Compile-time settings:
-// #define SOLVE_CUBIC_B_IS_ZERO - b is considered to be zero. Optimizes out a few multiplications
-// #define SOLVE_CUBIC_AVOID_BRANCHES - all roots are always computed
-
-// uses cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0
+// Use cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0
 // params:
-// a, b, c are the coefficients
+// a, b, c are the (complex) coefficients
 // root - which (0, 1, 2) root to compute; -1 if want all roots
 // roots - [out] computed roots; if only one root is specified,
 // returns 0 if equation was successfully solved, 1 otherwise
 int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots);
 int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots) {
-    // watch out!
+#ifdef SOLVE_CUBIC_AVOID_BRANCHES
+    (void)root;
+#endif
+    // NOTE watch out! input modification
     a /= 3; // need it anyway later
     c /= 2; //
     //
 #ifdef SOLVE_CUBIC_B_IS_ZERO
+    (void)b;
     const real2 p_div_3 = -csq(a);
     const real2 q_div_2 = ccb(a) + c;
 #else

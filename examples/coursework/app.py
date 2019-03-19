@@ -47,7 +47,7 @@ class CourseWork(SimpleApp):
         self.root_seq_edit = QLineEdit()
 
         self.random_seq = None
-        self.do_draw_basins = True
+        self.do_draw_basins = cfg.do_draw_basins
 
         self.setup_layout()
         self.connect_everything()
@@ -56,7 +56,7 @@ class CourseWork(SimpleApp):
         if self.do_draw_basins:
             self.compute_and_draw_basins()
         else:
-            self.draw_phase()
+            self.compute_and_draw_phase()
 
     def connect_everything(self):
 
@@ -65,7 +65,7 @@ class CourseWork(SimpleApp):
             if self.do_draw_basins:
                 self.compute_and_draw_basins()
             else:
-                self.draw_phase()
+                self.compute_and_draw_phase()
 
         def set_sliders_and_draw(val):
             draw()
@@ -78,6 +78,13 @@ class CourseWork(SimpleApp):
             self.param_wgt.setValue((h, alpha))
             # self.param_wgt.valueChanged.emit((h, alpha))
         self.h_slider.valueChanged.connect(set_h_value)
+
+        if cfg.param_map_draw_on_select and cfg.param_map_select_z0_from_phase:
+            def select_z0(*_):
+                print("asdasd")
+                self.compute_and_draw_param_map()
+            self.phase_wgt.valueChanged.connect(select_z0)
+            self.basins_wgt.valueChanged.connect(select_z0)
 
         def set_alpha_value(alpha):
             h, _ = self.param_wgt.value()
@@ -101,8 +108,7 @@ class CourseWork(SimpleApp):
         self.random_seq_reset_btn.clicked.connect(reset_random_seq_fn)
 
         self.refresh_btn.clicked.connect(draw)
-        self.param_map_compute_btn.clicked.connect(self.compute_param_map)
-        self.param_map_draw_btn.clicked.connect(self.draw_param_map)
+        self.param_map_compute_btn.clicked.connect(self.compute_and_draw_param_map)
 
     def setup_layout(self):
         self.setLayout(
@@ -152,13 +158,14 @@ class CourseWork(SimpleApp):
                 h=h,
                 c=cfg.C,
                 skip=cfg.basins_skip,
-                root_seq=seq
+                root_seq=seq,
+                resolution=cfg.basins_resolution
             )
-            image = self.basins.draw_points()
+            image = self.basins.draw_points(resolution=cfg.basins_resolution)
 
             self.basins_wgt.setImage(image)
 
-    def compute_param_map(self, *_):
+    def compute_and_draw_param_map(self, *_):
         with self.compute_lock:
             print("Start computing parameter map")
             t = time.perf_counter()
@@ -167,33 +174,41 @@ class CourseWork(SimpleApp):
             except:
                 seq = None
 
+            if cfg.param_map_select_z0_from_phase:
+                wgt = self.basins_wgt if self.do_draw_basins else self.phase_wgt
+                z0 = complex(*wgt.value())
+            else:
+                z0 = cfg.param_map_z0
+
             self.param.compute_points(
-                z0=cfg.param_map_z0,
+                z0=z0,
                 c=cfg.C,
                 skip=cfg.param_map_skip,
                 iter=cfg.param_map_iter,
                 tol=cfg.param_map_tolerance,
                 root_seq=seq,
-                wait=True
+                wait=True,
+                resolution=cfg.param_map_resolution
             )
             t = time.perf_counter() - t
         print("Computed parameter map in {:.3f} s".format(t))
-        self.draw_param_map()
 
-    def draw_param_map(self, *_):
         if self.param.points is None:
             self.compute_param_map()
         with self.compute_lock:
-            image, periods = self.param.display(num_points=cfg.param_map_iter)
+            image, periods = self.param.display(num_points=cfg.param_map_iter,
+                                                resolution=cfg.param_map_resolution)
             self.param_wgt.setImage(image)
             self.period_map = periods
 
-    def draw_phase(self, *_):
+    def compute_and_draw_phase(self, *_):
         h, alpha = self.param_wgt.value()
 
         x_px, y_px = self.param_wgt._imageWidget.targetPx()
         # print(x_px, y_px)
-        if self.period_map is not None and 0 <= x_px < cfg.param_map_image_shape[0] and 0 <= y_px < cfg.param_map_image_shape[1]:
+        if self.period_map is not None:
+            x_px = max(min(cfg.param_map_image_shape[0] - 1, x_px), 0)
+            y_px = max(min(cfg.param_map_image_shape[1] - 1, y_px), 0)
             y, x = int((y_px)), int((x_px))
             per = self.period_map[y][x]
             self.period_label.setText(

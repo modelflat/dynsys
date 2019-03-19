@@ -37,7 +37,7 @@ kernel void newton_fractal(
     uint2 rng_state;
     init_state(seed, &rng_state);
 
-    INIT_VARIABLES(use_single_point ? z0 : point_from_id(bounds) / 3, c, h, alpha);
+    INIT_VARIABLES(use_single_point ? z0 : point_from_id(bounds) / 1.5, c, h, alpha);
 
     for (int i = 0; i < skip; ++i) {
         NEXT_POINT(c, seq_size, &rng_state);
@@ -91,7 +91,9 @@ kernel void compute_points(
     result += (coord.y * get_global_size(0) + coord.x) * iter;
 
     const real2 param = point_from_id_dense(bounds);
+
     INIT_VARIABLES(z0, c, param.x, param.y);
+//    INIT_VARIABLES(z0, c, param.x, 0);
 
     for (int i = 0; i < skip; ++i) {
         NEXT_POINT(c, seq_size, &rng_state);
@@ -105,14 +107,17 @@ kernel void compute_points(
 
 // Draws parameter map using computed samples
 kernel void draw_periods(
+    const int resolution,
     const int num_points,
     const global float* color_scheme,
     global ulong* points,
     global int* periods,
     write_only image2d_t out
 ) {
-    const int2 coord = { get_global_id(0), get_global_id(1) };
-    points  += (coord.y * get_global_size(0) + coord.x) * num_points;
+    const int2 coord = (int2)(get_global_id(0), get_global_id(1)) / resolution;
+    const int size_x = get_global_size(0) / resolution;
+
+    points += (coord.y * size_x + coord.x) * num_points;
 
     int unique = count_unique(points, num_points);
     float h = (unique % 23) / (float)(22);
@@ -122,8 +127,8 @@ kernel void draw_periods(
 
     float3 color = hsv2rgb(hsvcolor);
 
-    periods[(get_global_size(1) - coord.y - 1) * get_global_size(0) + coord.x] = unique;
-    write_imagef(out, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
+    periods[coord.y * size_x + coord.x] = unique;
+    write_imagef(out, (int2)(get_global_id(0), get_global_id(1)), (float4)(color, 1.0));
 }
 
 // Compute where points would be after N iterations
@@ -158,13 +163,15 @@ kernel void compute_basins(
 
 //
 kernel void draw_basins(
+    const int resolution,
     const real4 bounds,
     const global real* endpoints,
     write_only image2d_t image
 ) {
-    const int2 coord = { get_global_id(0), get_global_id(1) };
+    const int2 coord = (int2)( get_global_id(0), get_global_id(1) ) / resolution;
+    const int size_x = get_global_size(0) / resolution;
     const real2 origin = point_from_id_dense(bounds);
-    const real2 end = vload2(coord.y * get_global_size(0) + coord.x, endpoints);
+    const real2 end = vload2(coord.y * size_x + coord.x, endpoints);
 
     real x_gran = (real)(1) / (get_global_size(0) - 1);
     real y_gran = (real)(1) / (get_global_size(1) - 1);
@@ -172,7 +179,7 @@ kernel void draw_basins(
     float edge = 1.0;
 
     if (coord.x > 0) {
-        const real2 west_end = vload2(coord.y * get_global_size(0) + coord.x - 1, endpoints);
+        const real2 west_end = vload2(coord.y * size_x + coord.x - 1, endpoints);
         av_len += length(west_end - end);
         if (length(west_end - end) > x_gran) {
             edge -= 0.25f;
@@ -180,7 +187,7 @@ kernel void draw_basins(
     }
 
     if (coord.x < get_global_size(1) - 1) {
-        const real2 east_end = vload2(coord.y * get_global_size(0) + coord.x + 1, endpoints);
+        const real2 east_end = vload2(coord.y * size_x + coord.x + 1, endpoints);
         av_len += length(east_end - end);
         if (length(east_end - end) > x_gran) {
             edge -= 0.25f;
@@ -188,7 +195,7 @@ kernel void draw_basins(
     }
 
     if (coord.y > 0) {
-        const real2 north_end = vload2((coord.y - 1) * get_global_size(0) + coord.x, endpoints);
+        const real2 north_end = vload2((coord.y - 1) * size_x + coord.x, endpoints);
         av_len += length(north_end - end);
         if (length(north_end - end) > y_gran) {
             edge -= 0.25f;
@@ -196,7 +203,7 @@ kernel void draw_basins(
     }
 
     if (coord.y < get_global_size(1) - 1) {
-        const real2 south_end = vload2((coord.y + 1) * get_global_size(0) + coord.x, endpoints);
+        const real2 south_end = vload2((coord.y + 1) * size_x + coord.x, endpoints);
         av_len += length(south_end - end);
         if (length(south_end - end) > y_gran) {
             edge -= 0.25f;
@@ -221,7 +228,7 @@ kernel void draw_basins(
         edge
     ));
 
-//    write_imagef(image, coord, (float4)(color, 1.0));
-    write_imagef(image, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
+    write_imagef(image, (int2)(get_global_id(0), get_global_id(1)), (float4)(color, 1.0));
+//    write_imagef(image, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
 //    write_imagef(image, (int2)(get_global_size(1) - coord.y - 1, coord.x), (float4)(color, 1.0));
 }

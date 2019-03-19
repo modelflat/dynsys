@@ -116,7 +116,7 @@ def make_phase_plot(ctx, queue, image_shape, space_shape,):
     )
 
     frw = ParameterizedImageWidget(
-        space_shape, ("z_real", "z_imag"), shape=(True, True)
+        space_shape, ("z_real", "z_imag"), shape=(True, True), textureShape=image_shape,
     )
 
     return fr, frw
@@ -133,7 +133,7 @@ class IFSFractalParameterMap(ComputedImage):
         self.points: cl.Buffer = None
 
     def compute_points(self, z0: complex, c: complex, skip: int, iter: int, tol: float, root_seq=None,
-                       wait=False):
+                       wait=False, resolution=1):
         reqd_size = iter * numpy.prod(self.imageShape)
 
         if self.points is None or self.points.size != reqd_size:
@@ -143,7 +143,7 @@ class IFSFractalParameterMap(ComputedImage):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
         self.program.compute_points(
-            self.queue, self.imageShape, (1, 1),
+            self.queue, (self.imageShape[0] // resolution, self.imageShape[1] // resolution), (1, 1),
             # z0
             numpy.array((z0.real, z0.imag), dtype=numpy.float64),
             # c
@@ -168,7 +168,7 @@ class IFSFractalParameterMap(ComputedImage):
         if wait:
             self.queue.finish()
 
-    def display(self, num_points: int):
+    def display(self, num_points: int, resolution=1):
         color_scheme = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=4)
 
         periods = numpy.empty(self.imageShape, dtype=numpy.int32)
@@ -176,6 +176,7 @@ class IFSFractalParameterMap(ComputedImage):
 
         self.program.draw_periods(
             self.queue, self.imageShape, None,
+            numpy.int32(resolution),
             numpy.int32(num_points),
             color_scheme,
             self.points,
@@ -220,11 +221,11 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
         self.points_dev = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=self.points.nbytes)
 
     def compute_points(self, alpha: float, h: float, c: complex, skip: int, root_seq=None,
-                       return_points=False):
+                       return_points=False, resolution=1):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
         self.program.compute_basins(
-            self.queue, self.imageShape, None,
+            self.queue, (self.imageShape[0] // resolution, self.imageShape[1] // resolution), None,
 
             numpy.int32(skip),
 
@@ -246,7 +247,7 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
             cl.enqueue_copy(self.queue, self.points, self.points_dev)
             return self.points
 
-    def draw_points(self, points=None):
+    def draw_points(self, resolution=1, points=None):
         self.clear()
 
         if points is None:
@@ -254,6 +255,7 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
 
         self.program.draw_basins(
             self.queue, self.imageShape, (1, 1),
+            numpy.int32(resolution),
             numpy.array(self.spaceShape, dtype=numpy.float64),
             points_dev,
             self.deviceImage
@@ -272,7 +274,7 @@ def make_basins(ctx, queue, image_shape, space_shape):
     )
 
     frw = ParameterizedImageWidget(
-        space_shape, ("z_real", "z_imag"), shape=(True, True)
+        space_shape, ("z_real", "z_imag"), shape=(True, True), textureShape=image_shape,
     )
 
     return fr, frw
