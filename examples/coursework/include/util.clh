@@ -39,7 +39,6 @@ inline int2 to_size(real2 point, const real4 bounds, const int2 size) {
 }
 
 inline bool in_image(const int2 coord, const int2 size) {
-
     return coord.x < size.x && coord.y < size.y && coord.x >= 0 && coord.y >= 0;
 }
 
@@ -95,5 +94,7 @@ inline void put_point(write_only image2d_t image, const int2 coord, const int2 i
         write_imagef(image, coord, POINT_COLOR);
     }
 }
+
+#define COORD_2D_INV_Y (int2)(get_global_id(0), get_global_size(1) - get_global_id(1) - 1)
 
 #endif // __UTIL_CLH

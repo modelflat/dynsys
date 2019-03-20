@@ -43,7 +43,7 @@ kernel void newton_fractal(
         NEXT_POINT(c, seq_size, &rng_state);
     }
 
-    const int2 image_size = (int2)(get_image_width(out), get_image_height(out));
+    const int2 image_size = get_image_dim(out);
 
     for (int i = 0, frozen = 0; i < iter; ++i) {
         const int2 coord = to_size(Z_VAR, bounds, image_size);
@@ -87,7 +87,8 @@ kernel void compute_points(
     uint2 rng_state;
     init_state(seed, &rng_state);
 
-    const int2 coord = { get_global_id(0), get_global_id(1) };
+    // NOTE flipped y
+    const int2 coord = COORD_2D_INV_Y;
     result += (coord.y * get_global_size(0) + coord.x) * iter;
 
     const real2 param = point_from_id_dense(bounds);
@@ -107,15 +108,16 @@ kernel void compute_points(
 
 // Draws parameter map using computed samples
 kernel void draw_periods(
-    const int resolution,
+    const int scale_factor,
     const int num_points,
     const global float* color_scheme,
     global ulong* points,
     global int* periods,
     write_only image2d_t out
 ) {
-    const int2 coord = (int2)(get_global_id(0), get_global_id(1)) / resolution;
-    const int size_x = get_global_size(0) / resolution;
+    // NOTE flipped y to correspond compute_periods
+    const int2 coord = COORD_2D_INV_Y / scale_factor;
+    const int size_x = get_global_size(0) / scale_factor;
 
     points += (coord.y * size_x + coord.x) * num_points;
 
@@ -128,7 +130,8 @@ kernel void draw_periods(
     float3 color = hsv2rgb(hsvcolor);
 
     periods[coord.y * size_x + coord.x] = unique;
-    write_imagef(out, (int2)(get_global_id(0), get_global_id(1)), (float4)(color, 1.0));
+    // NOTE flipped y to correspond to image coordinates (top left (0,0))
+    write_imagef(out, COORD_2D_INV_Y, (float4)(color, 1.0));
 }
 
 // Compute where points would be after N iterations
@@ -150,7 +153,8 @@ kernel void compute_basins(
     uint2 rng_state;
     init_state(seed, &rng_state);
 
-    const int2 coord = { get_global_id(0), get_global_id(1) };
+    // NOTE y flipped
+    const int2 coord = COORD_2D_INV_Y;
 
     INIT_VARIABLES(point_from_id_dense(bounds), c, h, alpha);
 
@@ -163,13 +167,14 @@ kernel void compute_basins(
 
 //
 kernel void draw_basins(
-    const int resolution,
+    const int scale_factor,
     const real4 bounds,
     const global real* endpoints,
     write_only image2d_t image
 ) {
-    const int2 coord = (int2)( get_global_id(0), get_global_id(1) ) / resolution;
-    const int size_x = get_global_size(0) / resolution;
+    // NOTE y flipped to correspond to compute_basins
+    const int2 coord = COORD_2D_INV_Y / scale_factor;
+    const int size_x = get_global_size(0) / scale_factor;
     const real2 origin = point_from_id_dense(bounds);
     const real2 end = vload2(coord.y * size_x + coord.x, endpoints);
 
@@ -232,7 +237,7 @@ kernel void draw_basins(
         edge
     ));
 
-    write_imagef(image, (int2)(get_global_id(0), get_global_id(1)), (float4)(color, 1.0));
+    write_imagef(image, COORD_2D_INV_Y, (float4)(color, 1.0));
 //    write_imagef(image, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
 //    write_imagef(image, (int2)(get_global_size(1) - coord.y - 1, coord.x), (float4)(color, 1.0));
 }

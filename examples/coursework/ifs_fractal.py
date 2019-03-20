@@ -171,7 +171,8 @@ class IFSFractalParameterMap(ComputedImage):
     def display(self, num_points: int, resolution=1):
         color_scheme = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=4)
 
-        periods = numpy.empty(self.imageShape, dtype=numpy.int32)
+        periods = numpy.empty((self.imageShape[0] // resolution, self.imageShape[0] // resolution),
+                              dtype=numpy.int32)
         periods_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=periods.nbytes)
 
         self.program.draw_periods(
