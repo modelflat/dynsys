@@ -62,7 +62,6 @@ class CourseWork(SimpleApp):
         self.root_seq_edit = QLineEdit()
 
         self.random_seq = None
-        self.do_draw_basins = cfg.do_draw_basins
 
         self.right_wgts = {
             "phase":  self.compute_and_draw_phase,
@@ -99,7 +98,7 @@ class CourseWork(SimpleApp):
             self.alpha_slider_wgt,
             self.h_slider_wgt
         )
-        self.setLayout(stack(left, right, kind="h", cm=(4, 4, 4, 4)))
+        self.setLayout(stack(left, right, kind="h", cm=(4, 4, 4, 4), sp=4))
 
     def connect_everything(self):
 
@@ -171,8 +170,8 @@ class CourseWork(SimpleApp):
 
         with self.compute_lock:
             self.basins.compute_points(
-                alpha=alpha,
                 h=h,
+                alpha=alpha,
                 c=cfg.C,
                 skip=cfg.basins_skip,
                 root_seq=self.parse_root_sequence(),
@@ -187,7 +186,7 @@ class CourseWork(SimpleApp):
             t = time.perf_counter()
 
             if cfg.param_map_select_z0_from_phase:
-                wgt = self.right_wgt if self.do_draw_basins else self.phase_wgt
+                wgt = self.right_wgt
                 z0 = complex(*wgt.value())
             else:
                 z0 = cfg.param_map_z0
@@ -214,10 +213,12 @@ class CourseWork(SimpleApp):
     def compute_and_draw_phase(self, *_):
         h, alpha = self.param_wgt.value()
 
+        print("Phase: ", h, alpha)
+
         with self.compute_lock:
             image = self.phase(
-                alpha=alpha,
                 h=h,
+                alpha=alpha,
                 c=cfg.C,
                 grid_size=cfg.phase_grid_size,
                 iterCount=cfg.phase_iter,
@@ -254,7 +255,7 @@ class CourseWork(SimpleApp):
         self.alpha_slider.blockSignals(False)
 
     def draw_right(self):
-        print("draw_right called")
+        # print("draw_right called")
         what = self.right_mode_cmb.currentText()
         self.set_period_label()
         self.right_wgts[what]()

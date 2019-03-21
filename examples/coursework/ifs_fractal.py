@@ -72,7 +72,7 @@ class IFSFractal(ComputedImage):
                                   "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])],
                          typeConfig=FLOAT)
 
-    def __call__(self, alpha: float, h: float, c: complex, grid_size: int, iterCount: int, skip: int,
+    def __call__(self, h: float, alpha: float, c: complex, grid_size: int, iterCount: int, skip: int,
                  z0=None, root_seq=None, clear_image=True):
 
         if clear_image:
@@ -221,7 +221,7 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
         self.points = numpy.empty((numpy.prod(imageShape), 2), dtype=numpy.float64)
         self.points_dev = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=self.points.nbytes)
 
-    def compute_points(self, alpha: float, h: float, c: complex, skip: int, root_seq=None, resolution=1):
+    def compute_points(self, h: float, alpha: float, c: complex, skip: int, root_seq=None, resolution=1):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
         self.program.compute_basins(
@@ -287,6 +287,7 @@ def make_basins(ctx, queue, image_shape, space_shape):
 
     frw = ParameterizedImageWidget(
         space_shape, ("z_real", "z_imag"), shape=(True, True), textureShape=image_shape,
+        targetColor=Qt.gray
     )
 
     return fr, frw

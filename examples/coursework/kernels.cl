@@ -126,7 +126,7 @@ kernel void draw_periods(
     float h = (unique % 23) / (float)(22);
     float v = 1.0 - (unique / (float)(num_points));
 
-    float3 hsvcolor = (float3)(240.0 * h, 1.0,v);
+    float3 hsvcolor = (float3)(240.0 * h, 0.8, v);
 
     float3 color = hsv2rgb(hsvcolor);
 
@@ -168,7 +168,7 @@ kernel void compute_basins(
     vstore2(Z_VAR, coord.y * get_global_size(0) + coord.x, endpoints);
 }
 
-//
+// Draw basins' bounds and color them approximately
 kernel void draw_basins(
     const int scale_factor,
     const real4 bounds,
@@ -234,7 +234,7 @@ kernel void draw_basins(
 
     }
 
-    mod = 0.5;
+    float value = 0.8;
 
     if (end.x >= 0 && end.y >= 0) {
         col = 0;
@@ -263,7 +263,7 @@ kernel void draw_basins(
 
     float3 color = hsv2rgb((float3)(
         col,
-        mod,
+        value,
         edge
     ));
 
@@ -272,6 +272,7 @@ kernel void draw_basins(
 //    write_imagef(image, (int2)(get_global_size(1) - coord.y - 1, coord.x), (float4)(color, 1.0));
 }
 
+// Draw basins in precise colors
 kernel void draw_basins_colored(
     const int scale_factor,
     const int attraction_points_count,
