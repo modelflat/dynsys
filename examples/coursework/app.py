@@ -9,6 +9,20 @@ from dynsys import SimpleApp, vStack, createSlider, hStack
 from ifs_fractal import make_parameter_map, make_phase_plot, make_simple_param_surface, make_basins
 
 
+def stack(*args, kind="v", cm=(0, 0, 0, 0), sp=0):
+    if kind == "v":
+        l = vStack(*args)
+        l.setSpacing(sp)
+        l.setContentsMargins(*cm)
+    elif kind == "h":
+        l = hStack(*args)
+        l.setSpacing(sp)
+        l.setContentsMargins(*cm)
+    else:
+        raise ValueError("Unknown kind of stack: \"{}\"".format(kind))
+    return l
+
+
 class CourseWork(SimpleApp):
 
     def __init__(self):
@@ -52,7 +66,8 @@ class CourseWork(SimpleApp):
 
         self.right_wgts = {
             "phase":  self.compute_and_draw_phase,
-            "basins": self.compute_and_draw_basins
+            "basins": lambda: self.compute_and_draw_basins(algo="b"),
+            "basins colored": lambda: self.compute_and_draw_basins(algo="c")
         }
         self.right_mode_cmb.addItems(self.right_wgts.keys())
 
@@ -62,23 +77,29 @@ class CourseWork(SimpleApp):
         self.draw_right()
 
     def setup_layout(self):
-        left = vStack(
-            self.param_map_compute_btn,
-            hStack(self.param_wgt),
-            hStack(self.random_seq_gen_btn, self.random_seq_reset_btn),
-            self.root_seq_edit
-        )
-        left.setSpacing(1)
-        right = vStack(
-            hStack(self.right_mode_cmb, self.refresh_btn, self.clear_cb),
-            self.right_wgt,
+        left = stack(
+            self.param_wgt,
             self.period_label,
-            self.alpha_slider_wgt,
-            self.h_slider_wgt,
+            stack(
+                self.param_map_compute_btn,
+                kind="h",
+            ),
+            stack(
+                self.random_seq_gen_btn, self.random_seq_reset_btn,
+                kind="h"
+            ),
+            self.root_seq_edit,
         )
-        right.setSpacing(1)
-        self.setLayout(hStack(left, right))
-        self.layout().setSpacing(1)
+        right = stack(
+            self.right_wgt,
+            stack(
+                self.right_mode_cmb, self.refresh_btn, self.clear_cb,
+                kind="h"
+            ),
+            self.alpha_slider_wgt,
+            self.h_slider_wgt
+        )
+        self.setLayout(stack(left, right, kind="h", cm=(4, 4, 4, 4)))
 
     def connect_everything(self):
 
@@ -140,7 +161,7 @@ class CourseWork(SimpleApp):
         with self.compute_lock:
             self.param_wgt.setImage(self.param_placeholder())
 
-    def compute_and_draw_basins(self, *_):
+    def compute_and_draw_basins(self, *_, algo="b"):
         h, alpha = self.param_wgt.value()
 
         # TODO why? probably some bug in parameter computation
@@ -157,7 +178,7 @@ class CourseWork(SimpleApp):
                 root_seq=self.parse_root_sequence(),
                 resolution=cfg.basins_resolution
             )
-            image = self.basins.draw_points(resolution=cfg.basins_resolution)
+            image = self.basins.draw_points(resolution=cfg.basins_resolution, algo=algo)
             self.right_wgt.setImage(image)
 
     def compute_and_draw_param_map(self, *_):

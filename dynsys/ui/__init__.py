@@ -7,8 +7,10 @@ from PyQt5.Qt import QVBoxLayout, QHBoxLayout, QLayout, QColor, QWidget, QLabel
 from PyQt5.QtCore import Qt, pyqtSignal as Signal
 
 
-def vStack(*args):
+def vStack(*args, cm=(0, 0, 0, 0)):
     l = QVBoxLayout()
+    l.setContentsMargins(*cm)
+    l.setSpacing(0)
     for a in args:
         if isinstance(a, QLayout):
             l.addLayout(a)
@@ -17,9 +19,10 @@ def vStack(*args):
     return l
 
 
-def hStack(*args):
+def hStack(*args, cm=(0, 0, 0, 0)):
     l = QHBoxLayout()
-    l.setSpacing(4)
+    l.setContentsMargins(*cm)
+    l.setSpacing(0)
     for a in args:
         if isinstance(a, QLayout):
             l.addLayout(a)

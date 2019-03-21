@@ -218,11 +218,10 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
                          options=[*options, "-w",
                                   "-D_{}".format(numpy.random.randint(0, 2**64-1, size=1, dtype=numpy.uint64)[0])],
                          typeConfig=FLOAT)
-        self.points = numpy.empty((numpy.prod(imageShape) * 2,), dtype=numpy.float64)
+        self.points = numpy.empty((numpy.prod(imageShape), 2), dtype=numpy.float64)
         self.points_dev = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=self.points.nbytes)
 
-    def compute_points(self, alpha: float, h: float, c: complex, skip: int, root_seq=None,
-                       return_points=False, resolution=1):
+    def compute_points(self, alpha: float, h: float, c: complex, skip: int, root_seq=None, resolution=1):
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
         self.program.compute_basins(
@@ -244,23 +243,35 @@ class IFSFractalBasinsOfAttraction(ComputedImage):
             self.points_dev
         )
 
-        if return_points:
-            cl.enqueue_copy(self.queue, self.points, self.points_dev)
-            return self.points
-
-    def draw_points(self, resolution=1, points=None):
+    def draw_points(self, resolution=1, algo="c"):
         self.clear()
 
-        if points is None:
-            points_dev = self.points_dev
+        if algo == "c":
+            cl.enqueue_copy(self.queue, self.points, self.points_dev)
+            unique_points = numpy.unique(self.points, axis=0)
+            unique_points_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                                          hostbuf=unique_points)
 
-        self.program.draw_basins(
-            self.queue, self.imageShape, (1, 1),
-            numpy.int32(resolution),
-            numpy.array(self.spaceShape, dtype=numpy.float64),
-            points_dev,
-            self.deviceImage
-        )
+            print("Unique attraction points: {} / {}".format(unique_points.shape[0], self.points.shape[0]))
+
+            self.program.draw_basins_colored(
+                self.queue, self.imageShape, (1, 1),
+                numpy.int32(resolution),
+                numpy.int32(unique_points.shape[0]),
+                unique_points_dev,
+                self.points_dev,
+                self.deviceImage
+            )
+        elif algo == "b":
+            self.program.draw_basins(
+                self.queue, self.imageShape, (1, 1),
+                numpy.int32(resolution),
+                numpy.array(self.spaceShape, dtype=numpy.float64),
+                self.points_dev,
+                self.deviceImage
+            )
+        else:
+            raise ValueError("Unknown algo: \"{}\"".format(algo))
 
         return self.readFromDevice()
 

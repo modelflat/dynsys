@@ -3,6 +3,7 @@
 
 #define POINT_RADIUS 1
 #define POINT_COLOR (float4)(0.0, 0.0, 0.0, 1.0)
+#define DETECTION_PRECISION 1e-4
 #include "util.clh"
 
 // Draws Newton fractal (phase plot)
@@ -162,6 +163,8 @@ kernel void compute_basins(
         NEXT_POINT(c, seq_size, &rng_state);
     }
 
+    Z_VAR = round_point(Z_VAR, 4);
+
     vstore2(Z_VAR, coord.y * get_global_size(0) + coord.x, endpoints);
 }
 
@@ -228,7 +231,34 @@ kernel void draw_basins(
 
     if (mod > 1) {
 //        printf("STABLE: %.6f, %.6f\n", origin.x, origin.y);
+
+    }
+
+    mod = 0.5;
+
+    if (end.x >= 0 && end.y >= 0) {
         col = 0;
+        if (!(origin.x >= 0 && origin.y >= 0)) {
+            mod = 0.5;
+        }
+    }
+    else if (end.x >= 0 && end.y < 0) {
+        col = 60;
+        if (!(origin.x >= 0 && origin.y < 0)) {
+            mod = 0.5;
+        }
+    }
+    else if (end.x < 0 && end.y >= 0) {
+        col = 120;
+        if (!(origin.x < 0 && origin.y >= 0)) {
+            mod = 0.5;
+        }
+    }
+    else if (end.x < 0 && end.y < 0) {
+        col = 180;
+        if (!(origin.x < 0 && origin.y < 0)) {
+            mod = 0.5;
+        }
     }
 
     float3 color = hsv2rgb((float3)(
@@ -240,4 +270,26 @@ kernel void draw_basins(
     write_imagef(image, COORD_2D_INV_Y, (float4)(color, 1.0));
 //    write_imagef(image, (int2)(coord.x, get_global_size(1) - coord.y - 1), (float4)(color, 1.0));
 //    write_imagef(image, (int2)(get_global_size(1) - coord.y - 1, coord.x), (float4)(color, 1.0));
+}
+
+kernel void draw_basins_colored(
+    const int scale_factor,
+    const int attraction_points_count,
+    const global real* attraction_points, // TODO make real and use vload in binary_search
+    const global real* result,
+    write_only image2d_t map
+) {
+    const int2 coord = COORD_2D_INV_Y / scale_factor;
+    const int size_x = get_global_id(0) / scale_factor;
+
+    const real2 val = vload2(coord.y * size_x + coord.x, result);
+
+    const int color_idx = binary_search(attraction_points_count, attraction_points, val);
+
+    const int v = 1 - (int)(color_idx == -1 || length(val) < DETECTION_PRECISION);
+    const float ratio = (float)(color_idx) / (float)(attraction_points_count);
+
+    float3 color = hsv2rgb((float3)(240.0 * ratio, 1.0, v));
+
+    write_imagef(map, COORD_2D_INV_Y, (float4)(color, 1.0));
 }
