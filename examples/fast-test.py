@@ -66,17 +66,33 @@ kernel void phase(
     }
 }
 """
+#
+#
+# print(
+#     Template(text=BOUNDS).render(
+#         compile_time_bounds=True,
+#         bounds_const_in_runtime=True,
+#         bounds_type="double",
+#         bounds=(0.0, 1.0),
+#         compile_time_image_bounds=False,
+#         infer_image_bounds=True,
+#         image_bounds_type="size_t",
+#         image_bounds=(512, 512)
+#     ).strip()
+# )
 
 
-print(
-    Template(text=BOUNDS).render(
-        compile_time_bounds=True,
-        bounds_const_in_runtime=True,
-        bounds_type="double",
-        bounds=(0.0, 1.0),
-        compile_time_image_bounds=False,
-        infer_image_bounds=True,
-        image_bounds_type="size_t",
-        image_bounds=(512, 512)
-    ).strip()
-)
+
+
+# """
+# for (uint i = 0, mask = 1; i < 32; mask <<= 1, ++i) {
+#
+# }
+# """
+#
+# mask = 1
+# for i in range(0, 32):
+#     print("v |= ((ulong)(coord.x & 0x{mask:08X}u) << {ip1:2d}) | ((ulong)(coord.y & 0x{mask:08X}u) << {i:2d});".format(
+#         ip1=i+1, i=i, mask=mask
+#     ))
+#     mask <<= 1

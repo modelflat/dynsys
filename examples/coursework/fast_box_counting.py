@@ -17,19 +17,18 @@ Note, that this algorithm was tested only against images that are square, and ha
  (e.g. 512x512)
 
 TODO looks like it works, but needs more testing
+TODO add customizable is_not_empty function
 
 """
 
-
-import pyopencl as cl
 import numpy
+import pyopencl as cl
+from matplotlib.pyplot import imread
 from scipy.stats import linregress
+from time import perf_counter
+
 from dynsys import allocateImage, createContextAndQueue
 from dynsys.LCE import dummyOption
-from time import perf_counter
-from matplotlib.pyplot import imread
-import os
-
 
 SOURCE = r"""
 constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
@@ -41,7 +40,6 @@ inline bool is_not_empty(uint4 color) {
 
 inline ulong intercalate(uint2 coord) {
     ulong v = 0;
-    // TODO unroll
     for (uint i = 0, mask = 1; i < 32; mask <<= 1, ++i) {
         v |= (((coord.x & mask) << (i + 1)) | (coord.y & mask) << i);
     }
@@ -122,7 +120,6 @@ class FastBoxCounting:
 
         cl.enqueue_copy(queue, intercalated_coords, intercalated_coords_dev)
 
-        # TODO Sort on device as well
         intercalated_coords.sort()
 
         cl.enqueue_copy(queue, intercalated_coords_dev, intercalated_coords)
@@ -158,12 +155,20 @@ class FastBoxCounting:
             cl.enqueue_copy(queue, gray_count, gray_count_dev)
 
             total_boxes = numpy.prod(image.shape) // box_size
+            filled_boxes = black_count[0] + gray_count[0]
 
             if verbose:
-                print("For box size {} ({} total boxes, {} bits stripped) - {} black, {} gray boxes {:.2f}% boxes occupied".format(
-                    box_size, total_boxes, strip_bits, black_count[0], gray_count[0],
-                    100 * (black_count[0] + gray_count[0]) / total_boxes
-                ))
+                print("For box size {} ({} total boxes, {} bits stripped) - {} black, {} gray boxes {:.2f}% boxes "
+                      "occupied".format(box_size, total_boxes, strip_bits, black_count[0], gray_count[0],
+                                        100 * filled_boxes / total_boxes))
+
+            if filled_boxes == 0:
+                # it makes no sense to check boxes of bigger size if filled_boxes is 0
+                # also, this can happen only in the first iteration, so image is empty according to
+                # is_not_empty function
+                assert i == 0, i
+                # TODO output a warning about empty image
+                return numpy.nan
 
             boxes.append((numpy.log(1 / box_size), numpy.log(black_count[0] + gray_count[0])))
 
@@ -213,7 +218,7 @@ def test_image(uri):
 
 if __name__ == '__main__':
     ctx, queue = createContextAndQueue()
-    # test_gen_image(kind="zeros")
+    test_gen_image(kind="zeros")
     test_gen_image(kind="ones")
     test_gen_image(kind="rand")
     # test_image(os.path.expanduser("~/Downloads/Triflake.png"))
