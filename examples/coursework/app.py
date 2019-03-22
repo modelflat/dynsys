@@ -8,6 +8,8 @@ import config as cfg
 from dynsys import SimpleApp, vStack, createSlider, hStack
 from ifs_fractal import make_parameter_map, make_phase_plot, make_simple_param_surface, make_basins
 
+from fast_box_counting import FastBoxCounting
+
 
 def stack(*args, kind="v", cm=(0, 0, 0, 0), sp=0):
     if kind == "v":
@@ -57,9 +59,11 @@ class CourseWork(SimpleApp):
         self.right_mode_cmb = QComboBox()
 
         self.period_label = QLabel()
+        self.d_label = QLabel()
         self.period_map = None
 
         self.root_seq_edit = QLineEdit()
+        self.box_counter = FastBoxCounting(self.ctx)
 
         self.random_seq = None
 
@@ -95,6 +99,7 @@ class CourseWork(SimpleApp):
                 self.right_mode_cmb, self.refresh_btn, self.clear_cb,
                 kind="h"
             ),
+            self.d_label,
             self.alpha_slider_wgt,
             self.h_slider_wgt
         )
@@ -213,7 +218,7 @@ class CourseWork(SimpleApp):
     def compute_and_draw_phase(self, *_):
         h, alpha = self.param_wgt.value()
 
-        print("Phase: ", h, alpha)
+        # print("Phase: ", h, alpha)
 
         with self.compute_lock:
             image = self.phase(
@@ -228,6 +233,9 @@ class CourseWork(SimpleApp):
                 z0=cfg.phase_z0
             )
             self.right_wgt.setImage(image)
+            D = self.box_counter.compute(self.queue, self.phase.deviceImage)
+
+            self.d_label.setText("D = {:.3f}".format(D))
 
     def set_period_label(self):
         x_px, y_px = self.param_wgt._imageWidget.targetPx()

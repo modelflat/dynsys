@@ -6,7 +6,7 @@
 #define DETECTION_PRECISION 1e-4
 #include "util.clh"
 
-// Draws Newton fractal (phase plot)
+// Draw Newton fractal (phase plot)
 kernel void newton_fractal(
     // algo parameters
     const int skip,
@@ -64,7 +64,7 @@ kernel void newton_fractal(
     }
 }
 
-// Computes samples for parameter map
+// Compute samples for parameter map
 kernel void compute_points(
     const real2 z0,
     const real2 c,
@@ -107,7 +107,7 @@ kernel void compute_points(
     }
 }
 
-// Draws parameter map using computed samples
+// Draw parameter map using computed samples
 kernel void draw_periods(
     const int scale_factor,
     const int num_points,

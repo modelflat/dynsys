@@ -87,7 +87,8 @@ inline real2 ccb(real2 z) {
 // params:
 // a, b, c are the (complex) coefficients
 // root - which (0, 1, 2) root to compute; -1 if want all roots
-// roots - [out] computed roots; if only one root is specified,
+// roots - [out] computed roots; if only one root is specified, others are undefined
+// (unless SOLVE_CUBIC_AVOID_BRANCHES is set)
 // returns 0 if equation was successfully solved, 1 otherwise
 int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots);
 int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots) {
