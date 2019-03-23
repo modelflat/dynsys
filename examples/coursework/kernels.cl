@@ -1,7 +1,7 @@
 #include "newton.clh"
 #include "heapsort.clh"
 
-#define POINT_RADIUS 1
+#define POINT_RADIUS 0
 #define POINT_COLOR (float4)(0.0, 0.0, 0.0, 1.0)
 #define DETECTION_PRECISION 1e-4
 #include "util.clh"

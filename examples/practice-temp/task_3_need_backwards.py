@@ -117,7 +117,7 @@ class Homoclinic:
 
     def __call__(self, stablePoint, eps, pointCount, p1, p2, iterations):
         points = generatePointsInEps(stablePoint, eps, pointCount, self.type)
-        print(points)
+        # print(points)
         pointsDev = cl.Buffer(self.ctx, cl.mem_flags.COPY_HOST_PTR | cl.mem_flags.READ_ONLY, hostbuf=points)
 
         end = numpy.empty(points.shape, dtype=self.type)
