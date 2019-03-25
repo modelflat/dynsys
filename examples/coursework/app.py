@@ -204,14 +204,16 @@ class CourseWork(SimpleApp):
                 tol=cfg.param_map_tolerance,
                 root_seq=self.parse_root_sequence(),
                 wait=True,
-                resolution=cfg.param_map_resolution
+                resolution=cfg.param_map_resolution,
+                lossless=cfg.param_map_lossless
             )
             t = time.perf_counter() - t
         print("Computed parameter map in {:.3f} s".format(t))
 
         with self.compute_lock:
             image, periods = self.param.display(num_points=cfg.param_map_iter,
-                                                resolution=cfg.param_map_resolution)
+                                                resolution=cfg.param_map_resolution,
+                                                lossless=cfg.param_map_lossless)
             self.param_wgt.setImage(image)
             self.period_map = periods
 
@@ -244,7 +246,7 @@ class CourseWork(SimpleApp):
         if self.period_map is not None:
             x_px = max(min(cfg.param_map_image_shape[0] // cfg.param_map_resolution - 1, x_px), 0)
             y_px = max(min(cfg.param_map_image_shape[1] // cfg.param_map_resolution - 1, y_px), 0)
-            print(x_px, y_px)
+            # print(x_px, y_px)
             y, x = int(y_px), int(x_px)
             per = self.period_map[y][x]
             self.period_label.setText(

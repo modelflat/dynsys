@@ -1,7 +1,7 @@
 ## general parameters
 
 # range for varying `h`
-h_bounds = (-1, 10)
+h_bounds = (-1, 1)
 
 # range for varying `alpha`
 alpha_bounds = (0.0, 1.0)
@@ -31,10 +31,13 @@ param_map_z0 = complex(0.01, 0.01)
 param_map_select_z0_from_phase = True
 
 # resolution
-param_map_resolution = 2
+param_map_resolution = 4
 
 
 param_map_draw_on_select = True
+
+
+param_map_lossless = True
 
 
 ## phase plot params
@@ -62,6 +65,6 @@ phase_z0 = None
 
 basins_image_shape = phase_image_shape
 
-basins_resolution = 2
+basins_resolution = 4
 
 basins_skip = param_map_skip + param_map_iter - 1

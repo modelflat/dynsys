@@ -236,30 +236,40 @@ kernel void draw_basins(
 
     float value = 0.8;
 
-    if (end.x >= 0 && end.y >= 0) {
+    real arg = atan2(end.y, end.x) + PI;
+
+    if        (0 <= arg && arg < 2 * PI / 3) {
         col = 0;
-        if (!(origin.x >= 0 && origin.y >= 0)) {
-            mod = 0.5;
-        }
-    }
-    else if (end.x >= 0 && end.y < 0) {
+    } else if (2 * PI / 3 <= arg && arg < 4 * PI / 3) {
         col = 60;
-        if (!(origin.x >= 0 && origin.y < 0)) {
-            mod = 0.5;
-        }
-    }
-    else if (end.x < 0 && end.y >= 0) {
+    } else if (4 * PI / 3 <= arg && arg < 2 * PI) {
         col = 120;
-        if (!(origin.x < 0 && origin.y >= 0)) {
-            mod = 0.5;
-        }
     }
-    else if (end.x < 0 && end.y < 0) {
-        col = 180;
-        if (!(origin.x < 0 && origin.y < 0)) {
-            mod = 0.5;
-        }
-    }
+
+//    if (end.x >= 0 && end.y >= 0) {
+//        col = 0;
+//        if (!(origin.x >= 0 && origin.y >= 0)) {
+//            mod = 0.5;
+//        }
+//    }
+//    else if (end.x >= 0 && end.y < 0) {
+//        col = 60;
+//        if (!(origin.x >= 0 && origin.y < 0)) {
+//            mod = 0.5;
+//        }
+//    }
+//    else if (end.x < 0 && end.y >= 0) {
+//        col = 120;
+//        if (!(origin.x < 0 && origin.y >= 0)) {
+//            mod = 0.5;
+//        }
+//    }
+//    else if (end.x < 0 && end.y < 0) {
+//        col = 180;
+//        if (!(origin.x < 0 && origin.y < 0)) {
+//            mod = 0.5;
+//        }
+//    }
 
     float3 color = hsv2rgb((float3)(
         col,
@@ -293,4 +303,72 @@ kernel void draw_basins_colored(
     float3 color = hsv2rgb((float3)(240.0 * ratio, 1.0, v));
 
     write_imagef(map, COORD_2D_INV_Y, (float4)(color, 1.0));
+}
+
+//
+kernel void compute_points_lossless(
+    const real2 z0,
+    const real2 c,
+
+    const real4 bounds,
+
+    const int skip,
+    const int iter,
+    const float tol,
+
+    // root selection
+    // seed
+    const ulong seed,
+
+    // root sequence size and contents
+    const int seq_size,
+    const global int* seq,
+
+    global real* result
+) {
+    uint2 rng_state;
+    init_state(seed, &rng_state);
+
+    // NOTE flipped y
+    const int2 coord = COORD_2D_INV_Y;
+    result += 2 * (coord.y * get_global_size(0) + coord.x) * iter;
+
+    const real2 param = point_from_id_dense(bounds);
+
+    INIT_VARIABLES(z0, c, param.x, param.y);
+//    INIT_VARIABLES(z0, c, param.x, 0);
+
+    for (int i = 0; i < skip; ++i) {
+        NEXT_POINT(c, seq_size, &rng_state);
+    }
+
+    for (int i = 0; i < iter; ++i) {
+        NEXT_POINT(c, seq_size, &rng_state);
+        vstore2(Z_VAR, i, result);
+    }
+}
+
+
+kernel void draw_periods_lossless(
+    const int scale_factor,
+    const int num_points,
+    const global float* color_scheme,
+    global real* points,
+    global int* periods,
+    write_only image2d_t out
+) {
+    // NOTE flipped y to correspond compute_periods
+    const int2 coord = COORD_2D_INV_Y / scale_factor;
+    const int size_x = get_global_size(0) / scale_factor;
+
+    int period = periods[coord.y * size_x + coord.x];
+
+    float h = (period % 23) / (float)(22);
+    float v = 1.0 - (period / (float)(num_points));
+    float3 hsvcolor = (float3)(240.0 * h, 0.8, v);
+
+    float3 color = hsv2rgb(hsvcolor);
+
+    // NOTE flipped y to correspond to image coordinates (top left (0,0))
+    write_imagef(out, COORD_2D_INV_Y, (float4)(color, 1.0));
 }

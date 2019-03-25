@@ -133,16 +133,19 @@ class IFSFractalParameterMap(ComputedImage):
         self.points: cl.Buffer = None
 
     def compute_points(self, z0: complex, c: complex, skip: int, iter: int, tol: float, root_seq=None,
-                       wait=False, resolution=1):
-        reqd_size = iter * numpy.prod(self.imageShape)
+                       wait=False, resolution=1, lossless=False):
+        reqd_size = iter * numpy.prod(self.imageShape) // resolution ** 2
+
+        elem_size = 16 if lossless else 8
+        kernel = self.program.compute_points_lossless if lossless else self.program.compute_points
 
         if self.points is None or self.points.size != reqd_size:
             self.points = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
-                                    size=reqd_size * 8)
+                                    size=reqd_size * elem_size)
 
         seq_size, seq = prepare_root_seq(self.ctx, root_seq)
 
-        self.program.compute_points(
+        kernel(
             self.queue, (self.imageShape[0] // resolution, self.imageShape[1] // resolution), (1, 1),
             # z0
             numpy.array((z0.real, z0.imag), dtype=numpy.float64),
@@ -165,17 +168,46 @@ class IFSFractalParameterMap(ComputedImage):
             # result
             self.points
         )
+
         if wait:
             self.queue.finish()
 
-    def display(self, num_points: int, resolution=1):
+    def display(self, num_points: int, resolution=1, lossless=False):
         color_scheme = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY, size=4)
 
-        periods = numpy.empty((self.imageShape[0] // resolution, self.imageShape[0] // resolution),
-                              dtype=numpy.int32)
-        periods_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=periods.nbytes)
+        if lossless:
+            points_host = numpy.empty((self.imageShape[0] // resolution,
+                                       self.imageShape[1] // resolution, num_points, 2),
+                                      dtype=numpy.float64)
+            cl.enqueue_copy(self.queue, points_host, self.points)
 
-        self.program.draw_periods(
+            periods = numpy.empty((self.imageShape[0] // resolution,
+                                  self.imageShape[1] // resolution),
+                                 dtype=numpy.int32)
+
+            points_host = numpy.round(points_host, decimals=2)
+
+            for i in range(periods.shape[0]):
+                for j in range(periods.shape[1]):
+                    un, cnt = numpy.unique(points_host[i][j], axis=0, return_counts=True)
+                    periods[i][j] = un.shape[0]
+
+            # uniques, un_counts = numpy.unique(points_host, axis=0, return_counts=True)
+            # print(un_counts.shape)
+            # print(un_counts)
+            # TODO period detection here?
+
+            # periods = un_counts.astype(numpy.int32)
+            periods_device = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+                                       hostbuf=periods)
+        else:
+            periods = numpy.empty((self.imageShape[0] // resolution, self.imageShape[1] // resolution),
+                                  dtype=numpy.int32)
+            periods_device = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=periods.nbytes)
+
+        kernel = self.program.draw_periods_lossless if lossless else self.program.draw_periods
+
+        kernel(
             self.queue, self.imageShape, None,
             numpy.int32(resolution),
             numpy.int32(num_points),
@@ -185,7 +217,8 @@ class IFSFractalParameterMap(ComputedImage):
             self.deviceImage
         )
 
-        cl.enqueue_copy(self.queue, periods, periods_device)
+        if not lossless:
+            cl.enqueue_copy(self.queue, periods, periods_device)
 
         return self.readFromDevice(), periods
 
