@@ -97,7 +97,7 @@ class Var:
 
 class EvolutionRule:
 
-    def __init__(self, name, variables, equations, init_rules: dict):
+    def __init__(self, name, variables, equations, init_rules: dict = None):
         self.name = name
         self.vars = tuple(filter(lambda v: not v.is_const() and not v.free(), variables))
         self.const_vars = tuple(filter(lambda v: v.is_const() and not v.free(), variables))
@@ -126,6 +126,8 @@ class EvolutionRule:
         )
 
     def struct_init(self):
+        if self.init_rules is None:
+            return ""
         return INIT_TEMPLATE.render(rule=self)
 
     def function_name(self):
