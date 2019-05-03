@@ -34,7 +34,7 @@ SOURCE = r"""
 constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
 
 inline bool is_not_empty(uint4 color) {
-    return color.r == 0 && color.g == 0 && color.b == 0;
+    return color.x == 0 && color.y == 0 && color.z == 0;
 }
 
 

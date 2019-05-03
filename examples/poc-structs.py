@@ -188,26 +188,20 @@ class InitializationRule:
 x = Var.mut("x")
 y = Var.mut("y")
 z = Var.mut("z")
-x_ = Var.mut("x_")
-y_ = Var.mut("y_")
-z_ = Var.mut("z_")
 a = Var.const("a")
 
 
 r = EvolutionRule.anon(
-    (x, y, z, x_, y_, z_, a),
+    (x, y, z, a),
     (
-        "z_ + x + y",
-        "y_ + z - a",
-        "x_ + y - z"
+        "x + y",
+        "z - a",
+        "y - z"
     ),
     {
         x:  InitializationRule.const(3.14),
         y:  InitializationRule.lerp_worker_id(-1.0, 1.0, 1),
         z:  InitializationRule.kernel_input(),
-        x_: InitializationRule.kernel_input_at_worker_id(0),
-        y_: InitializationRule.const(2),
-        # z_: InitializationRule.lerp_worker_id("in_z", "in_z", 0)
     }
 )
 

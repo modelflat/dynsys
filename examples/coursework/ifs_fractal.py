@@ -111,7 +111,7 @@ def make_phase_plot(ctx, queue, image_shape, space_shape,):
         ctx, queue, image_shape, space_shape,
         fractalSource=SOURCE,
         options=[
-            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+            *"-I {}".format(os.path.join(SCRIPT_DIR, "include")).split(),
         ]
     )
 
@@ -228,7 +228,7 @@ def make_parameter_map(ctx, queue, image_shape, h_bounds, alpha_bounds):
         ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
         fractalSource=SOURCE,
         options=[
-            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+            *"-I {}".format(os.path.join(SCRIPT_DIR, "include")).split(),
         ]
     )
 
@@ -314,7 +314,7 @@ def make_basins(ctx, queue, image_shape, space_shape):
         ctx, queue, image_shape, space_shape,
         fractalSource=SOURCE,
         options=[
-            "-I{}".format(os.path.join(SCRIPT_DIR, "include")),
+            *"-I {}".format(os.path.join(SCRIPT_DIR, "include")).split(),
         ]
     )
 

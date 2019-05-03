@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt, pyqtSignal as Signal
 def vStack(*args, cm=(0, 0, 0, 0)):
     l = QVBoxLayout()
     l.setContentsMargins(*cm)
-    l.setSpacing(0)
+    l.setSpacing(2)
     for a in args:
         if isinstance(a, QLayout):
             l.addLayout(a)
