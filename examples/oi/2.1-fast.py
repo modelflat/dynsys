@@ -1,11 +1,6 @@
-from dynsys import *
-from dynsys.ui.SliderWidgets import createSlider
-from dynsys.LCE import dummyOption
-import pyopencl as cl
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-import time
+from common import *
+from dynsys import allocateImage, ParameterizedImageWidget, SimpleApp, createSlider, hStack, vStack
+from dynsys.ui.ImageWidgets import *
 
 SOURCE = r"""
 #define real double
@@ -323,8 +318,6 @@ class Task2_1(SimpleApp):
 
 
         print("{:.3f} s compute, {:.3f} s draw".format(t, tt))
-
-
 
 
 if __name__ == '__main__':

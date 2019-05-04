@@ -3,15 +3,14 @@ import pyopencl as cl
 
 src = r"""
 
-void do_step(system_t* d, system_t* r, struct params_t* p) {
-    // code 
-}
-
 kernel void test(
-    global system_t* s
+    global system_t* s_
 ) {
     const int id = get_global_id(0);
-    printf("s.a = %f\n", s[id].a);
+    system_t s = s_[id];
+    printf("s = {\n\t{\n\t\tx: %f,\n\t\ty: %f\n\t},\n\ta: %f,\n\tb: %f\n}\n",
+        s.v.x, s.v.y, s.a, s.b 
+    );
 }
 
 """
@@ -32,20 +31,32 @@ def make_type(ctx, type_name, type_desc, device=None):
 ctx = cl.create_some_context(answers=[0, 0])
 queue = cl.CommandQueue(ctx)
 
-type_src, type_def = make_type(
+val_t_src, val_t = make_type(
     ctx=ctx,
-    type_name="system_t",
+    type_name="val_t",
     type_desc=[
-        ("a", numpy.float32),
-        ("b", numpy.float32),
+        ("x", numpy.float64),
+        ("y", numpy.float64)
     ]
 )
 
-prg = cl.Program(ctx, type_src + src).build()
+system_t_src, system_t = make_type(
+    ctx=ctx,
+    type_name="system_t",
+    type_desc=[
+        ("v", val_t),
+        ("a", numpy.float64),
+        ("b", numpy.float64),
+    ]
+)
 
-s = numpy.empty((10,), dtype=type_def)
+prg = cl.Program(ctx, val_t_src + system_t_src + src).build()
 
-s["a"] = range(10)
+s = numpy.zeros((10,), dtype=system_t)
+
+s["v"]["x"] = range(10)
+s["v"]["y"] = range(9, -1, -1)
+
 
 s_dev = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=s)
 

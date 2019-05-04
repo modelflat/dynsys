@@ -1,71 +1,23 @@
-import numpy
-import pyopencl as cl
-import pyopencl.cltypes
-from dynsys import SimpleApp
+from common import *
+from dynsys import SimpleApp, createSlider
 
 
-def make_type(ctx, type_name, type_desc, device=None):
-    """
-    :return: CL code generated for given type and numpy.dtype instance
-    """
-    import pyopencl.tools
-    dtype, cl_decl = cl.tools.match_dtype_to_c_struct(
-        ctx.devices[0] if device is None else device, type_name, numpy.dtype(type_desc), context=ctx
-    )
-    type_def = cl.tools.get_or_register_dtype(type_name, dtype)
-    return cl_decl, type_def
-
-
-PRNG_SOURCE = r"""
-// source code:
-// http://cas.ee.ic.ac.uk/people/dt10/research/rngs-gpu-mwc64x.html
-uint MWC64X(uint2 *state);
-uint MWC64X(uint2 *state) {
-    enum{ A=4294883355U };
-    uint x = (*state).x, c = (*state).y;  // Unpack the state
-    uint res = x^c;                     // Calculate the result
-    uint hi = mul_hi(x,A);              // Step the RNG
-    x = x*A+c;
-    c = hi+(x<c);
-    *state = (uint2)(x,c);               // Pack the state back up
-    return res;                        // Return the next result
-}
-
-void init_state(ulong seed, uint2* state);
-void init_state(ulong seed, uint2* state) {
-    int id = get_global_id(0) + 1;
-    uint2 s = as_uint2(seed);
-    (*state) = (uint2)(
-        // create a mixture of id and two seeds
-        (id + s.x & 0xFFFF) * s.y,
-        (id ^ (s.y & 0xFFFF0000)) ^ s.x
-    );
-}
-
-// retrieve random float in range [0.0; 1.0] (both inclusive)
-inline float random(uint2* state) {
-    return ((float)MWC64X(state)) / (float)0xffffffff;
-}
-"""
-
-
-SERIES_SOURCE = """
+SERIES_SOURCE = r"""
 
 #define _F(x, y, a) (1 - a*x*x + y)
 
 // HENON MAP hardcoded
-void do_step(system_t* d_, system_t* r_, param_t* p) {
-    system_t d = *d_;
-    system_t r = *r_;
+inline void do_step(system_t* d_, system_t* r_, param_t* p) {
+    system_t d = *d_, r = *r_;
     
-    (*d_).x = _F(d.x, d.y, d.a);
-    (*d_).y = d.b * d.x + (*p).D * random(&((*p).rng_state));
+    d_->x = _F(d.x, d.y, d.a);
+    d_->y = d.b * d.x + p->D * random(&(p->rng_state));
     
-    (*r_).x = _F(r.x, r.y, r.a) + (*p).eps * (_F(d.x, d.y, d.a) - _F(r.x, r.y, r.a));
-    (*r_).y = r.b * r.y + (*p).D * random(&((*p).rng_state));
+    r_->x = _F(r.x, r.y, r.a) + p->eps * (_F(d.x, d.y, d.a) - _F(r.x, r.y, r.a));
+    r_->y = r.b * r.x + p->D * random(&(p->rng_state));
 }
 
-kernel compute_time_series(
+kernel void compute_time_series(
     global system_t* d_systems,
     global system_t* r_systems,
     global param_t* params,
@@ -85,9 +37,9 @@ kernel compute_time_series(
         do_step(&d, &r, &p);
     }
     
-    drive += 2 * id * iter
+    drive += 2 * id * iter;
     //       ^ dim
-    response += 2 * id * iter
+    response += 2 * id * iter;
     //          ^ dim
     
     for (int i = 0; i < iter; ++i) {
@@ -125,7 +77,8 @@ class SystemWithNoise:
         ]
         self.prg = cl.Program(ctx, "\n".join(sources)).build()
 
-    def compute(self, queue, drive: dict, response: dict, eps: float, D: float, skip, iter):
+    def compute(self, queue, skip: int, iter: int, eps: float, D: float,
+                drive: dict, response: dict):
         num_par_systems = 1  # should be locked to 1 for now
 
         drive_sys = numpy.empty(num_par_systems, dtype=self.system_t)
@@ -146,7 +99,8 @@ class SystemWithNoise:
         params = numpy.empty(num_par_systems, dtype=self.param_t)
         params["eps"] = eps
         params["D"] = D
-        params["rng_state"] = numpy.random.randint(0, size=2, dtype=numpy.uint32)
+        params["rng_state"] = (42, 24)
+
         params_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                                hostbuf=params)
 
@@ -177,7 +131,66 @@ class App(SimpleApp):
     def __init__(self):
         super(App, self).__init__("6.9")
 
+        self.sys = SystemWithNoise(self.ctx)
 
+        self.figure = Figure(figsize=(15, 10))
+        self.canvas = FigureCanvas(self.figure)
+
+        self.d_slider, d_sl_elem = createSlider("r", (0, 0.02),
+                                                labelPosition="top",
+                                                withLabel="D = {}")
+        self.d_slider.valueChanged.connect(self.compute_and_draw_phase)
+        self.eps_slider, eps_sl_elem = createSlider("r", (0, 1),
+                                                    labelPosition="top",
+                                                    withLabel="eps = {}")
+
+        self.iter_slider, iter_sl_elem = createSlider("i", (1, 1 << 14))
+        self.iter_slider.valueChanged.connect(self.compute_and_draw_phase)
+
+        self.eps_slider.valueChanged.connect(self.compute_and_draw_phase)
+
+        layout = vStack(
+            d_sl_elem,
+            eps_sl_elem,
+            iter_sl_elem,
+            self.canvas
+        )
+        self.setLayout(layout)
+
+        self.compute_and_draw_phase()
+
+    def compute_time_series(self):
+        return self.sys.compute(
+            self.queue,
+            skip=0,
+            iter=self.iter_slider.value(),
+            eps=self.eps_slider.value(),
+            D=self.d_slider.value(),
+            drive={
+                "x": 0.2,
+                "y": 0.1,
+                "a": 1.4,
+                "b": 0.3
+            },
+            response={
+                "x": 0.02,
+                "y": 0.01,
+                "a": 1.4,
+                "b": 0.3
+            }
+        )
+
+    def compute_and_draw_phase(self, *_):
+        d, r = self.compute_time_series()
+        # print(d)
+        self.figure.clear()
+        self.ax = self.figure.subplots(2, 1)
+        self.figure.tight_layout()
+        self.ax[0].clear()
+        self.ax[0].scatter(d.T[0], d.T[1], s=1)
+        self.ax[1].clear()
+        self.ax[1].scatter(r.T[0], r.T[1], s=1)
+        self.canvas.draw()
 
 
 if __name__ == '__main__':
