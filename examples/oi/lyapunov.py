@@ -12,26 +12,26 @@ POTENTIALLY_GENERATED = r"""
 // - Equations:
 //   - Driver:
 #define USER_equation_d_x(x1, y1, a1, b1) \
-    1 - a1*x1*x1 + y1
+    a1 - x1*x1 + b1*y1
 #define USER_equation_d_y(x1, y1, a1, b1) \
-    b1*x1
+    x1
 //   - Response:
 #define USER_equation_r_x(x1, y1, a1, b1, x2, y2, a2, b2) \
-    1 - a2*x2*x2 + y2 + eps*(-a1*x1*x1 + y1 + a2*x2*x2 - y2)
+    a2 - (eps*x1*x2 + (1 - eps)*x2*x2) + b2*y2
 #define USER_equation_r_y(x1, y1, a1, b1, x2, y2, a2, b2) \
-    b2*x2
+    x2
 
 // - Variations:
 //   - Driver:
 #define USER_variation_d_x(x1, y1, x1_, y1_, a1, b1) \
-    y1_ - 2*a1*x1*x1_
+    b1*y1_ - 2*x1*x1_
 #define USER_variation_d_y(x1, y1, x1_, y1_, a1, b1) \
-    b1*x1_
+    x1_
 //   - Response:
 #define USER_variation_r_x(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
-    y2_ - 2*a2*x2*x2_ + eps*(-2*a1*x1*x1_ + y1_ + 2*a2*x2*x2_ - y2_)
+    b2*y2_ - (eps*x2*x1_ + eps*x1*x2_ + 2*(1-eps)*x2*x2_)
 #define USER_variation_r_y(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
-    b2*x2_
+    x2_
 
 // - - - - -
 
@@ -45,18 +45,27 @@ POTENTIALLY_GENERATED = r"""
 
 // dot(x, y) as if x and y are vectors
 inline real sys_dot(system_val_t x, system_val_t y) {
-    union { system_val_t x; real4 v; } __temp_x;
-    __temp_x.x = x;
-    union { system_val_t x; real4 v; } __temp_y;
-    __temp_y.x = y;
-    return dot(__temp_x.v, __temp_y.v);
+    // union { system_val_t x; real4 v; } __temp_x;
+    // __temp_x.x = x;
+    // union { system_val_t x; real4 v; } __temp_y;
+    // __temp_y.x = y;
+    real4 __temp_x = {
+        x.d.x, x.d.y, x.r.x, x.r.y
+    };
+    real4 __temp_y = {
+        y.d.x, y.d.y, y.r.x, y.r.y
+    };
+    return dot(__temp_x, __temp_y);
 }
 
 // normalize x as if it is float vector, return norm
 inline real sys_norm(system_val_t* x) {
-    union { system_val_t x; real4 v; } __temp_x;
-    __temp_x.x = *x;
-    real norm = length(__temp_x.v); 
+    // union { system_val_t x; real4 v; } __temp_x;
+    // __temp_x.x = *x;
+    real4 __temp_x = {
+        x->d.x, x->d.y, x->r.x, x->r.y
+    };
+    real norm = length(__temp_x); 
     x->d.x /= norm;
     x->d.y /= norm;
     x->r.x /= norm;
@@ -130,6 +139,11 @@ void lyapunov(
     
     real t = t_start;
     
+    // to establish system
+    // for (int i = 0; i < (1 << 15); ++i) {
+    //     do_step(&d, &r, v, &p);
+    // }
+    
     for (int i = 0; i < DIM; ++i) {
         S[i] = 0;
     }
@@ -189,8 +203,6 @@ kernel void compute_cle(
     for (int i = 0; i < DIM; ++i) {
         var[i] = v[i];
     }
-    
-    printf("p.eps = %f\n", p->eps);
     
     real L[DIM];
     lyapunov(t_start, t_step, iter, *d, *r, var, *p, L);
@@ -305,38 +317,6 @@ class CLE:
         return self._call_compute_cle(queue, 0, 1, iter, drives, responses, variations, params)
 
 
-def gen_code():
-    varnames = (
-        "x", "y"
-    )
-    parnames = (
-        "a", "b"
-    )
-    meta = (
-        "eps"
-    )
-    equations=(
-        ( # Drive
-            "1 - $a * $x*$x + $y",
-            "$b * $x",
-        ),
-        ( # Response
-            "1 - $a * $x*$x + $y + $eps * ($a_d * $x_d*$x_d + $y_d + $a * $x*$x - $y)",
-            "$b * $x",
-        )
-    )
-    variations=(
-        ( # Drive
-            "$y_ - 2*$a*$x*$x_",
-            "$b * $x_"
-        ),
-        ( # Response
-            "-2*$eps*$a_d*$x_d*$x_d_ + 2*$a*$x*($eps - 1)*$x_ + $eps*$y_d_ + (1 - $eps)*$y_",
-            "$b * $x_"
-        )
-    )
-
-
 class App(SimpleApp):
 
     def __init__(self):
@@ -356,7 +336,11 @@ class App(SimpleApp):
 
         ax = self.figure.subplots(1, 1)
 
-        for i in range(0, 4):
+        Lm = numpy.amax(lyap.T[2:4], axis=0)
+
+        ax.plot(eps, Lm)
+
+        for i in range(0, 0):
             ax.plot(eps, lyap.T[i], label="L[{}] of {}".format(
                 i % 2, "drive" if i < 2 else "resp.",
             ))
@@ -368,12 +352,12 @@ class App(SimpleApp):
         self.canvas.draw()
 
     def compute_cle_series(self):
-        eps = numpy.linspace(0, .1, 50)
+        eps = numpy.linspace(0, 1.0, 100)
         return eps, self.cle.compute_range_of_eps_same_systems(
             self.queue,
-            iter=1 << 2,
-            drv=((0.1, .3), 1.3, 0.3),
-            res=((0.1, 0.1), 1.4, 0.3),
+            iter=1 << 10,
+            drv=((0.1,  0.1), 1.4, 0.3),
+            res=((0.1, -0.1), 1.4, 0.3),
             eps=eps
         )
 
