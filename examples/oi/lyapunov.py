@@ -2,11 +2,37 @@ from common import *
 from dynsys import SimpleApp, vStack, hStack, createSlider
 
 
-POTENTIALLY_GENERATED = r"""
+EQUATIONS_PYRAGAS = r"""
 
-#define DIM 4
+// Coupled Henon maps
+// - Equations:
+//   - Driver:
+#define USER_equation_d_x(x1, y1, a1, b1) \
+    1 - a1*x1*x1 + y1
+#define USER_equation_d_y(x1, y1, a1, b1) \
+    b1*x1
+//   - Response:
+#define USER_equation_r_x(x1, y1, a1, b1, x2, y2, a2, b2) \
+    1 - a2*x2*x2 + y2 + eps*(-a1*x1*x1 + y1 + a2*x2*x2 - y2)
+#define USER_equation_r_y(x1, y1, a1, b1, x2, y2, a2, b2) \
+    b2*x2
 
-// - - - - -
+// - Variations:
+//   - Driver:
+#define USER_variation_d_x(x1, y1, x1_, y1_, a1, b1) \
+    y1_ - 2*a1*x1*x1_
+#define USER_variation_d_y(x1, y1, x1_, y1_, a1, b1) \
+    b1*x1_
+//   - Response:
+#define USER_variation_r_x(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
+    y2_ - 2*a2*x2*x2_ + eps*(-2*a1*x1*x1_ + y1_ + 2*a2*x2*x2_ - y2_)
+#define USER_variation_r_y(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
+    b2*x2_
+
+"""
+
+
+EQUATIONS_CANONICAL = r"""
 
 // Coupled Henon maps
 // - Equations:
@@ -33,7 +59,12 @@ POTENTIALLY_GENERATED = r"""
 #define USER_variation_r_y(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
     x2_
 
-// - - - - -
+"""
+
+
+POTENTIALLY_GENERATED = r"""
+
+#define DIM 4
 
 #define real double
 #define real4 double4
@@ -219,6 +250,7 @@ kernel void compute_cle(
 class CLE:
 
     def __init__(self, ctx):
+        self.use_workaround = True
         self.ctx = ctx
         self.DIM = 4
         param_t_src, self.param_t = make_type(
@@ -247,6 +279,8 @@ class CLE:
         )
         sources = [
             param_t_src, val_t_src, system_val_t_src, system_t_src,
+            EQUATIONS_CANONICAL,
+            # EQUATIONS_PYRAGAS,
             POTENTIALLY_GENERATED, LYAPUNOV_SRC, KERNEL_SRC
         ]
         self.prg = cl.Program(ctx, "\n".join(sources)).build()
@@ -284,6 +318,21 @@ class CLE:
         )
 
         cl.enqueue_copy(queue, cle, cle_dev)
+
+        if self.use_workaround:
+            # FIXME either alignment/other programming bug (unlikely but possible), or algorithm is shit (likely but less possible):
+            # We need to swap some data before return TODO figure out why
+
+            # Presumably: cle.T[0:2] -- lyapunov exponents of driver
+            #             cle.T[2:4] -- of response (conditional)
+            # It turns out data is messed up for some reason
+
+            # It's *probably* a programming error -- the result looks *almost* good
+            # but:
+            # 1) L2 of drive and L2 of response look swapped (???)
+            cle.T[1], cle.T[2] = cle.T[2].copy(), cle.T[1].copy()
+            # 2) the first elements of these also look swapped (???)
+            cle.T[1][0], cle.T[2][0] = cle.T[2][0], cle.T[1][0]
 
         return cle
 
@@ -328,14 +377,14 @@ class App(SimpleApp):
 
         self.iter_slider, it_sl_el = createSlider("i", (1, 8192),
                                            withLabel="iter = {}",labelPosition="top")
-        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .35), withLabel="b = {}",
+        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .3), withLabel="b = {}",
                                                  labelPosition="top")
 
         self.iter_slider.valueChanged.connect(self.compute_and_draw)
         self.response_b_slider.valueChanged.connect(self.compute_and_draw)
 
         self.setLayout(vStack(
-            it_sl_el,
+            # it_sl_el,
             rb_sl_el,
             self.canvas
         ))
@@ -344,7 +393,8 @@ class App(SimpleApp):
         eps = numpy.linspace(0, 1.0, 100)
         return eps, self.cle.compute_range_of_eps_same_systems(
             self.queue,
-            iter=1 << 16,#self.iter_slider.value(),
+            iter=1 << 16,
+            # iter=self.iter_slider.value(),
             drv=((0.1, 0.1), 1.4, 0.3),
             res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
             eps=eps
@@ -353,23 +403,15 @@ class App(SimpleApp):
     def compute_and_draw(self, *_):
         eps, lyap = self.compute_cle_series()
 
-        # print(lyap)
         self.figure.clear()
-
         ax = self.figure.subplots(1, 1)
 
-        Lm = numpy.amax(lyap.T[0:2], axis=0)
-
-        #ax.plot(eps, Lm)
-
-        # swap first elements?
-        lyap.T[1][0], lyap.T[2][0] = lyap.T[2][0], lyap.T[1][0]
-
         # for i in range(4):
-        ax.plot(eps, lyap.T[1], label="L0 of response")
-        # ax.plot(eps, lyap.T[2])
+        #     ax.plot(eps, lyap.T[i], label="L{} of {}".format(
+        #         i % 2, "drive" if i < 2 else "resp."
+        #     ))
 
-
+        ax.plot(eps, lyap.T[2], label="L0 of response")
         ax.axhline(0, color="black", linestyle="--")
         ax.set_xlabel("ε")
         ax.set_ylabel("L")
