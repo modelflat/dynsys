@@ -1,5 +1,5 @@
 from common import *
-from dynsys import SimpleApp, vStack, hStack
+from dynsys import SimpleApp, vStack, hStack, createSlider
 
 
 POTENTIALLY_GENERATED = r"""
@@ -326,40 +326,57 @@ class App(SimpleApp):
         self.figure = Figure(figsize=(15, 10))
         self.canvas = FigureCanvas(self.figure)
 
+        self.iter_slider, it_sl_el = createSlider("i", (1, 8192),
+                                           withLabel="iter = {}",labelPosition="top")
+        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .35), withLabel="b = {}",
+                                                 labelPosition="top")
+
+        self.iter_slider.valueChanged.connect(self.compute_and_draw)
+        self.response_b_slider.valueChanged.connect(self.compute_and_draw)
+
         self.setLayout(vStack(
+            it_sl_el,
+            rb_sl_el,
             self.canvas
         ))
 
+    def compute_cle_series(self):
+        eps = numpy.linspace(0, 1.0, 100)
+        return eps, self.cle.compute_range_of_eps_same_systems(
+            self.queue,
+            iter=1 << 16,#self.iter_slider.value(),
+            drv=((0.1, 0.1), 1.4, 0.3),
+            res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
+            eps=eps
+        )
+
+    def compute_and_draw(self, *_):
         eps, lyap = self.compute_cle_series()
 
-        print(lyap)
+        # print(lyap)
+        self.figure.clear()
 
         ax = self.figure.subplots(1, 1)
 
-        Lm = numpy.amax(lyap.T[2:4], axis=0)
+        Lm = numpy.amax(lyap.T[0:2], axis=0)
 
-        ax.plot(eps, Lm)
+        #ax.plot(eps, Lm)
 
-        for i in range(0, 0):
-            ax.plot(eps, lyap.T[i], label="L[{}] of {}".format(
-                i % 2, "drive" if i < 2 else "resp.",
-            ))
+        # swap first elements?
+        lyap.T[1][0], lyap.T[2][0] = lyap.T[2][0], lyap.T[1][0]
+
+        # for i in range(4):
+        ax.plot(eps, lyap.T[1], label="L0 of response")
+        # ax.plot(eps, lyap.T[2])
+
+
+        ax.axhline(0, color="black", linestyle="--")
         ax.set_xlabel("ε")
         ax.set_ylabel("L")
         ax.legend()
 
         # self.figure.tight_layout()
         self.canvas.draw()
-
-    def compute_cle_series(self):
-        eps = numpy.linspace(0, 1.0, 100)
-        return eps, self.cle.compute_range_of_eps_same_systems(
-            self.queue,
-            iter=1 << 10,
-            drv=((0.1,  0.1), 1.4, 0.3),
-            res=((0.1, -0.1), 1.4, 0.3),
-            eps=eps
-        )
 
 
 if __name__ == '__main__':

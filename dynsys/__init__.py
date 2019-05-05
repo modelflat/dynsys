@@ -132,7 +132,7 @@ class SimpleApp(QWidget):
         bounds = SimpleApp._convertBounds(spaceShape)
         pmap = ParameterMap(
             self.ctx, self.queue, imageShape, bounds, source,
-            varCount=variableCount, typeConfig=typeConfig
+            varCount=variableCount, parameterCount=variableCount, typeConfig=typeConfig
         )
         elem = ParameterizedImageWidget(bounds, uiNames, uiShape, uiTargetColor) if withUi else None
         return pmap if elem is None else (pmap, elem)

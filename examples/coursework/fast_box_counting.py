@@ -1,5 +1,4 @@
 """
-
 Implementation of algorithm described in https://www.sciencedirect.com/science/article/pii/S0169260712001794
 
 Changes that were made:
@@ -18,8 +17,8 @@ Note, that this algorithm was tested only against images that are square, and ha
 
 TODO looks like it works, but needs more testing
 TODO add customizable is_not_empty function
-
 """
+
 
 import numpy
 import pyopencl as cl
@@ -29,6 +28,7 @@ from time import perf_counter
 
 from dynsys import allocateImage, createContextAndQueue
 from dynsys.LCE import dummyOption
+
 
 SOURCE = r"""
 constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;

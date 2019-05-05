@@ -19,10 +19,10 @@ param_map_image_shape = (512, 512)
 param_map_skip = 64
 
 # iters on param map
-param_map_iter = 64
+param_map_iter = 128
 
 # same point detection tol
-param_map_tolerance = 1e-6
+param_map_tolerance = 1e-4
 
 # starting point for param map
 param_map_z0 = complex(0.01, 0.01)
@@ -31,13 +31,13 @@ param_map_z0 = complex(0.01, 0.01)
 param_map_select_z0_from_phase = True
 
 # resolution
-param_map_resolution = 4
+param_map_resolution = 1
 
 
 param_map_draw_on_select = True
 
 
-param_map_lossless = True
+param_map_lossless = False
 
 
 ## phase plot params
