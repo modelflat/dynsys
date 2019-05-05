@@ -82,7 +82,8 @@ kernel void render(
     const global val_t* a,
     
     write_only image2d_t synchr_XX,
-    write_only image2d_t synchr_YY
+    write_only image2d_t synchr_YY,
+    write_only image2d_t synchr_ZZ
 ) {
     const int id = get_global_id(0);
     // d += id;
@@ -91,8 +92,9 @@ kernel void render(
     
     //printf("%f %f %f %f\n", x_r, y_r, x_a, y_a);
     
-    write_to_img(r[id].x, a[id].x, bounds_XX, synchr_XX);
-    write_to_img(r[id].y, a[id].y, bounds_YY, synchr_YY);
+    write_to_img(d[id].x, d[id].y, bounds_XX, synchr_XX);
+    write_to_img(r[id].x, r[id].y, bounds_XX, synchr_YY);
+    write_to_img(a[id].x, a[id].y, bounds_XX, synchr_ZZ);
 }
 """
 
@@ -106,6 +108,7 @@ class AssistantSystem:
         self.image_shape = image_shape
         self.image_host_XX, self.image_dev_XX = allocateImage(ctx, image_shape)
         self.image_host_YY, self.image_dev_YY = allocateImage(ctx, image_shape)
+        self.image_host_ZZ, self.image_dev_ZZ = allocateImage(ctx, image_shape)
 
         val_t_src, self.val_t = make_type(
             ctx=ctx,
@@ -142,27 +145,23 @@ class AssistantSystem:
         self.ctx = ctx
 
     def clear(self, queue, color=(1.0, 1.0, 1.0, 1.0)):
-        cl.enqueue_fill_image(
-            queue, self.image_dev_XX,
-            color=numpy.array(color, dtype=numpy.float32),
-            origin=(0,)*len(self.image_shape), region=self.image_shape
-        )
-        cl.enqueue_fill_image(
-            queue, self.image_dev_YY,
-            color=numpy.array(color, dtype=numpy.float32),
-            origin=(0,)*len(self.image_shape), region=self.image_shape
-        )
+        for img in [self.image_dev_XX, self.image_dev_YY, self.image_dev_ZZ]:
+            cl.enqueue_fill_image(
+                queue, img,
+                color=numpy.array(color, dtype=numpy.float32),
+                origin=(0,)*len(self.image_shape), region=self.image_shape
+            )
 
     def read_from_device(self, queue):
-        cl.enqueue_copy(
-            queue, self.image_host_XX, self.image_dev_XX,
-            origin=(0,)*len(self.image_shape), region=self.image_shape
-        )
-        cl.enqueue_copy(
-            queue, self.image_host_YY, self.image_dev_YY,
-            origin=(0,)*len(self.image_shape), region=self.image_shape
-        )
-        return self.image_host_XX, self.image_host_YY
+        for img_host, img_dev in zip(
+                [self.image_host_XX, self.image_host_YY, self.image_host_ZZ],
+                [self.image_dev_XX, self.image_dev_YY, self.image_dev_ZZ]
+        ):
+            cl.enqueue_copy(
+                queue, img_host, img_dev,
+                origin=(0,)*len(self.image_shape), region=self.image_shape
+            )
+        return self.image_host_XX, self.image_host_YY, self.image_host_ZZ
 
     def _call_compute_time_series(self, queue, skip, iter, drives, responses, assistants, params):
         """
@@ -232,7 +231,8 @@ class AssistantSystem:
             bounds_YY,
             d, r, a,
             self.image_dev_XX,
-            self.image_dev_YY
+            self.image_dev_YY,
+            self.image_dev_ZZ
         )
 
         self.read_from_device(queue)
@@ -252,66 +252,36 @@ class AssistantSystem:
 
         self._call_render(queue, host.shape[1], iter, bounds_XX, bounds_YY, *dev)
 
-        return self.image_host_XX, self.image_host_YY
+        return self.image_host_XX, self.image_host_YY, self.image_host_ZZ
 
 
-class Task2_1(SimpleApp):
+class App(SimpleApp):
 
     def __init__(self):
-        super(Task2_1, self).__init__("2.1")
-        self.helper = AssistantSystem(self.ctx, image_shape=(480, 320))
+        super(App, self).__init__("2.1")
+        self.helper = AssistantSystem(self.ctx, image_shape=(256, 256))
         self.figure = Figure(figsize=(15, 10))
         self.canvas = FigureCanvas(self.figure)
 
-        special = numpy.ones((256, 256, 4), dtype=numpy.uint8)
-        special[:, :, :] = 255
-        special.T[2] = 0
-
-        self.init_sel = ParameterizedImageWidget(
-            bounds=(-1, 1, -1, 1),
-            names=("x", "y"),
-            shape=(256, 256), textureShape=(256, 256)
-        )
-        self.init_sel.setImage(special)
-        self.init_assist_sel = ParameterizedImageWidget(
-            bounds=(-1, 1, -1, 1),
-            names=("x", "y"),
-            shape=(256, 256), textureShape=(256, 256)
-        )
-        self.init_assist_sel.setImage(special)
-        self.param_sel = ParameterizedImageWidget(
-            bounds=(0, 2, 0.25, 0.35),
-            names=("a", "b"),
-            shape=(256, 256), textureShape=(256, 256)
-        )
-        self.param_sel.setImage(special)
-        self.param_assist_sel = ParameterizedImageWidget(
-            bounds=(0, 2, 0.25, 0.35),
-            names=("a", "b"),
-            shape=(256, 256), textureShape=(256, 256)
-        )
-        self.param_assist_sel.setImage(special)
-
-        self.eps_slider, self.eps_slider_ui = createSlider(
+        self.eps_slider, eps_slider_ui = createSlider(
             "r", (0, 1), withLabel="eps = {:.3f}", labelPosition="top",
             withValue=0.5
+        )
+        self.b_slider, b_slider_ui = createSlider(
+            "r", (0.25, 0.35), withLabel="b = {:.3f}", labelPosition="top",
+            withValue=0.3
         )
 
         self.image_XX_wgt = Image2D()
         self.image_YY_wgt = Image2D()
+        self.image_ZZ_wgt = Image2D()
 
         self.setLayout(
-            hStack(
-                vStack(
-                    self.eps_slider_ui,
-                    hStack(self.init_sel, self.init_assist_sel),
-                    hStack(self.param_sel, self.param_assist_sel),
-                    cm = (2, 2, 2, 2)
-                ),
-                vStack(self.canvas),
-                vStack(
-                    self.image_XX_wgt,
-                    self.image_YY_wgt
+            vStack(
+                eps_slider_ui, b_slider_ui,
+                self.canvas,
+                hStack(
+                    self.image_XX_wgt, self.image_YY_wgt, self.image_ZZ_wgt
                 )
             )
         )
@@ -320,37 +290,34 @@ class Task2_1(SimpleApp):
         self.compute()
 
     def connect_everything(self):
-        self.param_sel.valueChanged.connect(self.compute)
-        self.param_assist_sel.valueChanged.connect(self.compute)
-        self.init_sel.valueChanged.connect(self.compute)
-        self.init_assist_sel.valueChanged.connect(self.compute)
         self.eps_slider.valueChanged.connect(self.compute)
+        self.b_slider.valueChanged.connect(self.compute)
 
     def compute(self, *_):
         t = time.perf_counter()
 
-        ab = (1.4, 0.3) #self.param_sel.value()
-        ab_ass = self.param_assist_sel.value()
-        init = self.init_sel.value()
-        init_ass = (0.1, 0.2) #self.init_assist_sel.value()
+        ab_drv = (1.4, 0.3)
+        ab_rsp = (1.4, self.b_slider.value())
 
-        img_XX, img_YY = self.helper.compute_and_render(
+        init = (0.1, 0.1)
+
+        img_XX, img_YY, img_ZZ = self.helper.compute_and_render(
             self.queue,
             skip=0,
             iter=1 << 14,
             drives=numpy.array(
                 [
-                    (init, *ab)
+                    (init, *ab_drv)
                 ], dtype=self.helper.system_t
             ),
             responses=numpy.array(
                 [
-                    (init, *ab)
+                    (init, *ab_rsp)
                 ], dtype=self.helper.system_t
             ),
             assistants=numpy.array(
                 [
-                    (init_ass, *ab_ass)
+                    (init, *ab_rsp)
                 ], dtype=self.helper.system_t
             ),
             params=numpy.array(
@@ -362,10 +329,11 @@ class Task2_1(SimpleApp):
 
         self.image_XX_wgt.setTexture(img_XX)
         self.image_YY_wgt.setTexture(img_YY)
+        self.image_ZZ_wgt.setTexture(img_ZZ)
         t = time.perf_counter() - t
 
-        # print("{:.3f} s compute, {:.3f} s draw".format(t, tt))
+        #print("{:.3f} s compute".format(t))
 
 
 if __name__ == '__main__':
-    Task2_1().run()
+    App().run()
