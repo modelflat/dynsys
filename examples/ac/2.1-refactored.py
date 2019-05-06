@@ -1,5 +1,5 @@
 from common import *
-from dynsys import allocateImage, ParameterizedImageWidget, SimpleApp, createSlider, hStack, vStack
+from dynsys import allocateImage, SimpleApp, createSlider, hStack, vStack
 from dynsys.ui.ImageWidgets import *
 
 
@@ -69,7 +69,7 @@ inline void write_to_img(real x, real y, const float4 bounds, write_only image2d
         _x * img.x,
         (1.0 - _y) * img.y
     ));
-    if (coord.x >= 0 && coord.y < img.x && coord.y >= 0 && coord.y < img.y) {
+    if (coord.x >= 0 && coord.y <= img.x && coord.y >= 0 && coord.y <= img.y) {
         write_imagef(image, coord, (float4)(0.0, 0.0, 0.0, 1.0));
     }
 }
@@ -77,6 +77,7 @@ inline void write_to_img(real x, real y, const float4 bounds, write_only image2d
 kernel void render(
     const float4 bounds_XX,
     const float4 bounds_YY,
+    const float4 bounds_ZZ,
     const global val_t* d,
     const global val_t* r,
     const global val_t* a,
@@ -86,15 +87,10 @@ kernel void render(
     write_only image2d_t synchr_ZZ
 ) {
     const int id = get_global_id(0);
-    // d += id;
-    // r += id;
-    // a += id;
-    
-    //printf("%f %f %f %f\n", x_r, y_r, x_a, y_a);
     
     write_to_img(d[id].x, d[id].y, bounds_XX, synchr_XX);
-    write_to_img(r[id].x, r[id].y, bounds_XX, synchr_YY);
-    write_to_img(a[id].x, a[id].y, bounds_XX, synchr_ZZ);
+    write_to_img(r[id].x, a[id].x, bounds_YY, synchr_YY);
+    write_to_img(r[id].y, a[id].y, bounds_ZZ, synchr_ZZ);
 }
 """
 
@@ -182,14 +178,10 @@ class AssistantSystem:
         assert len(drives) == len(responses) == len(assistants) == len(params)
         n = len(drives)
 
-        drives_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=drives)
-        responses_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                                  hostbuf=responses)
-        assistants_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                                   hostbuf=assistants)
-        params_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=params)
+        drives_dev = copy_dev(self.ctx, drives)
+        responses_dev = copy_dev(self.ctx, responses)
+        assistants_dev = copy_dev(self.ctx, assistants)
+        params_dev = copy_dev(self.ctx, params)
 
         out = numpy.empty((3, n, iter), dtype=self.val_t)
         out_d_dev = cl.Buffer(self.ctx, cl.mem_flags.WRITE_ONLY, size=out[0].nbytes)
@@ -210,7 +202,7 @@ class AssistantSystem:
 
         return out, (out_d_dev, out_r_dev, out_a_dev)
 
-    def _call_render(self, queue, n, iter, bounds_XX, bounds_YY, d, r, a):
+    def _call_render(self, queue, n, iter, bounds_XX, bounds_YY, bounds_ZZ, d, r, a):
         """
         kernel void render(
             const float4 bounds_XX,
@@ -229,6 +221,7 @@ class AssistantSystem:
             queue, (iter,), None,
             bounds_XX,
             bounds_YY,
+            bounds_ZZ,
             d, r, a,
             self.image_dev_XX,
             self.image_dev_YY,
@@ -237,22 +230,35 @@ class AssistantSystem:
 
         self.read_from_device(queue)
 
+    def _bounds_for(self, arr, xx=None):
+        min_x = numpy.amin(arr["x"])
+        max_x = numpy.amax(arr["x"])
+        min_y = numpy.amin(arr["y"])
+        max_y = numpy.amax(arr["y"])
+        if xx is not None:
+            if xx == "x":
+                return numpy.array((min_x, max_x, min_x, max_x), dtype=numpy.float32)
+            elif xx == "y":
+                return numpy.array((min_y, max_y, min_y, max_y), dtype=numpy.float32)
+        else:
+            return numpy.array((min_x, max_x, min_y, max_y), dtype=numpy.float32)
+
     def compute_and_render(self, queue, skip, iter, drives, responses, assistants, params):
         host, dev = self._call_compute_time_series(
             queue, skip, iter, drives, responses, assistants, params
         )
 
-        min_x = numpy.amin(host["x"])
-        max_x = numpy.amax(host["x"])
-        min_y = numpy.amin(host["y"])
-        max_y = numpy.amax(host["y"])
+        d, r, a = host
 
-        bounds_XX = numpy.array((min_x, max_x, min_y, max_y), dtype=numpy.float32)
-        bounds_YY = numpy.array((min_x, max_x, min_y, max_y), dtype=numpy.float32)
+        bounds_XX = self._bounds_for(d)
+        bounds_YY = self._bounds_for(r, xx="x")
+        bounds_ZZ = self._bounds_for(a, xx="y")
 
-        self._call_render(queue, host.shape[1], iter, bounds_XX, bounds_YY, *dev)
+        self._call_render(queue, host.shape[1], iter, bounds_XX, bounds_YY, bounds_ZZ, *dev)
 
-        return self.image_host_XX, self.image_host_YY, self.image_host_ZZ
+        syn_err = (((r["x"] - a["x"])**2 + (r["y"] - a["y"])**2) **.5).sum() / iter
+
+        return self.image_host_XX, self.image_host_YY, self.image_host_ZZ, syn_err
 
 
 class App(SimpleApp):
@@ -262,6 +268,7 @@ class App(SimpleApp):
         self.helper = AssistantSystem(self.ctx, image_shape=(256, 256))
         self.figure = Figure(figsize=(15, 10))
         self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.subplots(1, 1)
 
         self.eps_slider, eps_slider_ui = createSlider(
             "r", (0, 1), withLabel="eps = {:.3f}", labelPosition="top",
@@ -288,20 +295,31 @@ class App(SimpleApp):
 
         self.connect_everything()
         self.compute()
+        self.compute_range_eps()
 
     def connect_everything(self):
         self.eps_slider.valueChanged.connect(self.compute)
         self.b_slider.valueChanged.connect(self.compute)
 
-    def compute(self, *_):
-        t = time.perf_counter()
+    def compute_range_eps(self):
+        eps = numpy.arange(0, 1, 0.05)
 
+        serr = []
+        for e in eps:
+            _, _, _, syn_err = self.compute_for_eps(e)
+            serr.append(syn_err)
+
+        self.ax.clear()
+        self.ax.plot(eps, serr)
+
+    def compute_for_eps(self, eps):
         ab_drv = (1.4, 0.3)
         ab_rsp = (1.4, self.b_slider.value())
 
         init = (0.1, 0.1)
+        init_a = (0.1, 0.2)
 
-        img_XX, img_YY, img_ZZ = self.helper.compute_and_render(
+        img_XX, img_YY, img_ZZ, syn_err = self.helper.compute_and_render(
             self.queue,
             skip=0,
             iter=1 << 14,
@@ -317,22 +335,23 @@ class App(SimpleApp):
             ),
             assistants=numpy.array(
                 [
-                    (init, *ab_rsp)
+                    (init_a, *ab_drv)
                 ], dtype=self.helper.system_t
             ),
             params=numpy.array(
                 [
-                    (self.eps_slider.value(),)
+                    (eps,)
                 ], dtype=self.helper.param_t
             )
         )
 
+        return img_XX, img_YY, img_ZZ, syn_err
+
+    def compute(self, *_):
+        img_XX, img_YY, img_ZZ, _ = self.compute_for_eps(self.eps_slider.value())
         self.image_XX_wgt.setTexture(img_XX)
         self.image_YY_wgt.setTexture(img_YY)
         self.image_ZZ_wgt.setTexture(img_ZZ)
-        t = time.perf_counter() - t
-
-        #print("{:.3f} s compute".format(t))
 
 
 if __name__ == '__main__':

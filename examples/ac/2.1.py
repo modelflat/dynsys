@@ -7,6 +7,8 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 import time
 
+from common import *
+
 SOURCE = r"""
 #define real double
 
@@ -138,8 +140,10 @@ class Task2_1(SimpleApp):
     def __init__(self):
         super(Task2_1, self).__init__("2.1")
         self.helper = HelperSystem(self.ctx)
-        self.figure = Figure(figsize=(15, 10))
+        self.figure = Figure(figsize=(21, 14))
         self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.subplots(3, 2)
+        self.figure.tight_layout()
 
         special = numpy.ones((256, 256, 4), dtype=numpy.uint8)
         special[:, :, :] = 255
@@ -179,11 +183,10 @@ class Task2_1(SimpleApp):
             hStack(
                 vStack(
                     self.eps_slider_ui,
-                    hStack(self.init_sel, self.init_assist_sel),
-                    hStack(self.param_sel, self.param_assist_sel),
-                    cm = (2, 2, 2, 2)
-                ),
-                vStack(self.canvas)
+                    # hStack(self.init_sel, self.init_assist_sel),
+                    # hStack(self.param_sel, self.param_assist_sel),
+                    self.canvas
+                )
             )
         )
 
@@ -199,10 +202,10 @@ class Task2_1(SimpleApp):
 
     def compute(self, *_):
         t = time.perf_counter()
-        ab = (1.4, 0.3) #self.param_sel.value()
-        ab_ass = (1.4, 0.3) #self.param_assist_sel.value()
-        init = self.init_sel.value()
-        init_ass = (0.1, 0.2) #self.init_assist_sel.value()
+        ab = (1.4, 0.3)
+        ab_ass = (1.4, 0.3)
+        init = (0.1, 0.2)
+        init_ass = (0.2, 0.1)
         result, = self.helper(
             self.queue,
             initial=(
@@ -221,15 +224,13 @@ class Task2_1(SimpleApp):
         )
         t = time.perf_counter() - t
         tt = time.perf_counter()
-        self.figure.clear()
-        self.ax = self.figure.subplots(3, 1)
-        self.figure.tight_layout()
-        self.ax[0].clear()
-        self.ax[0].scatter(result.T[0], result.T[1], s=1)
-        self.ax[1].clear()
-        self.ax[1].scatter(result.T[2], result.T[4], s=1)
-        self.ax[2].clear()
-        self.ax[2].scatter(result.T[3], result.T[5], s=1)
+
+        self.ax[0, 0].clear()
+        self.ax[0, 0].scatter(result.T[0], result.T[1], s=1)
+        self.ax[1, 0].clear()
+        self.ax[1, 0].scatter(result.T[2], result.T[4], s=1)
+        self.ax[2, 0].clear()
+        self.ax[2, 0].scatter(result.T[3], result.T[5], s=1)
         tt = time.perf_counter() - tt
 
         self.canvas.draw()
