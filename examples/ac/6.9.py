@@ -1,5 +1,7 @@
 from common import *
 from dynsys import SimpleApp, vStack, createSlider
+from collections import defaultdict
+from time import perf_counter
 
 
 SOURCE = r"""
@@ -44,8 +46,8 @@ kernel void sample(
     
     for (int i = 0; i < iter; ++i) {
         {
-            diffs[i].x = abs(d_.v.x - r_.v.x);
-            diffs[i].y = abs(d_.v.y - r_.v.y);
+            diffs[i].x = (d_.v.x - r_.v.x);
+            diffs[i].y = (d_.v.y - r_.v.y);
         }
         do_step(&d_, &r_, &p_);
     }
@@ -101,6 +103,7 @@ class IntermittencyDetector:
             global val_t* diffs
         )
         """
+        assert len(drives) == len(responses) == len(params)
         d = copy_dev(self.ctx, drives)
         r = copy_dev(self.ctx, responses)
         p = copy_dev(self.ctx, params)
@@ -118,18 +121,47 @@ class IntermittencyDetector:
 
         return diff
 
-    def compute_one(self, queue, iter, drive, response, eps):
-        drives = numpy.array([drive], dtype=self.system_t)
-        responses = numpy.array([response], dtype=self.system_t)
+    def compute_one(self, queue, skip, iter, drv, rsp, eps):
+        drives = numpy.array([drv], dtype=self.system_t)
+        responses = numpy.array([rsp], dtype=self.system_t)
         params = numpy.array([(eps,)], dtype=self.param_t)
 
-        res = self._call_sample(queue, 0, iter, drives, responses, params)
+        res = self._call_sample(queue, skip, iter, drives, responses, params)
+
+        return res
+
+    def compute_eps_range(self, queue, skip, iter, drv, rsp, eps):
+        n = len(eps)
+        drives = numpy.array([drv] * n, dtype=self.system_t)
+        responses = numpy.array([rsp] * n, dtype=self.system_t)
+        params = numpy.array([(e,) for e in eps], dtype=self.param_t)
+
+        res = self._call_sample(queue, skip, iter, drives, responses, params)
 
         return res
 
 
-def phases(diff):
-    
+def detect_phases(arr: numpy.ndarray, eps):
+    thr = arr.max() * eps
+    # thr = eps
+    return (abs(arr) > thr).astype(numpy.int32), thr
+
+
+def compute_distr(arr):
+    d = defaultdict(lambda: 0)
+    c = 0
+    for e in arr:
+        if e == 1 and c != 0:
+            d[c] += 1
+            c = 0
+        elif e == 0:
+            c += 1
+
+    distr_arr = numpy.empty(shape=(len(d), 2))
+    for idx, i in enumerate(d.items()):
+        distr_arr[idx] = i
+
+    return distr_arr
 
 
 class App(SimpleApp):
@@ -138,53 +170,105 @@ class App(SimpleApp):
         super(App, self).__init__("6.9")
         self.im = IntermittencyDetector(self.ctx)
 
-        self.figure = Figure(figsize=(15, 10))
+        self.figure = Figure(figsize=(16, 16))
         self.canvas = FigureCanvas(self.figure)
-        self.ax = self.figure.subplots(2, 1)
-        self.figure.tight_layout()
+        self.ax = self.figure.subplots(2, 3)
 
-        self.eps_slider1, eps_slider1 = createSlider("r", (0, 1), withLabel="eps = {}", labelPosition="top")
-        self.eps_slider2, eps_slider2 = createSlider("r", (0, 1), withLabel="eps = {}", labelPosition="top")
+        self.figure.tight_layout(pad=2.0)
+
+        self.eps_slider, eps_slider = createSlider("r", (0, 1), withLabel="eps = {}", labelPosition="top")
 
         layout = vStack(
-            eps_slider1,
+            eps_slider,
             self.canvas,
-            eps_slider2,
         )
         self.setLayout(layout)
 
-        self.eps_slider1.valueChanged.connect(self.draw1)
-        self.eps_slider2.valueChanged.connect(self.draw2)
+        self.skip = 0
+        self.iter = 1 << 10
+        self.eps_c = 0.365
+        self.phase_detection = 0.15
 
-        self.iter = 8192
+        self.eps_slider.valueChanged.connect(self.compute_and_draw)
 
-        self.draw1()
-        self.draw2()
+        self.compute_and_draw()
+        self.compute_mean_distr_plot()
 
-    def compute(self, eps):
-        return self.im.compute_one(
+    def compute_and_draw(self, *_):
+        eps = self.eps_slider.value()
+        r, = self.im.compute_one(
             self.queue,
+            skip=self.skip,
             iter=self.iter,
-            drive=   ((0.1, 0.1), 1.4, 0.3),
-            response=((0.1, 0.1), 1.4, 0.31),
+            drv=((0.1, 0.1), 1.4, 0.30),
+            rsp=((0.1, 0.1), 1.4, 0.28),
             eps=eps
         )
 
-    def draw1(self, *_):
-        res, = self.compute(self.eps_slider1.value())
+        x_phases, x_thr = detect_phases(r["x"], self.phase_detection)
+        y_phases, y_thr = detect_phases(r["y"], self.phase_detection)
 
-        self.ax[0].clear()
-        self.ax[0].plot(range(self.iter), res["x"])
+        x_distr = compute_distr(x_phases)
+        y_distr = compute_distr(y_phases)
+
+        self.ax[0, 1].clear()
+        self.ax[0, 1].plot(range(self.iter), r["x"])
+        self.ax[0, 1].axhline(x_thr, color="black", linestyle="--")
+        self.ax[0, 1].axhline(-x_thr, color="black", linestyle="--")
+
+        self.ax[1, 1].clear()
+        self.ax[1, 1].plot(range(self.iter), r["y"])
+        self.ax[1, 1].axhline(y_thr, color="black", linestyle="--")
+        self.ax[1, 1].axhline(-y_thr, color="black", linestyle="--")
+
+        self.ax[0, 2].clear()
+        self.ax[0, 2].hist(x_distr)
+
+        self.ax[1, 2].clear()
+        self.ax[1, 2].hist(y_distr)
+
+        self.ax[0, 0].clear()
+        self.ax[0, 0].scatter(r["x"], r["y"], s=1.0)
+
+        # self.ax[1, 0].scatter(self.eps_c - eps, a1, s=1.0, color="r")
+
         self.canvas.draw()
 
-    def draw2(self, *_):
-        res, = self.compute(self.eps_slider2.value())
+    def compute_mean_distr_plot(self):
+        eps = numpy.arange(0, 1, 0.05)
 
-        self.ax[1].clear()
-        self.ax[1].plot(range(self.iter), res["x"])
-        self.canvas.draw()
+        t = perf_counter()
+        res = self.im.compute_eps_range(
+            self.queue,
+            skip=self.skip,
+            iter=self.iter,
+            drv=((0.1, 0.1), 1.4, 0.30),
+            rsp=((0.1, 0.1), 1.4, 0.28),
+            eps=eps
+        )
+        print("points computed in {:.3f} s".format(perf_counter() - t))
 
+        x = list()
+        y = list()
+        d = list()
 
+        t = perf_counter()
+        for r, e in zip(res, eps):
+            x_phases, x_thr = detect_phases(r["x"], self.phase_detection)
+            y_phases, y_thr = detect_phases(r["y"], self.phase_detection)
+
+            x_distr = compute_distr(x_phases)
+            y_distr = compute_distr(y_phases)
+
+            d.append(self.eps_c - e)
+            x.append(x_distr[:, 0].sum() / x_distr[:, 1].sum())
+            y.append(y_distr[:, 0].sum() / y_distr[:, 1].sum())
+
+        self.ax[1, 0].clear()
+        self.ax[1, 0].plot(d, x)
+        print("drawn in {:.3f} s".format(perf_counter() - t))
+
+        # self.ax[1, 1].clear()
 
 
 if __name__ == '__main__':
