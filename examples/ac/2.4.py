@@ -1,5 +1,7 @@
 from common import *
-from dynsys import SimpleApp, vStack, hStack, createSlider
+from dynsys import SimpleApp, vStack, createSlider
+from collections import defaultdict
+from time import perf_counter
 
 
 EQUATIONS_PYRAGAS = r"""
@@ -350,83 +352,72 @@ class CLE:
             v[3]["r"]["y"] = 1
         return variations
 
-    def compute_range_of_eps(self, queue, t_start, t_step, iter, drives, responses, eps_range):
-        params = numpy.empty((len(drives),), dtype=self.param_t)
-        params["eps"] = eps_range
-        variations = self._make_variations(len(drives))
-        return self._call_compute_cle(queue, t_start, t_step, iter, drives, responses, variations, params)
-
-    def compute_range_of_eps_same_systems(self, queue, iter, drv, res, eps):
-        n = len(eps)
-        drives = numpy.array(n*[drv,], dtype=self.system_t)
-        responses = numpy.array(n*[res,], dtype=self.system_t)
-        variations = self._make_variations(n)
-        params = numpy.empty(n, dtype=self.param_t)
-        params["eps"] = eps
-        return self._call_compute_cle(queue, 0, 1, iter, drives, responses, variations, params)
+    def compute(self, queue, iter, drv: list, rsp: list, par: list):
+        drv = numpy.array(drv, dtype=self.system_t)
+        rsp = numpy.array(rsp, dtype=self.system_t)
+        par = numpy.array(par, dtype=self.param_t)
+        variations = self._make_variations(len(drv))
+        return self._call_compute_cle(queue, 0, 1, iter, drv, rsp, variations, par)
 
 
 class App(SimpleApp):
 
     def __init__(self):
-        super(App, self).__init__("CLE")
-        self.cle = CLE(self.ctx)
+        super(App, self).__init__("2.4")
+        self.lp = CLE(self.ctx)
 
-        self.figure = Figure(figsize=(15, 10))
+        self.figure = Figure(figsize=(16, 16))
         self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.subplots(1, 1)
 
-        self.iter_slider, it_sl_el = createSlider("i", (1, 8192),
-                                           withLabel="iter = {}",labelPosition="top")
-        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .3), withLabel="b = {}",
-                                                 labelPosition="top")
+        self.figure.tight_layout(pad=2.0)
 
-        self.iter_slider.valueChanged.connect(self.compute_and_draw)
-        self.response_b_slider.valueChanged.connect(self.compute_and_draw)
+        layout = vStack(
+            self.canvas,
+        )
+        self.setLayout(layout)
 
-        self.setLayout(vStack(
-            # it_sl_el,
-            rb_sl_el,
-            self.canvas
-        ))
+        self.skip = 0
+        self.iter = 1 << 14
 
         self.compute_and_draw()
 
-    def compute_cle_series(self):
-        eps = numpy.linspace(0, 1.0, 100)
-        return eps, self.cle.compute_range_of_eps_same_systems(
-            self.queue,
-            iter=1 << 16,
-            # iter=self.iter_slider.value(),
-            drv=((0.1, 0.1), 1.4, 0.3),
-            res=((0.1, 0.1), 1.4, 0.25),
-            eps=eps
-        )
-
     def compute_and_draw(self, *_):
-        eps, lyap = self.compute_cle_series()
+        b_count = 100
+        eps_count = 100
 
-        self.figure.clear()
-        ax = self.figure.subplots(1, 1)
+        eps_range = numpy.linspace(0, 1, eps_count)
+        b_range = numpy.linspace(0.2, 0.4, b_count)
 
-        # for i in range(4):
-        #     ax.plot(eps, lyap.T[i], label="L{} of {}".format(
-        #         i % 2, "drive" if i < 2 else "resp."
-        #     ))
+        base_b = 0.3
 
-        lp = lyap.T[2][0]
-        for i,l in enumerate(lyap.T[2][1:]):
-            if l < 0 and lp > 0:
-                print(eps[i])
-            lp = l
+        t = time.perf_counter()
+        r = self.lp.compute(
+            self.queue,
+            iter=self.iter,
+            drv=[
+                ((0.1, 0.1), 1.4, base_b) for _ in b_range for _ in eps_range
+            ],
+            rsp=[
+                ((0.1, 0.1), 1.4, b) for b in b_range for _ in eps_range
+            ],
+            par=[
+                (eps,) for _ in b_range for eps in eps_range
+            ]
+        ).reshape((b_count, eps_count, 4))
+        t = time.perf_counter() - t
+        print("Computed in {:.3f} s".format(t))
 
+        def detect_eps_c(arr_for_b):
+            # workaround:
+            a = arr_for_b.T[2][1:] if arr_for_b.T[2][0] < 0 else arr_for_b.T[2]
+            return eps_range[numpy.argmax(a < 0)]
 
-        ax.plot(eps, lyap.T[2], label="L0 of response")
-        ax.axhline(0, color="black", linestyle="--")
-        ax.set_xlabel("ε")
-        ax.set_ylabel("L")
-        ax.legend()
+        points = numpy.array([(b - base_b, detect_eps_c(r[i])) for i, b in enumerate(b_range)])
 
-        # self.figure.tight_layout()
+        self.ax.plot(*points.T)
+        self.ax.grid()
+
         self.canvas.draw()
 
 

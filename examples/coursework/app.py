@@ -57,6 +57,7 @@ class CourseWork(SimpleApp):
         self.clear_cb = QCheckBox("Clear image")
         self.clear_cb.setChecked(True)
         self.right_mode_cmb = QComboBox()
+        self.left_mode_cmb = QComboBox()
 
         self.period_label = QLabel()
         self.d_label = QLabel()
@@ -66,6 +67,13 @@ class CourseWork(SimpleApp):
         self.box_counter = FastBoxCounting(self.ctx)
 
         self.random_seq = None
+
+        self.left_wgts = {
+            "parameter map": self.compute_and_draw_param_map,
+            "bif tree (h)": lambda: self.compute_and_draw_biftree(param="h"),
+            "bif tree (alpha)": lambda: self.compute_and_draw_biftree(param="alpha")
+        }
+        self.left_mode_cmb.addItems(self.left_wgts.keys())
 
         self.right_wgts = {
             "phase":  self.compute_and_draw_phase,
@@ -84,7 +92,7 @@ class CourseWork(SimpleApp):
             self.param_wgt,
             self.period_label,
             stack(
-                self.param_map_compute_btn,
+                self.left_mode_cmb, self.param_map_compute_btn,
                 kind="h",
             ),
             stack(
@@ -144,6 +152,7 @@ class CourseWork(SimpleApp):
         self.random_seq_reset_btn.clicked.connect(reset_random_seq_fn)
 
         self.right_mode_cmb.currentIndexChanged.connect(self.draw_right)
+        self.right_mode_cmb.currentIndexChanged.connect(self.draw_left)
         self.refresh_btn.clicked.connect(self.draw_right)
         self.param_map_compute_btn.clicked.connect(self.compute_and_draw_param_map)
 
@@ -239,6 +248,14 @@ class CourseWork(SimpleApp):
 
             self.d_label.setText("D = {:.3f}".format(D))
 
+    def compute_and_draw_biftree(self, *_, param=None):
+        if param == "h":
+            pass
+        elif param == "alpha":
+            pass
+        else:
+            raise RuntimeError()
+
     def set_period_label(self):
         x_px, y_px = self.param_wgt._imageWidget.targetPx()
         x_px //= cfg.param_map_resolution
@@ -269,6 +286,11 @@ class CourseWork(SimpleApp):
         what = self.right_mode_cmb.currentText()
         self.set_period_label()
         self.right_wgts[what]()
+
+    def draw_left(self):
+        what = self.left_mode_cmb.currentText()
+        # self.set_period_label()
+        self.left_wgts[what]()
 
 
 if __name__ == '__main__':

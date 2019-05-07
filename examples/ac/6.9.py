@@ -185,7 +185,7 @@ class App(SimpleApp):
         self.setLayout(layout)
 
         self.skip = 0
-        self.iter = 1 << 10
+        self.iter = 1 << 16
         self.eps_c = 0.365
         self.phase_detection = 0.15
 
@@ -201,7 +201,7 @@ class App(SimpleApp):
             skip=self.skip,
             iter=self.iter,
             drv=((0.1, 0.1), 1.4, 0.30),
-            rsp=((0.1, 0.1), 1.4, 0.28),
+            rsp=((0.1, 0.1), 1.4, 0.25),
             eps=eps
         )
 
@@ -235,7 +235,7 @@ class App(SimpleApp):
         self.canvas.draw()
 
     def compute_mean_distr_plot(self):
-        eps = numpy.arange(0, 1, 0.05)
+        eps = numpy.arange(0, self.eps_c, 0.01)
 
         t = perf_counter()
         res = self.im.compute_eps_range(
@@ -243,7 +243,7 @@ class App(SimpleApp):
             skip=self.skip,
             iter=self.iter,
             drv=((0.1, 0.1), 1.4, 0.30),
-            rsp=((0.1, 0.1), 1.4, 0.28),
+            rsp=((0.1, 0.1), 1.4, 0.25),
             eps=eps
         )
         print("points computed in {:.3f} s".format(perf_counter() - t))
@@ -265,7 +265,8 @@ class App(SimpleApp):
             y.append(y_distr[:, 0].sum() / y_distr[:, 1].sum())
 
         self.ax[1, 0].clear()
-        self.ax[1, 0].plot(d, x)
+        self.ax[1, 0].plot(d[::-1], x[::-1])
+        self.ax[1, 0].plot(d[:-5][::-1], 0.0035*numpy.array(d[:-5][::-1])**-1.5)
         print("drawn in {:.3f} s".format(perf_counter() - t))
 
         # self.ax[1, 1].clear()

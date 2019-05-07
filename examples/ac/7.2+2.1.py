@@ -1,7 +1,7 @@
 from common import *
 from dynsys import allocateImage, SimpleApp, createSlider, hStack, vStack
 from dynsys.ui.ImageWidgets import *
-
+import pyopencl.cltypes
 
 SOURCE = r"""
 
@@ -12,13 +12,14 @@ inline void do_step(system_t* d, system_t* r, system_t* a, param_t* p) {
     #define _F(v, a) (1 - a*v.x*v.x + v.y)
     
     d_.x = _F(d->v, d->a);
-    d_.y = d->b * d->v.x;
+    d_.y = d->b * d->v.x + p->D * random(&p->rng_state);
     
     r_.x = _F(r->v, r->a) + p->eps * (_F(d->v, r->a) - _F(r->v, r->a));
-    r_.y = r->b * r->v.x;
+    r_.y = r->b * r->v.x + p->D * random(&p->rng_state);
     
+    // TODO should we use same noise value for R and A?
     a_.x = _F(a->v, a->a) + p->eps * (_F(d->v, a->a) - _F(a->v, a->a));
-    a_.y = a->b * a->v.x;
+    a_.y = a->b * a->v.x + p->D * random(&p->rng_state);
     
     d->v = d_; r->v = r_; a->v = a_;
 }
@@ -129,12 +130,14 @@ class AssistantSystem:
             ctx=ctx,
             type_name="param_t",
             type_desc=[
-                ("eps", numpy.float64)
+                ("eps", numpy.float64),
+                ("D", numpy.float64),
+                ("rng_state", cl.cltypes.uint2),
             ]
         )
 
         sources = [
-            val_t_src, system_t_src, param_t_src, SOURCE
+            val_t_src, system_t_src, param_t_src, PRNG_SOURCE, SOURCE
         ]
 
         self.prg = cl.Program(ctx, "\n".join(sources)).build()
@@ -274,14 +277,18 @@ class App(SimpleApp):
             "r", (0, 1), withLabel="eps = {:.3f}", labelPosition="top",
             withValue=0.5
         )
+        self.d_slider, d_slider_ui = createSlider(
+            "r", (0, 0.05), withLabel="D = {:.3f}", labelPosition="top",
+            withValue=0.01
+        )
         self.b_slider, b_slider_ui = createSlider(
             "r", (0.25, 0.35), withLabel="b = {:.3f}", labelPosition="top",
             withValue=0.3
         )
 
-        self.iter_slider, iter_slider_ui = createSlider(
-            "i", (16, 1 << 14), withLabel="iter = {}", labelPosition="top",
-        )
+        # self.iter_slider, iter_slider_ui = createSlider(
+        #     "i", (16, 1 << 14), withLabel="iter = {}", labelPosition="top",
+        # )
 
         self.image_XX_wgt = Image2D()
         self.image_YY_wgt = Image2D()
@@ -289,7 +296,9 @@ class App(SimpleApp):
 
         self.setLayout(
             vStack(
-                iter_slider_ui, eps_slider_ui, b_slider_ui,
+                # iter_slider_ui,
+                d_slider_ui,
+                eps_slider_ui, b_slider_ui,
                 self.canvas,
                 hStack(
                     self.image_XX_wgt, self.image_YY_wgt, self.image_ZZ_wgt
@@ -303,23 +312,25 @@ class App(SimpleApp):
 
     def connect_everything(self):
         self.eps_slider.valueChanged.connect(self.compute)
+        self.d_slider.valueChanged.connect(self.compute)
         self.b_slider.valueChanged.connect(self.compute)
-        self.iter_slider.valueChanged.connect(self.compute)
+        # self.iter_slider.valueChanged.connect(self.compute)
 
     def compute_range_eps(self):
+        D = 0.01
         eps = numpy.arange(0, 1, 0.05)
 
         serr = []
         for e in eps:
-            _, _, _, syn_err = self.compute_for_eps(e)
+            _, _, _, syn_err = self.compute_for_eps(e, D)
             serr.append(syn_err)
 
         self.ax.clear()
         self.ax.plot(eps, serr)
 
-    def compute_for_eps(self, eps):
+    def compute_for_eps(self, eps, D):
         ab_drv = (1.4, 0.3)
-        ab_rsp = (1.4, 0.25)
+        ab_rsp = (1.4, self.b_slider.value())
 
         init = (0.1, 0.1)
         init_a = (0.1, 0.2)
@@ -346,7 +357,7 @@ class App(SimpleApp):
             ),
             params=numpy.array(
                 [
-                    (eps,)
+                    (eps, D, (42, 24))
                 ], dtype=self.helper.param_t
             )
         )
@@ -354,7 +365,10 @@ class App(SimpleApp):
         return img_XX, img_YY, img_ZZ, syn_err
 
     def compute(self, *_):
-        img_XX, img_YY, img_ZZ, _ = self.compute_for_eps(self.eps_slider.value())
+        img_XX, img_YY, img_ZZ, _ = self.compute_for_eps(
+            self.eps_slider.value(),
+            self.d_slider.value()
+        )
         self.image_XX_wgt.setTexture(img_XX)
         self.image_YY_wgt.setTexture(img_YY)
         self.image_ZZ_wgt.setTexture(img_ZZ)
