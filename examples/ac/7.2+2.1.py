@@ -2,6 +2,7 @@ from common import *
 from dynsys import allocateImage, SimpleApp, createSlider, hStack, vStack
 from dynsys.ui.ImageWidgets import *
 import pyopencl.cltypes
+from tqdm import tqdm
 
 SOURCE = r"""
 
@@ -267,7 +268,7 @@ class AssistantSystem:
 class App(SimpleApp):
 
     def __init__(self):
-        super(App, self).__init__("2.1")
+        super(App, self).__init__("7.2 + 2.1")
         self.helper = AssistantSystem(self.ctx, image_shape=(256, 256))
         self.figure = Figure(figsize=(15, 10))
         self.canvas = FigureCanvas(self.figure)
@@ -307,18 +308,21 @@ class App(SimpleApp):
         )
 
         self.connect_everything()
-        self.compute()
-        self.compute_range_eps()
+        # self.compute()
+        # self.compute_range_eps()
+
+        self.compute_d_by_eps(0.25)
 
     def connect_everything(self):
-        self.eps_slider.valueChanged.connect(self.compute)
-        self.d_slider.valueChanged.connect(self.compute)
-        self.b_slider.valueChanged.connect(self.compute)
+        # self.eps_slider.valueChanged.connect(self.compute)
+        # self.d_slider.valueChanged.connect(self.compute)
+        # self.b_slider.valueChanged.connect(self.compute)
         # self.iter_slider.valueChanged.connect(self.compute)
+        pass
 
     def compute_range_eps(self):
         D = 0.01
-        eps = numpy.arange(0, 1, 0.05)
+        eps = numpy.linspace(0, 1, 200)
 
         serr = []
         for e in eps:
@@ -330,7 +334,7 @@ class App(SimpleApp):
 
     def compute_for_eps(self, eps, D):
         ab_drv = (1.4, 0.3)
-        ab_rsp = (1.4, self.b_slider.value())
+        ab_rsp = (1.4, 0.25)#self.b_slider.value())
 
         init = (0.1, 0.1)
         init_a = (0.1, 0.2)
@@ -367,11 +371,61 @@ class App(SimpleApp):
     def compute(self, *_):
         img_XX, img_YY, img_ZZ, _ = self.compute_for_eps(
             self.eps_slider.value(),
-            self.d_slider.value()
+            0.01,#self.d_slider.value()
         )
         self.image_XX_wgt.setTexture(img_XX)
         self.image_YY_wgt.setTexture(img_YY)
         self.image_ZZ_wgt.setTexture(img_ZZ)
+
+    def compute_d_by_eps(self, b):
+        s_err = 0.005
+
+        ab_drv = (1.4, 0.3)
+        ab_rsp = (1.4, b)#self.b_slider.value())
+
+        init = (0.1, 0.1)
+        init_a = (0.1, 0.2)
+
+        D_range = numpy.linspace(0, 0.01, 200)
+        eps = numpy.linspace(0, 1, 100)
+
+        serr = []
+        for D in tqdm(D_range):
+            eps_c = None
+            for e in eps:
+                _, _, _, syn_err = self.helper.compute_and_render(
+                    self.queue,
+                    skip=0,
+                    iter=1 << 14,
+                    drives=numpy.array(
+                        [
+                            (init, *ab_drv)
+                        ], dtype=self.helper.system_t
+                    ),
+                    responses=numpy.array(
+                        [
+                            (init, *ab_rsp)
+                        ], dtype=self.helper.system_t
+                    ),
+                    assistants=numpy.array(
+                        [
+                            (init_a, *ab_rsp)
+                        ], dtype=self.helper.system_t
+                    ),
+                    params=numpy.array(
+                        [
+                            (e, D, (42, 24))
+                        ], dtype=self.helper.param_t
+                    )
+                )
+                if syn_err < s_err:
+                    eps_c = e
+                    break
+
+            serr.append((D, eps_c))
+
+        self.ax.clear()
+        self.ax.plot(*numpy.array(serr).T)
 
 
 if __name__ == '__main__':

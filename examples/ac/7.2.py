@@ -468,12 +468,12 @@ class CLE:
 class App(SimpleApp):
 
     def __init__(self):
-        super(App, self).__init__("7.2")
+        super(App, self).__init__("7.2 - CLE")
         self.cle = CLE(self.ctx)
 
         self.figure = Figure(figsize=(15, 10))
         self.canvas = FigureCanvas(self.figure)
-        self.ax = self.figure.subplots(1, 3)
+        self.ax = self.figure.subplots(1, 2)
         self.figure.tight_layout(pad=1.5)
 
         self.response_b_slider, rb_sl_el = createSlider(
@@ -497,15 +497,17 @@ class App(SimpleApp):
             self.canvas
         ))
 
+        self.iter = 1 << 14
+
         self.compute_and_draw()
 
     def compute_cle_series(self):
-        eps = numpy.linspace(0, 1.0, 100)
+        eps = numpy.linspace(0, 1.0, 500)
         return eps, self.cle.compute_range_of_eps_same_systems(
             self.queue,
-            iter=1 << 10,
+            iter=self.iter,
             drv=((0.1, 0.1), 1.4, 0.3),
-            res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
+            res=((0.1, 0.1), 1.4, 0.25), #self.response_b_slider.value()),
             eps=eps,
             D=self.d_slider.value()
         )
@@ -513,12 +515,12 @@ class App(SimpleApp):
     def compute_phase(self):
         return self.cle.compute_phase_plot(
             self.queue,
-            iter=1 << 10,
+            iter=self.iter,
             # iter=self.iter_slider.value(),
             drv=((0.1, 0.1), 1.4, 0.3),
-            res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
+            res=((0.1, 0.1), 1.4, 0.25),# self.response_b_slider.value()),
             eps=self.eps_slider.value(),
-            D=self.d_slider.value()
+            D=0.01#self.d_slider.value()
         )
 
     def compute_and_draw(self, *_):
@@ -543,8 +545,8 @@ class App(SimpleApp):
         self.ax[1].clear()
         self.ax[1].scatter(d["x"], d["y"], s=0.5)
 
-        self.ax[2].clear()
-        self.ax[2].scatter(r["x"], r["y"], s=0.5)
+        # self.ax[2].clear()
+        # self.ax[2].scatter(r["x"], r["y"], s=0.5)
 
         self.canvas.draw()
 
@@ -561,10 +563,10 @@ class D_EPS_App(SimpleApp):
         self.figure.tight_layout(pad=2.5)
 
         self.response_b_slider, rb_sl_el = createSlider(
-            "r", (.2, .3), withLabel="b = {}", labelPosition="top", withValue=0.25
+            "r", (.1, .3), withLabel="b = {}", labelPosition="top", withValue=0.25
         )
 
-        self.response_b_slider.valueChanged.connect(self.compute_and_draw)
+        # self.response_b_slider.valueChanged.connect(self.compute_and_draw)
 
         self.setLayout(vStack(
             rb_sl_el,
@@ -573,28 +575,32 @@ class D_EPS_App(SimpleApp):
 
         self.compute_and_draw()
 
-    def compute_e_c(self, D):
+    def compute_e_c(self, D, b):
         eps = numpy.linspace(0, 1.0, 500)
         lyap = self.cle.compute_range_of_eps_same_systems(
             self.queue,
-            iter=1 << 10,
+            iter=1 << 14,
             drv=((0.1, 0.1), 1.4, 0.3),
-            res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
+            res=((0.1, 0.1), 1.4, b),
             eps=eps, D=D
         )
-        lp = lyap.T[2][0]
-        for i,l in enumerate(lyap.T[2][1:]):
-            if lp > 0 > l:
-                return eps[i]
-            lp = l
-        return numpy.nan
+        L = lyap.T[2]
+        return eps[numpy.nanargmax(L < 0)]
+
+        # return numpy.nan
 
     def compute_and_draw(self, *_):
-        d_range = numpy.linspace(0.0, 1.0, 100)
+        d_range = numpy.linspace(0.0, 0.0095, 200)
+        b_range = numpy.linspace(0.25, 0.35, 50)
+
+        D = 0.01
+        b = 0.2
+        self.response_b_slider.setValue(b)
 
         points = []
         for D in tqdm(d_range):
-            points.append((D, self.compute_e_c(D)))
+        # for b in tqdm(b_range):
+            points.append((D, self.compute_e_c(D, b)))
 
         self.ax.clear()
         self.ax.plot(*numpy.array(points).T)

@@ -319,7 +319,7 @@ class App(SimpleApp):
 
     def compute_for_eps(self, eps):
         ab_drv = (1.4, 0.3)
-        ab_rsp = (1.4, 0.25)
+        ab_rsp = (1.4, self.b_slider.value())
 
         init = (0.1, 0.1)
         init_a = (0.1, 0.2)

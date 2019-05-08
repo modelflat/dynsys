@@ -377,7 +377,7 @@ class App(SimpleApp):
 
         self.iter_slider, it_sl_el = createSlider("i", (1, 8192),
                                            withLabel="iter = {}",labelPosition="top")
-        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .3), withLabel="b = {}",
+        self.response_b_slider, rb_sl_el = createSlider("r", (.2, .4), withLabel="b = {}",
                                                  labelPosition="top")
 
         self.iter_slider.valueChanged.connect(self.compute_and_draw)
@@ -398,7 +398,7 @@ class App(SimpleApp):
             iter=1 << 16,
             # iter=self.iter_slider.value(),
             drv=((0.1, 0.1), 1.4, 0.3),
-            res=((0.1, 0.1), 1.4, 0.25),
+            res=((0.1, 0.1), 1.4, self.response_b_slider.value()),
             eps=eps
         )
 
