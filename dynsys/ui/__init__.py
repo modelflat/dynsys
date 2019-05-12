@@ -92,3 +92,7 @@ class ParameterizedImageWidget(QWidget):
         else:
             self._imageWidget.setTargetReal(targetValue)
             self.updatePositionLabel(targetValue, (False, False))
+
+    def setShape(self, shape):
+        self._shape = shape
+        self._imageWidget._target._shape = shape
