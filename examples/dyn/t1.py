@@ -349,19 +349,12 @@ class Scaling(SimpleApp):
             raise RuntimeError("unsupported mode '{}'".format(mode))
 
 
-class IterDiag(SimpleApp):
+class App(SimpleApp):
 
     def __init__(self):
-        super(IterDiag, self).__init__("1.b")
-
-
-class RG(SimpleApp):
-
-    def __init__(self):
-        super(RG, self).__init__("1.b")
+        super(App, self).__init__("1.b / 1.d")
 
 
 if __name__ == '__main__':
     # Scaling().run()
-    IterDiag().run()
-    # RG().run()
+    App().run()

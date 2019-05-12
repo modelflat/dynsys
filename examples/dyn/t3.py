@@ -338,9 +338,12 @@ kernel void compute_rotation_no(
 """
 
 
-GOLDEN = (5 ** .5 - 1) / 2
-INV_OMEGA = 2 / (5**.5 - 1)
-DELTA_1 = -2.8336
+# TODO why this number?
+GOLDEN = 0.6066610634702
+INV_OMEGA = 1 / GOLDEN
+
+DELTA_1 = -2.833610655891167799
+DELTA_2 =  1.660424381098700680
 
 
 def rescale(point, om_min, om_max, l_min, l_max):
@@ -354,6 +357,16 @@ def rescale_n_times(n, point, om_min, om_max, l_min, l_max):
     for _ in range(n):
         om_min, om_max, l_min, l_max = rescale(point, om_min, om_max, l_min, l_max)
     return om_min, om_max, l_min, l_max
+
+
+def fib(n):
+    assert n >= 2
+    a = numpy.empty((n,), dtype=numpy.int64)
+    a[0] = 0
+    a[1] = 1
+    for i in range(2, n):
+        a[i] = a[i - 1] + a[i - 2]
+    return a
 
 
 class CircleMap:
@@ -517,6 +530,7 @@ class CircleMap:
 
         return res
 
+
 class App(SimpleApp):
 
     def __init__(self):
@@ -543,6 +557,8 @@ class App(SimpleApp):
         self.ax = self.figure.subplots(1, 1)
         self.figure.tight_layout(pad=6)
         self.canvas_frame = QFrame()
+
+        self.staircase_k_touched = False
 
         self.scale_slider, scale_slider_wgt = createSlider(
             "i", (0, 8), withValue=0, withLabel="scale = {}", labelPosition="top"
@@ -572,18 +588,54 @@ class App(SimpleApp):
         # self.draw_param_map()
         self.draw_iter_diag((0.35, 0.9))
 
-    def plot_staircase(self, *_):
+    def plot_staircase(self, *_, k=1):
         n = 1 << 10
-        k = 1
-        iter = 1 << 12
 
-        om_values = numpy.linspace(0, 1, n)
+        if self.staircase_k_touched:
+            k = self.left_wgt.value()[1]
+
+        iter = 1 << 14
+
+        om_min, om_max, w_min, w_max = 0, 1, 0, 1
+
+        scale_times = self.scale_slider.value()
+
+        om_min, om_max, w_min, w_max = rescale_n_times(scale_times, GOLDEN, om_min, om_max, w_min, w_max)
+
+        om_values = numpy.linspace(om_min, om_max, n)
         k_values = numpy.full(n, k, numpy.float64)
 
         res = self.cm.compute_many_rotation_nums(self.queue, iter, om_values, k_values)
 
+        fib_ns = fib(16)
+
+        closest_points = []
+        labels = []
+        for n1, n2 in zip(fib_ns[::2], fib_ns[1::2]):
+            golden_approx = n1 / n2
+            # print("{} / {} ~=".format(n1, n2), golden_approx)
+            # closest = numpy.argmin(numpy.abs(res - golden_approx))
+            closest = numpy.argmin(numpy.abs(res - golden_approx))
+            closest_points.append(closest)
+            # labels.extend(["{}/{}".format(n1, n2)]*len(closest))
+            labels.append("{}/{}".format(n1, n2))
+
+        closest_points = numpy.array(closest_points)
+
         self.ax.clear()
+        # self.ax.set_xlim(om_min, om_max)
+        # self.ax.set_ylim(w_min, w_max)
         self.ax.plot(om_values, res)
+
+        i = 0
+        for label, x, y in zip(labels, om_values[closest_points], res[closest_points]):
+            self.ax.annotate(
+                label,
+                xy=(x, y), xytext=(-20 * i if i % 2 == 0 else 20 * i, 20 * i if i % 2 == 0 else -20 * i),
+                textcoords='offset points', ha='right', va='bottom',
+                bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+                arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+            i += 1
 
         self.canvas.draw()
 
@@ -593,10 +645,9 @@ class App(SimpleApp):
         om_min, om_max, l_min, l_max = 0, 1, -2, 0
 
         scale_times = self.scale_slider.value()
-        point = 0.60666
 
         om_min, om_max, l_min, l_max = rescale_n_times(
-            scale_times, point, om_min, om_max, l_min, l_max
+            scale_times, GOLDEN, om_min, om_max, l_min, l_max
         )
 
         # om_values = numpy.linspace(min(om_min, om_max), max(om_max, om_min), n)
@@ -672,23 +723,27 @@ class App(SimpleApp):
         print("switching to '{}'".format(mode))
 
         self.left_wgt.setShape((True, True))
+        try:
+            self.left_wgt.valueChanged.disconnect()
+            self.scale_slider.valueChanged.disconnect()
+        except:
+            print("[error] disconnect failed")
 
         if mode == "param":
             self.canvas_frame.hide()
             self.right_wgt.setVisible(True)
-            # self.left_wgt.valueChanged.connect(self.draw_iter_diag)
+            self.left_wgt.valueChanged.connect(self.draw_iter_diag)
 
             self.draw_param_map()
         elif mode == "lyap":
             self.canvas_frame.hide()
             self.right_wgt.setVisible(True)
-            # self.left_wgt.valueChanged.connect(self.draw_iter_diag)
+            self.left_wgt.valueChanged.connect(self.draw_iter_diag)
 
             self.draw_lyap_map()
         elif mode == "show both":
             self.canvas_frame.hide()
             self.right_wgt.setVisible(True)
-            # self.left_wgt.valueChanged.disconnect(self.draw_iter_diag)
 
             self.draw_param_map()
             self.draw_lyap_map(img=self.right_wgt)
@@ -696,7 +751,6 @@ class App(SimpleApp):
             self.canvas_frame.show()
             self.left_wgt.setShape((False, True))
             self.right_wgt.setVisible(False)
-            # self.left_wgt.valueChanged.disconnect(self.draw_iter_diag)
             self.scale_slider.valueChanged.connect(self.plot_lyap_along_k_1)
 
             self.plot_lyap_along_k_1()
@@ -704,11 +758,17 @@ class App(SimpleApp):
             self.canvas_frame.show()
             self.left_wgt.setShape((False, True))
             self.right_wgt.setVisible(False)
-
             self.scale_slider.valueChanged.connect(self.plot_staircase)
-            # self.left_wgt.valueChanged.disconnect(self.draw_iter_diag)
 
-            self.plot_staircase()
+            def _k_preserving(value):
+                self.staircase_k_touched = True
+                self.plot_staircase(value)
+
+            self.left_wgt.valueChanged.connect(_k_preserving)
+
+            self.draw_param_map()
+            self.staircase_k_touched = False
+            self.plot_staircase(k=1)
         else:
             raise RuntimeError("No such mode: '{}'".format(mode))
 
