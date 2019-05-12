@@ -11,16 +11,16 @@ DELTA = 4.66920_16091_02990_7
 SCALE_ALPHA = -2.50290_78750_95892_8
 
 
-def rescale_log_map(l_min, l_max, x_min, x_max):
-    l_min = L_CRITICAL - (L_CRITICAL - l_min) / DELTA
-    l_max = L_CRITICAL + (l_max - L_CRITICAL) / DELTA
+def rescale_log_map(point, l_min, l_max, x_min, x_max):
+    l_min = point - (point - l_min) / DELTA
+    l_max = point + (l_max - point) / DELTA
     x_min, x_max = x_min / SCALE_ALPHA, x_max / SCALE_ALPHA
     return l_min, l_max, x_min, x_max
 
 
-def rescale_n_times(n, l_min, l_max, x_min, x_max):
+def rescale_n_times(n, point, l_min, l_max, x_min, x_max):
     for _ in range(n):
-        l_min, l_max, x_min, x_max = rescale_log_map(l_min, l_max, x_min, x_max)
+        l_min, l_max, x_min, x_max = rescale_log_map(point, l_min, l_max, x_min, x_max)
     return l_min, l_max, x_min, x_max
 
 
@@ -159,6 +159,75 @@ kernel void lyap(
 """
 
 
+ITER_DIAG_AND_UTILS = r"""
+
+#define real3 double3
+#define real4 double4
+
+kernel void draw_lines(
+    const real l, 
+    const real4 bounds,
+    write_only image2d_t result
+) {
+    const int2 id = (int2)(get_global_id(0), get_global_id(1));
+    
+    const real x = bounds.s0 + id.x * (bounds.s1 - bounds.s0) / get_global_size(0);
+    const real y = bounds.s2 + (get_global_size(1) - id.y - 1) * (bounds.s3 - bounds.s2) / get_global_size(1);
+    
+    if (fabs(y - x) < 1e-3) {
+        write_imagef(result, id, (float4)(1.0, 0.0, 0.0, 1.0));
+    } else if (fabs(y - map(x, l)) < 2e-3) {
+        write_imagef(result, id, (float4)(0.0, 0.5, 0.0, 1.0));
+    }
+}
+
+kernel void draw_cobweb(
+    const global real* samples,
+    const real4 bounds,
+    write_only image2d_t result
+) {
+    const int id = get_global_id(0);
+    
+    if (id + 2u >= get_global_size(0)) {
+        return;
+    }
+    
+    const real3 x = (real3)(samples[id], samples[id+1], samples[id+2]);
+
+    if (isnan(x.s0) || isnan(x.s1) || isnan(x.s2)) {
+        return;
+    }
+    
+    const int2 im = get_image_dim(result);
+    
+    int2 p1 = {
+        convert_int_rtz((x.s0 - bounds.s0) / (bounds.s1 - bounds.s0) * im.x),
+        im.y - convert_int_rtz((x.s1 - bounds.s2) / (bounds.s3 - bounds.s2) * im.y) - 1
+    };
+    p1 = clamp(p1, (int2)(0, 0), (int2)(im - 1));
+    
+    int2 p2 = {
+        convert_int_rtz((x.s1 - bounds.s0) / (bounds.s1 - bounds.s0) * im.x),
+        im.y - convert_int_rtz((x.s2 - bounds.s2) / (bounds.s3 - bounds.s2) * im.y) - 1
+    };
+    p2 = clamp(p2, (int2)(0, 0), (int2)(im - 1));
+    
+    int2 line;
+     
+    line = (int2)(min(p1.x, p2.x), max(p1.x, p2.x));
+    for (int i = line.s0; i <= line.s1; ++i) {
+        write_imagef(result, (int2)(i, p1.y), (float4)(0.0, 0.0, 0.0, 1.0));
+    }
+    
+    line = (int2)(min(p1.y, p2.y), max(p1.y, p2.y));
+    for (int i = line.s0; i <= line.s1; ++i) {
+        write_imagef(result, (int2)(p2.x, i), (float4)(0.0, 0.0, 0.0, 1.0));
+    }
+}
+
+"""
+
+
 class LogMap:
 
     def __init__(self, ctx, shape):
@@ -166,7 +235,7 @@ class LogMap:
         self.shape = shape
         self.img = allocateImage(ctx, shape)
         sources = [
-            BIFTREE_SOURCE, LYAP_SOURCE
+            BIFTREE_SOURCE, LYAP_SOURCE, ITER_DIAG_AND_UTILS
         ]
         self.prg = cl.Program(ctx, "\n".join(sources)).build()
 
@@ -235,6 +304,38 @@ class LogMap:
         x_max = min(x_max, numpy.amax(buf))
         return self._call_draw(queue, iter, buf_dev, x_min, x_max)
 
+    def draw_iter_diag(self, queue, skip, iter, l, bounds=(-1, 1, -1, 1), x0=0):
+        assert len(bounds) == 4
+
+        res_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=8 * iter)
+
+        clear_image(queue, self.img[1], self.shape)
+
+        queue.finish()
+
+        self.prg.sample(
+            queue, (1,), None,
+            numpy.int32(skip), numpy.int32(iter),
+            numpy.float64(x0), numpy.float64(l),
+            res_dev
+        )
+
+        self.prg.draw_lines(
+            queue, self.shape, None,
+            numpy.float64(l),
+            numpy.array(bounds, dtype=numpy.float64),
+            self.img[1]
+        )
+
+        self.prg.draw_cobweb(
+            queue, (iter,), None,
+            res_dev,
+            numpy.array(bounds, dtype=numpy.float64),
+            self.img[1]
+        )
+
+        return read(queue, *self.img, self.shape)
+
 
 class Scaling(SimpleApp):
 
@@ -255,7 +356,8 @@ class Scaling(SimpleApp):
         self.x_max_slider, x_max_slider_el = createSlider("r", bounds=(-1, 1), withLabel="x_max = {}",
                                                     labelPosition="top", withValue=1)
 
-        self.iter_slider, iter_slider_el = createSlider("i", bounds=(4, 1024), withLabel="iter = {}",
+        self.l_cr_slider, l_cr_slider = createSlider("r", bounds=(L_CRITICAL - 0.01, L_CRITICAL + 0.01),
+                                                     withLabel="l_cr = {}", withValue=L_CRITICAL,
                                                         labelPosition="top")
 
         self.scale_slider, scale_slider_el = createSlider("i", bounds=(0, 8), withLabel="scale = {}",
@@ -278,7 +380,7 @@ class Scaling(SimpleApp):
 
         layout = vStack(
             hStack(self.info_label, self.mode_cb),
-            hStack(iter_slider_el, scale_slider_el),
+            hStack(l_cr_slider, scale_slider_el),
             hStack(l_min_slider_el, l_max_slider_el),
             hStack(x_min_slider_el, x_max_slider_el),
             hStack(self.im, self.canvas_frame)
@@ -289,7 +391,7 @@ class Scaling(SimpleApp):
         self.x_min_slider.valueChanged.connect(self.scale)
         self.x_max_slider.valueChanged.connect(self.scale)
         self.mode_cb.currentIndexChanged.connect(self.scale)
-        # self.iter_slider.valueChanged.connect(self.compute_bif_tree)
+        self.l_cr_slider.valueChanged.connect(self.scale)
 
         self.scale_slider.valueChanged.connect(self.scale)
 
@@ -333,7 +435,9 @@ class Scaling(SimpleApp):
             print("bad lambda bounds")
             return
 
-        l_min, l_max, x_min, x_max = rescale_n_times(scale_times, l_min, l_max, x_min, x_max)
+        point = self.l_cr_slider.value()
+
+        l_min, l_max, x_min, x_max = rescale_n_times(scale_times, point, l_min, l_max, x_min, x_max)
 
         self.info_label.setText("l_min = {}\t\tl_max = {}\t\tx_min = {}\t\tx_max = {}".format(
             l_min, l_max, x_min, x_max
@@ -349,12 +453,81 @@ class Scaling(SimpleApp):
             raise RuntimeError("unsupported mode '{}'".format(mode))
 
 
+def logistic(x, lam):
+    return 1.0 - lam * x ** 2
+
+
+def RG(fn, k):
+    def make_next(fk):
+        return lambda x: fk(fk( x * fk(fk(0)) )) / fk(fk(0))
+
+    for _ in range(k):
+        fn = make_next(fn)
+
+    return fn
+
+
 class App(SimpleApp):
 
     def __init__(self):
-        super(App, self).__init__("1.b / 1.d")
+        super(App, self).__init__("1.b")
+
+        self.lm = LogMap(self.ctx, (512, 512))
+        self.iter_diag = Image2D()
+
+        self.figure = Figure((18, 12))
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.subplots(1, 1)
+        self.figure.tight_layout(pad=2)
+
+        self.canvas_frame = QFrame()
+        self.canvas_frame.setLayout(hStack(self.canvas))
+
+        self.l_slider, l_slider_el = createSlider(
+            "r", (1.35, 1.45), withValue=L_CRITICAL, withLabel="l = {}", labelPosition="top"
+        )
+        self.l_slider.valueChanged.connect(self.draw_rgs)
+        self.l_slider.valueChanged.connect(self.draw_diag)
+
+        self.k_slider, k_slider_el = createSlider(
+            "i", (1, 5), withValue=1, withLabel="k = {}", labelPosition="top"
+        )
+        self.k_slider.valueChanged.connect(self.draw_rgs)
+
+        layout = vStack(
+            k_slider_el, l_slider_el,
+            hStack(self.iter_diag, self.canvas_frame)
+        )
+
+        self.setLayout(layout)
+
+        self.draw_rgs()
+        self.draw_diag()
+
+    def draw_diag(self, *_):
+        l = self.l_slider.value()
+        im = self.lm.draw_iter_diag(
+            self.queue, 1 << 9, 1 << 7, l
+        )
+        self.iter_diag.setTexture(im)
+
+    def draw_rgs(self, *_):
+        l = self.l_slider.value()
+        k = self.k_slider.value()
+
+        rgs = [RG(lambda x: logistic(x, l), k_) for k_ in range(k)]
+
+        xs = numpy.linspace(-1, 1, 100)
+        ys = lambda f: [f(x) for x in xs]
+
+        self.ax.clear()
+        for i, e in enumerate(zip(["r-", "g-", "b-", "c-", "m-"], rgs)):
+            col, rg = e
+            self.ax.plot(xs, ys(rg), col, label="k = {}".format(i + 1))
+        self.ax.legend()
+        self.canvas.draw()
 
 
 if __name__ == '__main__':
-    # Scaling().run()
-    App().run()
+    Scaling().run()
+    # App().run()
