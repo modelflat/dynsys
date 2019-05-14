@@ -7,7 +7,7 @@ import config as cfg
 from dynsys import SimpleApp, createSlider
 
 from fast_box_counting import FastBoxCounting
-import ifs_fractal_v2 as ifs
+import ifs_fractal as ifs
 from utils import stack
 
 

@@ -3,7 +3,7 @@ import numpy
 from time import perf_counter
 
 from dynsys.LCE import dummyOption
-from ifs_fractal import SCRIPT_DIR, SOURCE
+from ifs_fractal import SCRIPT_DIR, IFS_SOURCE
 
 test_kernel = r"""
 
@@ -81,7 +81,7 @@ kernel void solve_cubic_bench_seq_v2(
 dev = cl.get_platforms()[0].get_devices()[0]
 ctx = cl.Context(devices=[dev])
 queue = cl.CommandQueue(ctx)
-prg = cl.Program(ctx, SOURCE + test_kernel).build(options=["-I", SCRIPT_DIR + "/include", dummyOption()])
+prg = cl.Program(ctx, IFS_SOURCE + test_kernel).build(options=["-I", SCRIPT_DIR + "/include", dummyOption()])
 
 
 def run_bench(n, ver):

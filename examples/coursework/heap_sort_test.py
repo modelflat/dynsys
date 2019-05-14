@@ -2,7 +2,7 @@ import pyopencl as cl
 import numpy
 
 from dynsys.LCE import dummyOption
-from ifs_fractal import SCRIPT_DIR, SOURCE
+from ifs_fractal import SCRIPT_DIR, IFS_SOURCE
 
 test_kernel = r"""
 
@@ -18,7 +18,7 @@ kernel void test_heap_sort(
 dev = cl.get_platforms()[0].get_devices()[0]
 ctx = cl.Context(devices=[dev])
 queue = cl.CommandQueue(ctx)
-prg = cl.Program(ctx, SOURCE + test_kernel).build(options=["-I", SCRIPT_DIR + "/include", dummyOption()])
+prg = cl.Program(ctx, IFS_SOURCE + test_kernel).build(options=["-I", SCRIPT_DIR + "/include", dummyOption()])
 
 n = 32
 arr = numpy.random.randint(
