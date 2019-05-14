@@ -51,8 +51,8 @@ class Dim1D:
         arr_dev = copy_dev(self.ctx, arr)
         r_values_dev = copy_dev(self.ctx, r_values)
 
-        res = numpy.empty(n_r, numpy.int32)
-        res_dev = alloc_like(self.ctx, res)
+        res = numpy.zeros(n_r, numpy.int32)
+        res_dev = copy_dev(self.ctx, res)
         self.prg.corr(
             queue, (n, n_r), None,
             numpy.int32(n),
