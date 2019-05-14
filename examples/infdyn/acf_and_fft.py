@@ -58,25 +58,25 @@ class App(SimpleApp):
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.subplots(1, 1)
 
-        self.l_slider, l_slider_el = createSlider("r", (self.l_min, self.l_max),
-                                                  withLabel="lambda = {}",
-                                                  withValue=L_CRITICAL,
-                                                  labelPosition="top")
+        self.lag_slider, lag_slider_el = createSlider("i", (1, 128),
+                                                      withLabel="lags = {}",
+                                                      withValue=32, labelPosition="top")
 
-        self.l_slider.valueChanged.connect(self.compute_akf)
+        self.lag_slider.valueChanged.connect(self.compute_akf)
 
         self.bif_tree = ParameterizedImageWidget((self.l_min, self.l_max, 0, 1), ("lambda", None), (True, False))
+        self.bif_tree.valueChanged.connect(self.compute_akf)
 
         layout = vStack(
             self.bif_tree,
-            l_slider_el,
+            lag_slider_el,
             self.canvas
         )
 
         self.setLayout(layout)
 
         self.draw_bif_tree()
-        self.compute_akf()
+        self.bif_tree.setValue((L_CRITICAL, 0))
 
     def draw_bif_tree(self):
         self.bif_tree.setImage(self.lm.compute(
@@ -84,13 +84,12 @@ class App(SimpleApp):
         ))
 
     def compute_akf(self, *_):
-        l = self.l_slider.value()
+        l = self.bif_tree.value()[0]
+        lags = self.lag_slider.value()
 
-        self.bif_tree.setValue((l, 0))
+        res = self.lm.sample(self.queue, skip=1024, iter=2048, x=0, l=l)
 
-        res = self.lm.sample(self.queue, skip=1024, iter=512, x=0, l=l)
-
-        lags = range(64 + 1)
+        lags = range(lags + 1)
 
         self.ax.clear()
 
@@ -102,7 +101,7 @@ class App(SimpleApp):
 
         for lab, (f, ls) in autocorrs.items():
             a_corr = f(res, lags)
-            self.ax.plot(lags, abs(a_corr), label=lab, linestyle=ls)
+            self.ax.plot(lags, (a_corr), label=lab, linestyle=ls)
 
         self.ax.set_xlabel('lag')
         self.ax.set_ylabel('correlation coefficient')
