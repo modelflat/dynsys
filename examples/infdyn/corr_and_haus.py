@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 from scipy.stats import linregress
 
 from common2 import *
-from dynsys import SimpleApp, vStack, createSlider
+from dynsys import SimpleApp, vStack, createSlider, ParameterizedImageWidget
 from t1 import LogMap, L_CRITICAL
 from collections import Counter
 
@@ -103,7 +103,7 @@ class App(SimpleApp):
 
     def __init__(self):
         super(App, self).__init__("Correlation & Hausdorff")
-        self.lm = LogMap(self.ctx, (1, 1))
+        self.lm = LogMap(self.ctx, (900, 256))
         self.cr = Dim1D(self.ctx)
 
         self.figure = Figure((18, 12))
@@ -111,49 +111,35 @@ class App(SimpleApp):
         self.ax = self.figure.subplots(1, 1)
         self.figure.tight_layout(pad=4)
 
-        self.l_slider, l_slider_el = createSlider("r", (1, 2), withValue=L_CRITICAL)
-        self.l_slider.valueChanged.connect(self.compute_corr_dim)
+        self.bif_tree = ParameterizedImageWidget((1, 2, 0, 1), ("lambda", None), (True, False))
+        self.bif_tree.setValue((L_CRITICAL, 0))
+        self.bif_tree.valueChanged.connect(self.compute)
 
         self.info_label = QLabel()
-        self.l_label = QLabel()
+
         self.mode_cb = QComboBox()
         self.mode_cb.addItems(["corr", "haus"])
-
-        self.mode_cb.currentIndexChanged.connect(self.switch_mode)
+        self.mode_cb.currentIndexChanged.connect(self.compute)
 
         layout = vStack(
-            self.mode_cb,
-            self.l_label,
-            l_slider_el,
-            self.info_label,
-            self.canvas
+            self.bif_tree, self.info_label, self.canvas, self.mode_cb
         )
 
         self.setLayout(layout)
 
-        self.switch_mode("corr")
+        self.draw_bif_tree()
+        self.compute(mode="corr")
 
-    def switch_mode(self, *_, mode=None):
-        mode = mode if mode is not None else self.mode_cb.currentText()
-
-        self.l_slider.valueChanged.disconnect()
-
-        print("switching to {}".format(mode))
-
-        if mode == "corr":
-            self.l_slider.valueChanged.connect(self.compute_corr_dim)
-            self.compute_corr_dim()
-        elif mode == "haus":
-            self.l_slider.valueChanged.connect(self.compute_hausdorff_dim)
-            self.compute_hausdorff_dim()
-        else:
-            raise RuntimeError("no such mode: '{}'".format(mode))
+    def draw_bif_tree(self):
+        self.bif_tree.setImage(self.lm.compute(
+            self.queue, skip=1024, iter=512, l_min=1, l_max=2
+        ))
 
     def compute_corr_dim(self, *_):
         l = self.get_l_value()
 
         r_values = numpy.linspace(0, 1.5, 100)
-        res = self.lm.sample(self.queue, skip=200, iter=2000, x=0, l=l)
+        res = self.lm.sample(self.queue, skip=512, iter=2048, x=0, l=l)
 
         corrs = self.cr.corr(self.queue, res, r_values)
 
@@ -186,10 +172,18 @@ class App(SimpleApp):
 
         self.canvas.draw()
 
+    def compute(self, *_, mode=None):
+        mode = mode if mode is not None else self.mode_cb.currentText()
+
+        if mode == "corr":
+            self.compute_corr_dim()
+        elif mode == "haus":
+            self.compute_hausdorff_dim()
+        else:
+            raise RuntimeError("no such mode: '{}'".format(mode))
+
     def get_l_value(self):
-        l = self.l_slider.value()
-        self.l_label.setText("lambda = {}".format(l))
-        return l
+        return self.bif_tree.value()[0]
 
 
 if __name__ == '__main__':
