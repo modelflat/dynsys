@@ -52,7 +52,7 @@ phase_image_shape = (512, 512)
 phase_skip = param_map_skip * 64
 
 # iters on phase plot
-phase_iter = 512 ** 2
+phase_iter = 1 << 16
 
 # grid size for phase plot
 phase_grid_size = 2
