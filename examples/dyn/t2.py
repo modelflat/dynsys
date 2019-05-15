@@ -140,6 +140,7 @@ class App(SimpleApp):
         self.ax[1].clear()
         self.ax[1].plot(numpy.linspace(self.l_min, self.l_max, n_lyap), self.cached_lyap)
         self.ax[1].axvline(l, color="red", linestyle="--", linewidth=1)
+        self.ax[1].axhline(0, color="black", linestyle="--", linewidth=1)
 
         self.canvas.draw()
 
