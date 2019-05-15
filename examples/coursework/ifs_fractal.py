@@ -196,6 +196,77 @@ class IFSFractal:
         self._compute_basins(queue, skip, h, alpha, c, bounds, root_seq, resolution)
         return self._render_basins(queue, bounds, resolution, algo)
 
+    def _compute_bif_tree(self, queue, skip, iter, z0, c, var_id, param_properties: dict, root_seq=None):
+        fixed_id = param_properties["fixed_id"]
+        fixed_value = param_properties["fixed_value"]
+        other_min = param_properties["other_min"]
+        other_max = param_properties["other_max"]
+
+        seq_size, seq = prepare_root_seq(self.ctx, root_seq)
+
+        res = numpy.empty((self.img_shape[0], iter), dtype=numpy.float64)
+        res_dev = alloc_like(self.ctx, res)
+
+        self.prg.compute_points_for_bif_tree(
+            queue, (self.img_shape[0],), None,
+            # z0
+            numpy.array((z0.real, z0.imag), dtype=numpy.float64),
+            # c
+            numpy.array((c.real, c.imag), dtype=numpy.float64),
+
+            numpy.int32(var_id),
+            numpy.int32(fixed_id),
+            numpy.float64(fixed_value),
+            numpy.float64(other_min),
+            numpy.float64(other_max),
+
+            numpy.int32(skip),
+            numpy.int32(iter),
+
+            numpy.uint64(random_seed()),
+
+            numpy.int32(seq_size),
+            seq,
+
+            res_dev
+        )
+
+        return res, res_dev
+
+    def _render_bif_tree(self, queue, iter, var_min, var_max, result_buf):
+        clear_image(queue, self.img[1], self.img_shape)
+
+        self.prg.draw_bif_tree(
+            queue, (self.img_shape[0],), None,
+            numpy.int32(iter),
+            numpy.float64(var_min),
+            numpy.float64(var_max),
+            numpy.int32(1),
+            result_buf,
+            self.img[1]
+        )
+
+        return read_image(queue, *self.img, self.img_shape)
+
+    def draw_bif_tree(self, queue, skip, iter, z0, c, var_id, param_properties: dict, root_seq=None,
+                      var_min=-10, var_max=10):
+
+        res, res_dev = self._compute_bif_tree(queue, skip, iter, z0, c, var_id, param_properties, root_seq)
+        cl.enqueue_copy(queue, res, res_dev)
+
+        c_var_min, c_var_max = numpy.nanmin(res), numpy.nanmax(res)
+
+        print(c_var_min, c_var_max)
+
+        var_min = max(c_var_min, var_min)
+        var_max = min(c_var_max, var_max)
+
+        print(var_min, var_max)
+
+        # print(res)
+
+        return self._render_bif_tree(queue, iter, var_min, var_max, res_dev)
+
 
 def make_param_placeholder(ctx, queue, image_shape, h_bounds, alpha_bounds):
     pm = ParameterSurface(ctx, queue, image_shape, (*h_bounds, *alpha_bounds),
@@ -238,5 +309,3 @@ def make_param_wgt(h_bounds, alpha_bounds, image_shape):
         textureShape=image_shape,
         targetColor=Qt.gray
     )
-
-

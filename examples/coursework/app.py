@@ -111,17 +111,21 @@ class CourseWork(SimpleApp):
             _, alpha = self.left_wgt.value()
             self.set_values_no_signal(h, alpha)
             self.draw_right()
+            if "bif" in self.left_mode_cmb.currentText():
+                self.draw_left()
         self.h_slider.valueChanged.connect(set_h_value)
 
         def set_alpha_value(alpha):
             h, _ = self.left_wgt.value()
             self.set_values_no_signal(h, alpha)
             self.draw_right()
+            if "bif" in self.left_mode_cmb.currentText():
+                self.draw_left()
         self.alpha_slider.valueChanged.connect(set_alpha_value)
 
         if cfg.param_map_draw_on_select and cfg.param_map_select_z0_from_phase:
             def select_z0(*_):
-                self.draw_param_map()
+                self.draw_left()
             self.right_wgt.valueChanged.connect(select_z0)
 
         def gen_random_seq_fn(*_):
@@ -226,12 +230,39 @@ class CourseWork(SimpleApp):
         self.d_label.setText("D = {:.3f}".format(D))
 
     def draw_bif_tree(self, *_, param=None):
+        h, alpha = self.left_wgt.value()
+
         if param == "h":
-            self.ifs
+            param_properties = {
+                "fixed_id": 1,
+                "fixed_value": alpha,
+                "other_min": cfg.h_bounds[0],
+                "other_max": cfg.h_bounds[1]
+            }
         elif param == "alpha":
-            pass
+            param_properties = {
+                "fixed_id": 0,
+                "fixed_value": h,
+                "other_min": cfg.alpha_bounds[0],
+                "other_max": cfg.alpha_bounds[1]
+            }
         else:
             raise RuntimeError()
+
+        z0 = cfg.bif_tree_z0
+
+        image = self.ifs.draw_bif_tree(
+            self.queue,
+            skip=cfg.bif_tree_skip,
+            iter=cfg.bif_tree_iter,
+            z0=z0,
+            c=cfg.C,
+            var_id=0,
+            param_properties=param_properties,
+            root_seq=self.parse_root_sequence(),
+            var_min=-8, var_max=8
+        )
+        self.left_wgt.setImage(image.copy())
 
     def set_period_label(self):
         x_px, y_px = self.left_wgt._imageWidget.targetPx()

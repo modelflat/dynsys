@@ -1,7 +1,7 @@
 ## general parameters
 
 # range for varying `h`
-h_bounds = (-1, 1)
+h_bounds = (1.5, 6)
 
 # range for varying `alpha`
 alpha_bounds = (0.0, 1.0)
@@ -68,3 +68,10 @@ basins_image_shape = phase_image_shape
 basins_resolution = 4
 
 basins_skip = param_map_skip + param_map_iter - 1
+
+
+## bif tree
+
+bif_tree_skip = 1 << 10
+bif_tree_iter = 1 << 10
+bif_tree_z0 = complex(-0.1, 0.1)
