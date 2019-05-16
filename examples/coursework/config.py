@@ -1,7 +1,7 @@
 ## general parameters
 
 # range for varying `h`
-h_bounds = (1.5, 6)
+h_bounds = (-6, -0)
 
 # range for varying `alpha`
 alpha_bounds = (0.0, 1.0)
@@ -49,13 +49,13 @@ phase_shape = (-1, 1, -1, 1)
 phase_image_shape = (512, 512)
 
 # skip iters on phase plot
-phase_skip = param_map_skip * 64
+phase_skip = 150
 
 # iters on phase plot
-phase_iter = 1 << 16
+phase_iter = 1 << 10
 
 # grid size for phase plot
-phase_grid_size = 2
+phase_grid_size = 10
 
 # z0 to use when in single-point mode
 phase_z0 = None
@@ -72,6 +72,6 @@ basins_skip = param_map_skip + param_map_iter - 1
 
 ## bif tree
 
-bif_tree_skip = 1 << 10
+bif_tree_skip = 150
 bif_tree_iter = 1 << 10
 bif_tree_z0 = complex(-0.1, 0.1)

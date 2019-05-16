@@ -254,12 +254,12 @@ class IFSFractal:
         res, res_dev = self._compute_bif_tree(queue, skip, iter, z0, c, var_id, param_properties, root_seq)
         cl.enqueue_copy(queue, res, res_dev)
 
-        c_var_min, c_var_max = numpy.nanmin(res), numpy.nanmax(res)
-
-        print(c_var_min, c_var_max)
-
-        var_min = max(c_var_min, var_min)
-        var_max = min(c_var_max, var_max)
+        # c_var_min, c_var_max = numpy.nanmin(res, axis=1), numpy.nanmax(res, axis=1)
+        #
+        # print(c_var_min, c_var_max)
+        #
+        # var_min = max(numpy.nanmedian(c_var_min), var_min)
+        # var_max = min(numpy.nanmedian(c_var_max), var_max)
 
         print(var_min, var_max)
 

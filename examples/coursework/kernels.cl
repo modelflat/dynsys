@@ -432,7 +432,6 @@ inline void write_point(
     const int h = get_image_height(out) - 1;
 
     int x_coord = convert_int_rtz((x - x_min) / (x_max - x_min) * h);
-
     write_imagef(out, (int2)(l_id, (flip_y) ? h - x_coord : x_coord), (float4)(0.0, 0.0, 0.0, 1.0));
 }
 
