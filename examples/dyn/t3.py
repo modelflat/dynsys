@@ -1,15 +1,12 @@
-from common2 import *
-
-from dynsys import SimpleApp, allocateImage, vStack, Image2D, hStack, ParameterizedImageWidget, createSlider
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QComboBox, QFrame
-
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-
 import time
 
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QLabel, QComboBox, QFrame
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+from common2 import *
+from dynsys import SimpleApp, allocateImage, vStack, hStack, ParameterizedImageWidget, createSlider
 
 PARAM_MAP_SOURCE = r"""
 #define real double
@@ -583,9 +580,7 @@ class App(SimpleApp):
         )
         self.setLayout(layout)
 
-        self.switch_mode("staircase")
-
-        # self.draw_param_map()
+        self.draw_param_map()
         self.draw_iter_diag((0.35, 0.9))
 
     def plot_staircase(self, *_, k=1):
@@ -611,7 +606,7 @@ class App(SimpleApp):
 
         closest_points = []
         labels = []
-        for n1, n2 in zip(fib_ns[::2], fib_ns[1::2]):
+        for n1, n2 in zip(fib_ns[::], fib_ns[1::]):
             golden_approx = n1 / n2
             # print("{} / {} ~=".format(n1, n2), golden_approx)
             # closest = numpy.argmin(numpy.abs(res - golden_approx))
@@ -631,7 +626,7 @@ class App(SimpleApp):
         for label, x, y in zip(labels, om_values[closest_points], res[closest_points]):
             self.ax.annotate(
                 label,
-                xy=(x, y), xytext=(-20 * i if i % 2 == 0 else 20 * i, 20 * i if i % 2 == 0 else -20 * i),
+                xy=(x, y), xytext=(-10 * i if i % 2 == 0 else 10 * i, 10 * i if i % 2 == 0 else -10 * i),
                 textcoords='offset points', ha='right', va='bottom',
                 bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
                 arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
@@ -650,7 +645,6 @@ class App(SimpleApp):
             scale_times, GOLDEN, om_min, om_max, l_min, l_max
         )
 
-        # om_values = numpy.linspace(min(om_min, om_max), max(om_max, om_min), n)
         om_values = numpy.linspace(om_min, om_max, n)
 
         lyaps = self.cm.compute_many_lyaps(

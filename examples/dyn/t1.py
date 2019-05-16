@@ -1,10 +1,9 @@
+from PyQt5.QtWidgets import QLabel, QComboBox, QFrame, QCheckBox
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
 from common2 import *
 from dynsys import SimpleApp, allocateImage, Image2D, vStack, hStack, createSlider
-from PyQt5.QtWidgets import QLabel, QComboBox, QFrame
-
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
 
 L_CRITICAL = 1.40115_51890_92050_6
 DELTA = 4.66920_16091_02990_7
@@ -457,9 +456,9 @@ def logistic(x, lam):
     return 1.0 - lam * x ** 2
 
 
-def RG(fn, k):
+def RG(fn, k, alpha=lambda fk: fk(fk(0))):
     def make_next(fk):
-        return lambda x: fk(fk( x * fk(fk(0)) )) / fk(fk(0))
+        return lambda x: fk(fk(x * alpha(fk))) / alpha(fk)
 
     for _ in range(k):
         fn = make_next(fn)
@@ -483,6 +482,9 @@ class App(SimpleApp):
         self.canvas_frame = QFrame()
         self.canvas_frame.setLayout(hStack(self.canvas))
 
+        self.use_scaled_rg_cb = QCheckBox("Show RG")
+        self.use_scaled_rg_cb.stateChanged.connect(self.draw_rgs)
+
         self.l_slider, l_slider_el = createSlider(
             "r", (1.35, 1.45), withValue=L_CRITICAL, withLabel="l = {}", labelPosition="top"
         )
@@ -495,6 +497,7 @@ class App(SimpleApp):
         self.k_slider.valueChanged.connect(self.draw_rgs)
 
         layout = vStack(
+            self.use_scaled_rg_cb,
             k_slider_el, l_slider_el,
             hStack(self.iter_diag, self.canvas_frame)
         )
@@ -515,7 +518,10 @@ class App(SimpleApp):
         l = self.l_slider.value()
         k = self.k_slider.value()
 
-        rgs = [RG(lambda x: logistic(x, l), k_) for k_ in range(k)]
+        if self.use_scaled_rg_cb.isChecked():
+            rgs = [RG(lambda x: logistic(x, l), k_) for k_ in range(k)]
+        else:
+            rgs = [RG(lambda x: logistic(x, l), k_, alpha=lambda _: 1) for k_ in range(k)]
 
         xs = numpy.linspace(-1, 1, 100)
         ys = lambda f: [f(x) for x in xs]
@@ -529,5 +535,9 @@ class App(SimpleApp):
 
 
 if __name__ == '__main__':
-    Scaling().run()
-    # App().run()
+    run_1_b = False
+
+    if run_1_b:
+        App().run()
+    else:
+        Scaling().run()

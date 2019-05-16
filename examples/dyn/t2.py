@@ -1,17 +1,14 @@
-from t1 import LogMap
-from dynsys import SimpleApp, createSlider, vStack, hStack
-
 from collections import defaultdict
 
 import numpy
-
-from matplotlib.figure import Figure
+from PyQt5.QtWidgets import QLabel
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-from PyQt5.QtWidgets import QLabel, QCheckBox
-
-from tqdm import tqdm
+from matplotlib.figure import Figure
 from scipy.optimize import curve_fit
+from tqdm import tqdm
+
+from dynsys import SimpleApp, createSlider, vStack
+from t1 import LogMap
 
 
 def count_phases(arr):
@@ -138,9 +135,12 @@ class App(SimpleApp):
             self.cached_lyap = self.lm.compute_lyap(self.queue, skip, iter_lyap, self.l_min, self.l_max, n_lyap)
 
         self.ax[1].clear()
-        self.ax[1].plot(numpy.linspace(self.l_min, self.l_max, n_lyap), self.cached_lyap)
+        self.ax[1].plot(1.75 - numpy.linspace(self.l_min, self.l_max, n_lyap), self.cached_lyap)
         self.ax[1].axvline(l, color="red", linestyle="--", linewidth=1)
         self.ax[1].axhline(0, color="black", linestyle="--", linewidth=1)
+
+        self.ax[1].set_xscale("log")
+        self.ax[1].set_yscale("log")
 
         self.canvas.draw()
 
@@ -167,9 +167,11 @@ class App(SimpleApp):
         self.ax[2].clear()
         self.ax[2].plot(lambdas, av_lam)
         self.ax[2].plot(lambdas, lambdas ** a, label="approx. pow. value = {:.5f}".format(a))
+        self.ax[2].set_xscale("log")
+        self.ax[2].set_yscale("log")
         self.ax[2].legend()
         self.canvas.draw()
 
 
 if __name__ == '__main__':
-    App(False).run()
+    App(True).run()
