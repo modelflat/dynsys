@@ -62,9 +62,6 @@ class Dim1D:
 
         return res / n ** 2
 
-    def hausdorf(self, queue, arr):
-        arr_min, arr_max = arr.min(), arr.max()
-
 
 def pipeline_each(data, fns):
     return reduce(lambda a, x: list(map(x, a)), fns, data)
@@ -79,7 +76,7 @@ def hausdorf_D(x_array, ax):
         box_indexes_of_x_array = ((x_array - xmin) / xdelta).astype(numpy.int32)
         return xdelta, len(Counter(box_indexes_of_x_array))
 
-    box_number = numpy.arange(10, 1000, 10)
+    box_number = numpy.array([2**i for i in range(1, 10)])  # numpy.arange(10, 1000, 10)
 
     delta, n_non_empty = numpy.array(list(map(do_delta_and_N, box_number))).T
 
@@ -96,7 +93,7 @@ def hausdorf_D(x_array, ax):
     d1 = (n_non_empty.max() - n_non_empty.min()) / (delta.max() - delta.min())
     d2 = linregress(delta, n_non_empty).slope
 
-    return d, d1, d2
+    return d, d1, abs(d2)
 
 
 class App(SimpleApp):
@@ -109,7 +106,7 @@ class App(SimpleApp):
         self.figure = Figure((18, 12))
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.subplots(1, 1)
-        self.figure.tight_layout(pad=4)
+        self.figure.tight_layout(pad=5)
 
         self.bif_tree = ParameterizedImageWidget((1, 2, 0, 1), ("lambda", None), (True, False))
         self.bif_tree.setValue((L_CRITICAL, 0))
@@ -139,7 +136,7 @@ class App(SimpleApp):
         l = self.get_l_value()
 
         r_values = numpy.linspace(0, 1.5, 100)
-        res = self.lm.sample(self.queue, skip=512, iter=2048, x=0, l=l)
+        res = self.lm.sample(self.queue, skip=1024, iter=2048, x=0, l=l)
 
         corrs = self.cr.corr(self.queue, res, r_values)
 

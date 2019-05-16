@@ -94,8 +94,8 @@ class App(SimpleApp):
         self.ax.clear()
 
         autocorrs = {
-            "Manual AC": (ac_manual, "-"),
-            "FFT + IFFT AC": (ac_fft, "-."),
+            # "Manual AC": (ac_manual, "-"),
+            "FFT AC": (ac_fft, "-."),
             "NumPy AC": (ac_numpy, "--"),
         }
 
