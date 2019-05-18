@@ -122,7 +122,7 @@ kernel void draw_periods(
 
     points += (coord.y * size_x + coord.x) * num_points;
 
-    int unique = count_unique(points, num_points);
+    int unique = count_unique(points, num_points, 0.0);
     float h = (unique % 23) / (float)(22);
     float v = 1.0 - (unique / (float)(num_points));
 

@@ -3,7 +3,7 @@
 
 #include "random.clh"
 
-#define USE_OPTIMIZED_COMPLEX
+//#define USE_OPTIMIZED_COMPLEX
 
 #ifdef USE_OPTIMIZED_COMPLEX
 #define SOLVE_CUBIC_AVOID_BRANCHES
