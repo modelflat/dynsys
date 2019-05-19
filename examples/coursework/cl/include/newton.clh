@@ -31,7 +31,7 @@ real2 next_point(
 
     real2 roots[3];
     solve_cubic(
-        a_coef(z, c, A, B), ZERO, c_coef(c, B), root, roots
+        a_coef(z, c, A, B), ZERO, c_coef(c, B), roots
     );
     return roots[root];
 }

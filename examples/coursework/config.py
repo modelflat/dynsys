@@ -53,13 +53,13 @@ phase_shape = (-2, 2, -2, 2)
 phase_image_shape = (768, 768)
 
 # skip iters on phase plot
-phase_skip = 0#1 << 10#1 << 1
+phase_skip = 1 << 4#1 << 1
 
 # iters on phase plot
-phase_iter = param_map_skip + param_map_iter
+phase_iter = 1 << 6
 
 # grid size for phase plot
-phase_grid_size = 64
+phase_grid_size = 2
 
 phase_plot_select_point = True
 

@@ -1,26 +1,34 @@
+#ifndef __COMPLEX_CLH
+#define __COMPLEX_CLH
+
+// #define USE_FLOATS
+
+#ifndef USE_FLOATS
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
-
-#ifdef cl_khr_fp64
-    #define real  double
-    #define real2 double2
-    #define real4 double4
-    #define convert_real2 convert_double2
-
-    #define PI M_PI
-#else
-    #define real  float
-    #define real2 float2
-    #define real4 float4
-    #define convert_real2 convert_float2
-
-    #define PI M_PI_F
 #endif
 
+#if defined(cl_khr_fp64) && (!defined(USE_FLOATS))
+#define real  double
+#define real2 double2
+#define real4 double4
+#define convert_real2 convert_double2
 #define IS_REAL_CHECK_THRESHOLD 1e-96
-
 #define SQRT_3_DIV_2 0.866025403784438596
 #define UNITY_ROOT_1 (real2)(-.5, +SQRT_3_DIV_2)
 #define UNITY_ROOT_2 (real2)(-.5, -SQRT_3_DIV_2)
+#define PI M_PI
+#else
+#define real  float
+#define real2 float2
+#define real4 float4
+#define convert_real2 convert_float2
+#define IS_REAL_CHECK_THRESHOLD 1e-96
+#define SQRT_3_DIV_2 0.866025403784438596f
+#define UNITY_ROOT_1 (real2)(-.5f, +SQRT_3_DIV_2)
+#define UNITY_ROOT_2 (real2)(-.5f, -SQRT_3_DIV_2)
+#define PI M_PI_F
+#endif
+
 
 // a / b for complex a, b
 inline real2 cdiv(real2 a, real2 b) {
@@ -78,22 +86,20 @@ inline int is_real(real2 x) {
 
 // solve_cubic -- general case
 void solve_depressed_cubic(real2 p, real2 q, real2 roots[3]) {
-    q /= 2;
+    const real2 d = csqrt1(csq(q / 2) + ccb(p / 3));
 
-    const real2 d = csqrt1(csq(q) + ccb(p / 3));
+    real2 u = ccbrt1(-q / 2 + d);
+    real2 v = -cdiv(p, 3 * u);
 
-    real2 u1 = ccbrt1(-q + d);
-    real2 v1 = ccbrt1(-q - d);
+    roots[0] = u + v;
 
-    roots[0] = u1 + v1;
+    u = cmul(u, UNITY_ROOT_1);
+    v = cmul(v, UNITY_ROOT_2);
+    roots[1] = u + v;
 
-    u1 = cmul(u1, UNITY_ROOT_1);
-    v1 = cmul(v1, UNITY_ROOT_2);
-    roots[1] = u1 + v1;
-
-    u1 = cmul(u1, UNITY_ROOT_1);
-    v1 = cmul(v1, UNITY_ROOT_2);
-    roots[2] = u1 + v1;
+    u = cmul(u, UNITY_ROOT_1);
+    v = cmul(v, UNITY_ROOT_2);
+    roots[2] = u + v;
 }
 
 // solve_cubic -- real p, q
@@ -122,18 +128,25 @@ void solve_depressed_real_cubic(real p, real q, real2 roots[3]) {
 }
 
 // solves cubic equation given in form z**3 + a*z**2 + b*z + c = 0
-void solve_cubic(real2, real2, real2, real2[3]);
-void solve_cubic(real2 a, real2 b, real2 c, real2 roots[3]) {
+int solve_cubic(real2, real2, real2, real2[3]);
+int solve_cubic(real2 a, real2 b, real2 c, real2 roots[3]) {
     const real2 p = b - csq(a) / 3;
     const real2 q = (2 * ccb(a) - 9 * cmul(a, b)) / 27 + c;
 
+    int code;
     if (is_real(p) && is_real(q)) {
         solve_depressed_real_cubic(p.x, q.x, roots);
+        code = 0;
     } else {
         solve_depressed_cubic(p, q, roots);
+        code = 1;
     }
 
     roots[0] -= a / 3;
     roots[1] -= a / 3;
     roots[2] -= a / 3;
+
+    return code;
 }
+
+#endif
