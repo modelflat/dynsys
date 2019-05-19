@@ -66,4 +66,5 @@ def prepare_root_seq(ctx, root_seq):
 
 SCRIPT_DIR = os.path.abspath(sys.path[0])
 
-IFS_SOURCE = read_file(os.path.join(SCRIPT_DIR, "kernels.cl"))
+CL_SOURCE_PATH = os.path.join(SCRIPT_DIR, "cl")
+CL_INCLUDE_PATH = os.path.join(CL_SOURCE_PATH, "include")

@@ -1,10 +1,12 @@
 ## general parameters
 
 # range for varying `h`
-h_bounds = (-6, -0)
+# h_bounds = (-0.5, 0.5)
+h_bounds = (-3, 0)
 
 # range for varying `alpha`
-alpha_bounds = (0.0, 1.0)
+# alpha_bounds = (0, 2)
+alpha_bounds = (0, 1)
 
 # `c` constant
 C = complex(-0.5, 0.5)
@@ -16,10 +18,10 @@ C = complex(-0.5, 0.5)
 param_map_image_shape = (512, 512)
 
 # skip iters on param map
-param_map_skip = 64
+param_map_skip = 1 << 9
 
 # iters on param map
-param_map_iter = 128
+param_map_iter = 1 << 7
 
 # same point detection tol
 param_map_tolerance = 1e-4
@@ -43,22 +45,25 @@ param_map_lossless = False
 ## phase plot params
 
 # space bounds
-phase_shape = (-1, 1, -1, 1)
+phase_shape = (-5, 5, -5, 5)
 
 # phase plot image shape
-phase_image_shape = (512, 512)
+phase_image_shape = (768, 768)
 
 # skip iters on phase plot
-phase_skip = 150
+phase_skip = 1 << 10#1 << 1
 
 # iters on phase plot
-phase_iter = 1 << 10
+phase_iter = 1 << 6
 
 # grid size for phase plot
-phase_grid_size = 10
+phase_grid_size = 64
+
+phase_plot_select_point = True
 
 # z0 to use when in single-point mode
-phase_z0 = None
+phase_z0 = param_map_z0
+# phase_z0 = None
 
 
 ## basins params

@@ -45,13 +45,20 @@ real2 next_point(
     return roots[root];
 }
 
+inline real2 henon(real2 z, real b, real a) {
+    return (real2)(
+        1 - a*z.x*z.x - b*z.y,
+        z.x
+    );
+}
+
 #define INIT_VARIABLES(z0, c, h, alpha)                                         \
     int _SEQ_POS = 0;                                                           \
     int _ROOT_NUM;                                                              \
     const real2 _AB = (real2)((h) * (alpha) / 3, (h) * (alpha) / 3 - (h) / 3);  \
     const real2 _C_COEF = c_coef(c, _AB.s1);                                    \
     real2 _ROOTS[3];                                                            \
-    real2 _Z_VAR = (z0);
+    real2 _Z_VAR = (z0); // real2 _pajapapa = {h, alpha};
 
 #define Z_VAR _Z_VAR // (_ROOTS[0])
 
@@ -72,6 +79,7 @@ real2 next_point(
             _ROOT_NUM,                                      \
             _ROOTS                                          \
         );                                                  \
+        /*Z_VAR = henon(Z_VAR, _pajapapa.x, _pajapapa.y);*/     \
         Z_VAR = _ROOTS[_ROOT_NUM];                          \
     }
 

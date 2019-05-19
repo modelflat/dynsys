@@ -16,7 +16,7 @@
     #define real  float
     #define real2 float2
     #define real4 float4
-    convert_real2 convert_float2
+    #define convert_real2 convert_float2
 
     #define PI M_PI_F
     #define UNIT_R2_REAL (-0.5f)
@@ -68,8 +68,9 @@ inline real2 ccb(real2 z) {
     );
 }
 
+
 #ifndef SOLVE_CUBIC_ALPHA_FIT_PRECISION
-#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-8)
+#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-10)
 #endif
 
 // uses cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0

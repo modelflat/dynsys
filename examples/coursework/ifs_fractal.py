@@ -6,12 +6,20 @@ from multiprocessing import Lock
 
 class IFSFractal:
 
-    def __init__(self, ctx, img_shape, include_dir, options=None):
+    def __init__(self, ctx, img_shape, options=None):
         self.ctx = ctx
         self.img = alloc_image(self.ctx, img_shape)
         self.img_shape = img_shape
-        self.prg = cl.Program(ctx, IFS_SOURCE).build(
-            options=["-I", include_dir, *(options if options is not None else [])]
+
+        src = [
+            read_file(os.path.join(CL_SOURCE_PATH, "phase_plot.cl")),
+            read_file(os.path.join(CL_SOURCE_PATH, "param_map.cl")),
+            read_file(os.path.join(CL_SOURCE_PATH, "basins.cl")),
+            read_file(os.path.join(CL_SOURCE_PATH, "bif_tree.cl")),
+        ]
+
+        self.prg = cl.Program(ctx, "\n".join(src)).build(
+            options=["-I", CL_INCLUDE_PATH, *(options if options is not None else [])]
         )
         self.map_points = None
         self.basin_points = numpy.empty((numpy.prod(img_shape), 2), dtype=numpy.float64)

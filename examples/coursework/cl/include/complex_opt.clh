@@ -80,7 +80,7 @@ inline real2 ccb(real2 z) {
 // #define SOLVE_CUBIC_ALPHA_FIT_PRECISION <precision> - set precision for detecting matching alpha/beta
 
 #ifndef SOLVE_CUBIC_ALPHA_FIT_PRECISION
-#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-8)
+#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-10)
 #endif
 
 // Use cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0

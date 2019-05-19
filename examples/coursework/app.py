@@ -17,7 +17,7 @@ class CourseWork(SimpleApp):
         super().__init__("Coursework")
 
         # wrapper around all the OpenCL code
-        self.ifs = ifs.IFSFractal(self.ctx, (512, 512), include_dir=ifs.SCRIPT_DIR + "/include")
+        self.ifs = ifs.IFSFractal(self.ctx, (512, 512))
 
         # left widget is for parameter-related stuff
         self.left_wgt = ifs.make_param_wgt(cfg.h_bounds, cfg.alpha_bounds, cfg.param_map_image_shape)
@@ -219,7 +219,9 @@ class CourseWork(SimpleApp):
             c=cfg.C,
             bounds=cfg.phase_shape,
             grid_size=cfg.phase_grid_size,
-            z0=cfg.phase_z0,
+            z0=cfg.phase_z0 if not cfg.phase_plot_select_point else complex(
+                *self.right_wgt.value()
+            ),
             root_seq=self.parse_root_sequence(),
             clear=self.clear_cb.isChecked()
         )
