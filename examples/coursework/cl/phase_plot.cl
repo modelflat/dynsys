@@ -50,16 +50,18 @@ kernel void newton_fractal(
     const int2 image_size = get_image_dim(out);
 
     for (int i = 0, frozen = 0; i < iter; ++i) {
-        const int2 coord = to_size(Z_VAR, bounds, image_size);
+        for (int i = 0; i < 3; ++i) {
+            const int2 coord = to_size(_ROOTS[i], bounds, image_size);
 
-        if (in_image(coord, image_size) && !near_zero(Z_VAR, 1e-6)) {
-            put_point(out, coord, image_size);
-            frozen = 0;
-        } else {
-            if (++frozen > 32) {
-                // this likely means that solution is going to approach infinity
-                // printf("[OCL] error at slave %d: frozen!\n", get_global_id(0));
-                break;
+            if (in_image(coord, image_size) && !near_zero(_ROOTS[i], 1e-6)) {
+                put_point(out, coord, image_size);
+                frozen = 0;
+            } else {
+                if (++frozen > 32) {
+                    // this likely means that solution is going to approach infinity
+                    // printf("[OCL] error at slave %d: frozen!\n", get_global_id(0));
+                    break;
+                }
             }
         }
 

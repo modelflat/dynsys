@@ -26,6 +26,14 @@
 #define UNIT_R3_REAL  UNIT_R2_REAL
 #define UNIT_R3_IMAG -UNIT_R2_IMAG
 
+
+inline real2 cmul(real2 a, real2 b) {
+    return (real2)(
+        a.x*b.x - a.y*b.y,
+        a.y*b.x + a.x*b.y
+    );
+}
+
 // a / b for complex a, b
 inline real2 cdiv(real2 a, real2 b) {
     return (real2)(
@@ -70,7 +78,7 @@ inline real2 ccb(real2 z) {
 
 
 #ifndef SOLVE_CUBIC_ALPHA_FIT_PRECISION
-#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-10)
+#define SOLVE_CUBIC_ALPHA_FIT_PRECISION (1e-8)
 #endif
 
 // uses cardano's formulas to solve cubic equation given in form: z**3 + a*z**2 + b*z + c = 0
@@ -141,6 +149,51 @@ int solve_cubic(real2 a, real2 b, real2 c, int root, real2* roots) {
         roots[2].y = alpha[2].y - a.y / 3.0 + UNIT_R2_REAL*beta[idx].y + UNIT_R2_IMAG*beta[idx].x;
     }
     return 0;
+}
+
+real2 csqrt1(real2 x) {
+    return (real2)(
+        sqrt(length(x) + x.x) / 2, sqrt(length(x) - x.x) / 2
+    );
+}
+
+real2 ccbrt1(real2 x) {
+    real phi = atan2(x.y, x.x) / 3.0;
+    real cp; real sp = sincos(phi, &cp);
+    return cbrt(length(x)) * (real2)(sp, cp);
+}
+
+int solve_cubic_new(real2 a, real2 b, real2 c, int _, real2 roots[3]) {
+    real D = 18 * a.x*b.x*c.x - 4 * a.x*a.x*a.x * c.x - 27 * c.x*c.x;
+
+    printf("D = %f\n", D);
+
+    int err;
+    if (D > 0) {
+        err = 0;
+    } else if (D < 0) {
+        err = 2;
+    } else {
+        err = 1;
+    }
+
+    real p = (3 * b.x - a.x * a.x) / 3;
+    real q = (2 * a.x*a.x*a.x - 9 * a.x*b.x + 27 * c.x) / 27;
+
+    const real2 w1 = { 1, 0 };
+    const real2 w2 = { -0.5,  sqrt(3.0) / 2 };
+    const real2 w3 = { -0.5, -sqrt(3.0) / 2 };
+
+    real k1 = cbrt(-q/2 + sqrt(q*q / 4 + p*p*p / 27));
+    real k2 = cbrt(-q/2 - sqrt(q*q / 4 + p*p*p / 27));
+
+    printf("p = %f\n", p);
+
+    roots[0] = k1 * w1 + k2 * csq(w1);
+    roots[1] = k1 * w2 + k2 * csq(w2);
+    roots[2] = k1 * w3 + k2 * csq(w3);
+
+    return err;
 }
 
 #endif // __COMPLEX_CLH

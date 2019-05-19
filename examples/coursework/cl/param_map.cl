@@ -2,6 +2,30 @@
 #include "heapsort.clh"
 #include "util.clh"
 
+inline float3 color_for_count(int count, int total) {
+    if (count == total) {
+        return 0.25;
+    }
+    const float d = 1.0 / count * 8;
+    switch(count % 8) {
+        case 1:
+            return (float3)(1.0, 0.0, 0.0)*d;
+        case 2:
+            return (float3)(0.0, 1.0, 0.0)*d;
+        case 3:
+            return (float3)(0.0, 0.0, 1.0)*d;
+        case 4:
+            return (float3)(1.0, 0.0, 1.0)*d;
+        case 5:
+            return (float3)(1.0, 1.0, 0.0)*d;
+        case 6:
+            return (float3)(0.0, 1.0, 1.0)*d;
+        case 7:
+            return (float3)(0.5, 0.0, 0.0)*d;
+        default:
+            return count == 8 ? .5 : d;
+    }
+}
 
 // Compute samples for parameter map
 kernel void compute_points(
@@ -33,8 +57,8 @@ kernel void compute_points(
 
     const real2 param = point_from_id_dense(bounds);
 
-//    INIT_VARIABLES(z0, c, param.x, param.y);
-    INIT_VARIABLES(z0, c, param.x, 1);
+    INIT_VARIABLES(z0, c, param.x, param.y);
+//    INIT_VARIABLES(z0, c, param.x, 1);
 
     for (int i = 0; i < skip; ++i) {
         NEXT_POINT(c, seq_size, &rng_state);
@@ -68,7 +92,7 @@ kernel void draw_periods(
 
     float3 hsvcolor = (float3)(240.0 * h, 0.8, v);
 
-    float3 color = hsv2rgb(hsvcolor);
+    float3 color = color_for_count(unique, num_points);//hsv2rgb(hsvcolor);
 
     periods[coord.y * size_x + coord.x] = unique;
     // NOTE flipped y to correspond to image coordinates (top left (0,0))

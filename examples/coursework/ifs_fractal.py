@@ -4,6 +4,9 @@ from dynsys import FLOAT, ParameterizedImageWidget, ParameterSurface, allocateIm
 from multiprocessing import Lock
 
 
+numpy.random.seed(42)
+
+
 class IFSFractal:
 
     def __init__(self, ctx, img_shape, options=None):

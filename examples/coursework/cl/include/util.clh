@@ -88,6 +88,10 @@ inline void put_point(write_only image2d_t image, const int2 coord, const int2 i
     }
 }
 
+inline real2 round_point(real2 point, int to_sign) {
+    return convert_real2(convert_long2_rtz(point * pow(10.0f, (float)to_sign))) / pow(10.0f, (float)(to_sign));
+}
+
 // C++ STL pair operator< implementation
 inline int pair_lt(const real2 p1, const real2 p2) {
     if (p1.x < p2.x) {

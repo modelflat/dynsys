@@ -2,18 +2,9 @@
 #define __NEWTON_CLH
 
 #include "random.clh"
+#include "complex_v2.clh"
 
-//#define USE_OPTIMIZED_COMPLEX
-
-#ifdef USE_OPTIMIZED_COMPLEX
-#define SOLVE_CUBIC_AVOID_BRANCHES
-#define SOLVE_CUBIC_B_IS_ZERO
-#include "complex_opt.clh"
-#else
-#include "complex.clh"
-#endif
-
-#define RANDOM_ROOT(rngState) ((as_uint(random(rngState)) >> 3) % 3)
+#define RANDOM_ROOT(rng_state) ((as_uint(random(rng_state)) >> 3) % 3)
 
 #define ZERO (real2)(0, 0)
 
@@ -76,7 +67,6 @@ inline real2 henon(real2 z, real b, real a) {
             _A_COEF(Z_VAR, (c), _AB.s0, _AB.s1),            \
             ZERO,                                           \
             _C_COEF,                                        \
-            _ROOT_NUM,                                      \
             _ROOTS                                          \
         );                                                  \
         /*Z_VAR = henon(Z_VAR, _pajapapa.x, _pajapapa.y);*/     \
