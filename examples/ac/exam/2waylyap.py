@@ -1,3 +1,5 @@
+from matplotlib.ticker import MultipleLocator
+
 from common import *
 from dynsys import SimpleApp, vStack, hStack, createSlider
 
@@ -39,24 +41,24 @@ EQUATIONS_CANONICAL = r"""
 // - Equations:
 //   - Driver:
 #define USER_equation_d_x(x1, y1, a1, b1, x2, y2, a2, b2) \
-    f(x1, y1, a1, b1) - eps*(f(x2, y2, a2, b2) - f(x1, y1, a1, b1))
+    f(x1, y1, a1, b1) + eps*(f(x2, y2, a2, b2) - f(x1, y1, a1, b1))
 #define USER_equation_d_y(x1, y1, a1, b1, x2, y2, a2, b2) \
     b1*x1
 //   - Response:
 #define USER_equation_r_x(x1, y1, a1, b1, x2, y2, a2, b2) \
-    f(x2, y2, a2, b2) - eps*(f(x1, y1, a1, b1) - f(x2, y2, a2, b2))
+    f(x2, y2, a2, b2) + eps*(f(x1, y1, a1, b1) - f(x2, y2, a2, b2))
 #define USER_equation_r_y(x1, y1, a1, b1, x2, y2, a2, b2) \
     b2*x2
 
 // - Variations:
 //   - Driver:
 #define USER_variation_d_x(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
-    y1_ - 2*a1*x1*x1_ - eps*(-2*a2*x2*x2_ + y2_ + 2*a1*x1*x1_ - y1_)
+    y1_ - 2*a1*x1*x1_ + eps*(-2*a2*x2*x2_ + y2_ + 2*a1*x1*x1_ - y1_)
 #define USER_variation_d_y(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
     b1*x1_
 //   - Response:
 #define USER_variation_r_x(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
-    y2_ - 2*a2*x2*x2_ - eps*(-2*a1*x1*x1_ + y1_ + 2*a2*x2*x2_ - y2_)
+    y2_ - 2*a2*x2*x2_ + eps*(-2*a1*x1*x1_ + y1_ + 2*a2*x2*x2_ - y2_)
 #define USER_variation_r_y(x1, y1, x1_, y1_, a1, b1, x2, y2, x2_, y2_, a2, b2) \
     b2*x2_
 
@@ -390,20 +392,22 @@ class App(SimpleApp):
 
         self.setLayout(vStack(
             # it_sl_el,
-            rb_sl_el,
+            # rb_sl_el,
             self.canvas
         ))
 
         self.compute_and_draw()
 
     def compute_cle_series(self):
-        eps = numpy.linspace(0, 1.0, 100)
+        eps = numpy.array([*numpy.linspace(0.09, 0.1075, 500),
+                           # *numpy.linspace(0.08, 0.2, 250)
+                           ], dtype=numpy.float64)
         return eps, self.cle.compute_range_of_eps_same_systems(
             self.queue,
             iter=1 << 16,
             # iter=self.iter_slider.value(),
-            drv=((1e-4, 1e-4), 1.4, 0.3),
-            res=((1e-4, 1e-4), 1.4, 0.3),
+            drv=((0.0, 0.0), 1.4, 0.3),
+            res=((0.1, 0.1), 1.4, 0.3),
             eps=eps
         )
 
@@ -416,9 +420,7 @@ class App(SimpleApp):
         print(lyap)
 
         for i in range(4):
-            ax.plot(eps, lyap.T[i], label="L{} of {}".format(
-                i % 2, "drive" if i < 2 else "resp."
-            ))
+            ax.plot(eps[1:], lyap.T[i][1:], label=f"L{i}")
 
         # lp = lyap.T[2][0]
         # for i,l in enumerate(lyap.T[2][1:]):
@@ -426,11 +428,17 @@ class App(SimpleApp):
         #         print(eps[i])
         #     lp = l
 
+        spacing = 0.00025
+        minorLocator = MultipleLocator(spacing)
+        # Set minor tick locations.
+        ax.xaxis.set_minor_locator(minorLocator)
+        # ax.yaxis.set_minor_locator(minorLocator)
 
         # ax.plot(eps, lyap.T[2], label="L0 of response")
         ax.axhline(0, color="black", linestyle="--")
         ax.set_xlabel("ε")
         ax.set_ylabel("L")
+        ax.grid(which="both")
         ax.legend()
 
         # self.figure.tight_layout()
