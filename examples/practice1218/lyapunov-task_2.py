@@ -63,7 +63,7 @@ class DiscreteMapLyapunov(SimpleApp):
         res, min_, max_ = self.lyapMapIkeda(lyapId)
 
         self.label = ParameterizedImageWidget(
-            bounds=(1, 6, 0, .3), names=("A", "B"), shape=(512, 512))
+            bounds=(1, 6, 0, .3), names=("A", "B"), shape=(1920, 1080))
         self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
         self.label.setImage(res)
         self.setLayout(
@@ -79,10 +79,10 @@ class DiscreteMapLyapunov(SimpleApp):
         print(res)
 
     def lyapMapIkeda(self, lyapId=0):
-        lyap = LCE2Map.LyapunovMap(self.ctx, self.queue, Fn_Ikeda, (400, 256))
+        lyap = LCE2Map.LyapunovMap(self.ctx, self.queue, Fn_Ikeda, (1920, 1080))
         t = time.perf_counter()
-        res, min_, max_ = lyap((-.8, .8), lyapId, (1.0, 6.0), (0.0, 0.3), iter=100)
-        print("Series %.3f s" % (time.perf_counter() - t))
+        res, min_, max_ = lyap((-.8, .8), lyapId, (1.0, 6.0), (0.0, 0.3), iter=1 << 12)
+        print("Map %.3f s" % (time.perf_counter() - t))
         return res, min_, max_
 
     def lyapSeriesIkeda(self, fig):
@@ -92,7 +92,7 @@ class DiscreteMapLyapunov(SimpleApp):
         par = numpy.linspace(1.0, 6.0, 512)
         t = time.perf_counter()
         res = lyap((-.8, .8), (2.0, 0.3), 0, par, iter=600)
-        print("Map %.3f s" % (time.perf_counter() - t))
+        print("Series %.3f s" % (time.perf_counter() - t))
         sub.plot(par, res.T[0], "r-", par, res.T[1], "g-")
 
 

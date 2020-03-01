@@ -4,6 +4,8 @@ import pyopencl as cl
 from dynsys import allocateImage, SimpleApp, Image2D, vStack, ParameterizedImageWidget, hStack
 from dynsys.LCE import dummyOption
 
+from PyQt5.QtWidgets import QApplication
+
 
 BOGDANOV = r"""
 
@@ -89,7 +91,7 @@ def generatePointsInEps(stablePoint: tuple, eps: tuple, pointCount: int, dtype=n
 
 class Homoclinic:
 
-    def __init__(self, ctx, queue, spaceShape, imageShape=(512, 512)):
+    def __init__(self, ctx, queue, spaceShape, imageShape=(1920, 1080)):
         self.ctx, self.queue = ctx, queue
         self.prg = cl.Program(self.ctx, "\n".join(
             (BOGDANOV, SOURCE,)
@@ -99,7 +101,7 @@ class Homoclinic:
         self.imageShape = imageShape
         self.hostImage, self.deviceImage = allocateImage(self.ctx, self.imageShape)
 
-    def clear(self, readBack=False, color=(1.0, 1.0, 1.0, 1.0)):
+    def clear(self, readBack=False, color=(0.0, 0.0, 0.0, 1.0)):
         cl.enqueue_fill_image(
             self.queue, self.deviceImage,
             color=numpy.array(color, dtype=numpy.float32),
@@ -154,11 +156,11 @@ class Test(SimpleApp):
 
     def __init__(self):
         super().__init__("123")
-        self.homo = Homoclinic(self.ctx, self.queue, (-5, 5, -5, 5))
+        self.homo = Homoclinic(self.ctx, self.queue, (-25, 25, -25, 25))
 
         self.sel = ParameterizedImageWidget(
-            bounds=(-1, 1, -1, 1), names=("u", "eps"),
-            shape=(512, 512)
+            bounds=(-0.5, 0.5, -0.5, 0.5), names=("u", "eps"),
+            shape=(1920, 1080)
         )
         self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
         self.sel.valueChanged.connect(self.draw)
@@ -168,14 +170,26 @@ class Test(SimpleApp):
             hStack(self.sel, self.lab)
         )
 
-        self.draw()
+        self.draw(False)
+
+    def draw(self, loop=True):
+        import time
+        cur_u, cur_eps = self.sel.value()
+        while loop:
+            u, eps = self.sel.value()
+            self.app.processEvents()
+            time.sleep(0.005)
+            self.lab.setTexture(
+                self.homo((1, 0), (1e-3, 1e-3), 1 << 16, cur_u, cur_eps, 1 << 10)
+            )
+            if self.sel.value() == (u, eps):
+                cur_u = u + 0.001
+                cur_eps = cur_eps + 0.001
+            else:
+                cur_u = u
+                cur_eps = cur_eps
 
 
-    def draw(self):
-        u, eps = self.sel.value()
-        self.lab.setTexture(
-            self.homo((1, 0), (1e-3, 1e-3), 1024, u, eps, 1000)
-        )
 
 
 class Henon(SimpleApp):
@@ -185,7 +199,7 @@ class Henon(SimpleApp):
         self.homo = Homoclinic(self.ctx, self.queue, (-5, 5, -5, 5))
 
         self.sel = ParameterizedImageWidget(
-            bounds=(-1, 1, -1, 1), names=("u", "eps"),
+            bounds=(-2, 2, -2, 2), names=("u", "eps"),
             shape=(512, 512)
         )
         self.sel._imageWidget.setTexture(numpy.empty((512, 512, 4), dtype=numpy.int32))
@@ -202,7 +216,7 @@ class Henon(SimpleApp):
     def draw(self):
         u, eps = self.sel.value()
         self.lab.setTexture(
-            self.homo((1, 0), (1e-3, 1e-3), 1024, u, eps, 1000)
+            self.homo((1, 0), (1e-3, 1e-3), 1 << 16, u, eps, 1 << 10)
         )
 
 

@@ -115,9 +115,9 @@ class ContinuousMapLyapunov(SimpleApp):
         sub.legend()
 
     def lyapMap(self, hBounds, gBounds, lyapId):
-        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (1, 1))
+        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (1920, 1080))
         t = time.perf_counter()
-        res, min_, max_ = lyap(startPoint, lyapId, hBounds, gBounds, eps, t0=0, dt=1, iter=1000, stepIter=15)
+        res, min_, max_ = lyap(startPoint, lyapId, hBounds, gBounds, eps, t0=0, dt=1, iter=1024, stepIter=1)
         print("Map %.3f s" % (time.perf_counter() - t))
         return res, min_, max_
 
@@ -139,7 +139,7 @@ class ContinuousMapRossler(SimpleApp):
         res, min_, max_ = self.lyapMap((0.06, 0.15), (0.75, 0.95), lyapId)
 
         self.label = Image2D(targetShape=(True, True))
-        # self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
+        self.label2 = QLabel("L%d varies from %.3f (blue) to %.3f (red)" % (lyapId, min_, max_))
         self.label.setTexture(res)
         self.setLayout(
             hStack(
@@ -160,14 +160,14 @@ class ContinuousMapRossler(SimpleApp):
         sub.legend()
 
     def lyapMap(self, hBounds, gBounds, lyapId):
-        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (1, 1))
+        lyap = LCE.LyapunovMap(self.ctx, self.queue, Fn_KPR, (1920, 1080))
         t = time.perf_counter()
-        res, min_, max_ = lyap((1, 1, 1), lyapId, hBounds, gBounds, 0.2, t0=0, dt=1, iter=1, stepIter=1)
+        res, min_, max_ = lyap((1, 1, 1), lyapId, hBounds, gBounds, 0.2, t0=0, dt=1, iter=128, stepIter=1)
         print("Map %.3f s" % (time.perf_counter() - t))
         return res, min_, max_
 
 
 
 if __name__ == '__main__':
-    ContinuousMapLyapunov().run()
-    #ContinuousMapRossler().run()
+    # ContinuousMapLyapunov().run()
+    ContinuousMapRossler().run()

@@ -399,7 +399,7 @@ class App(SimpleApp):
         self.compute_and_draw()
 
     def compute_cle_series(self):
-        eps = numpy.array([*numpy.linspace(0.09, 0.1075, 500),
+        eps = numpy.array([*numpy.linspace(0.17045, 0.1707, 500),
                            # *numpy.linspace(0.08, 0.2, 250)
                            ], dtype=numpy.float64)
         return eps, self.cle.compute_range_of_eps_same_systems(
