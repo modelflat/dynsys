@@ -1,6 +1,6 @@
 from mako.template import Template
 
-with open("pocstructs.templates/rk4.mako.cl") as f:
+with open("templates/rk4.mako.cl") as f:
     tpl = Template(f.read())
 
 var_type = "real"
@@ -39,3 +39,4 @@ print(tpl.render(
     assign=assign,
     call_equations=call_equations
 ))
+

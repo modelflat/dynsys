@@ -408,10 +408,10 @@ class App(SimpleApp):
         self.figure.clear()
         ax = self.figure.subplots(1, 1)
 
-        for i in range(4):
-            ax.plot(eps, lyap.T[i], label="L{} of {}".format(
-                i % 2, "drive" if i < 2 else "resp."
-            ))
+        # for i in range(4):
+        #     ax.plot(eps, lyap.T[i], label="L{} of {}".format(
+        #         i % 2, "drive" if i < 2 else "resp."
+        #     ))
 
         # lp = lyap.T[2][0]
         # for i,l in enumerate(lyap.T[2][1:]):
@@ -419,11 +419,12 @@ class App(SimpleApp):
         #         print(eps[i])
         #     lp = l
 
-        # ax.plot(eps, lyap.T[2], label="L0 of response")
+        ax.plot(eps, lyap.T[2], label="L0 of response")
         ax.axhline(0, color="black", linestyle="--")
         ax.set_xlabel("ε")
         ax.set_ylabel("L")
         ax.legend()
+        ax.grid()
 
         # self.figure.tight_layout()
         self.canvas.draw()
