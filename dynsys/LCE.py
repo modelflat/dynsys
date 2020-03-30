@@ -106,14 +106,14 @@ void rk4(
 
 SOURCE_LYAP = r"""
 void LCE(
-    vec_t y[N], 
-    real param[N - 1], 
+    __modif vec_t y[N], 
+    __modif real param[N - 1], 
     real tStart, real tStep, int iter, int stepIter, 
     real L[N - 1]
 );
 void LCE(
-    vec_t y[N], 
-    real param[N - 1], 
+    __modif vec_t y[N], 
+    __modif real param[N - 1], 
     real tStart, real tStep, int iter, int stepIter, 
     real L[N - 1]
 ) {
