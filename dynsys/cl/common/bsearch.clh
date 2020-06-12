@@ -1,0 +1,27 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+// Performs binary search in a global array.
+int binary_search(int, const global uint*, uint);
+
+int binary_search(int size, const global uint* arr, uint value) {
+    int l = 0, r = size;
+
+    while (l < r) {
+        const int mid = (r + l) / 2;
+        const uint mid_value = arr[mid];
+
+        if (mid_value == value) {
+            return mid;
+        }
+        if (r == l + 1) {
+            return -1;
+        }
+        if (mid_value < value) {
+            l = mid;
+        } else {
+            r = mid;
+        }
+    }
+
+    return (r + l) / 2;
+}

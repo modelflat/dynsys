@@ -1,0 +1,32 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+// MWC64X pseudo-random number generator.
+// See: http://cas.ee.ic.ac.uk/people/dt10/research/rngs-gpu-mwc64x.html
+inline uint MWC64X(uint2 *state) {
+    enum { A = 4294883355U };
+    uint x = (*state).x;
+    uint c = (*state).y;
+    const uint res = x ^ c;
+    const uint hi = mul_hi(x, A);
+    x = x * A + c;
+    c = hi + (x < c);
+    *state = (uint2)(x, c);
+    return res;
+}
+
+void init_state(ulong, uint2*);
+
+void init_state(ulong seed, uint2* state) {
+    const int id = get_global_id(0) + 1;
+    const uint2 s = as_uint2(seed);
+    (*state) = (uint2)(
+        // create a mixture of id and two seeds
+        (id + s.x & 0xFFFF) * s.y,
+        (id ^ (s.y & 0xFFFF0000)) ^ s.x
+    );
+}
+
+// Retrieve a random float in range [0.0; 1.0] (both inclusive)
+inline float random(uint2* state) {
+    return ((float)MWC64X(state)) / (float)0xffffffff;
+}

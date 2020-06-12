@@ -1,0 +1,153 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+<%include file="/common/types.clh" />
+
+inline void do_step(PARAMETERS* params, int id, int i, point_t* point) {
+% for name in system.parameters:
+    const real_t ${name} = params->${name};
+% endfor
+% for i, name in enumerate(system.variables):
+    const real_t ${name} = point->s${i};
+% endfor
+    // arbitrary user-provided code
+% for line in system.before_step:
+    ${line}
+% endfor
+    // actual step
+% for i, eq in enumerate(system.equations):
+    // ${eq.var}
+    point->s${i} = ${eq.expr};
+% endfor
+    // arbitrary user-provided code
+% for line in system.after_step:
+    ${line}
+% endfor
+}
+
+<%def name="init()">
+    // linear id
+    const int id = (
+          (get_global_id(2) - get_global_offset(2)) * get_global_size(1) * get_global_size(0)
+        + (get_global_id(1) - get_global_offset(1)) * get_global_size(0)
+        + (get_global_id(0) - get_global_offset(0))
+    );
+    // this is needed because on some platforms passing struct by value is broken
+    PARAMETERS params = *params_;
+    ${caller.body()}
+</%def>
+
+<%def name="skip()">
+    for (int i = 0; i < skip; ++i) {
+        do_step(&params, id, i, &point);
+        ${caller.body()}
+    }
+</%def>
+
+<%def name="iter()">
+    for (int i = 0; i < iter; ++i) {
+        do_step(&params, id, i, &point);
+        ${caller.body()}
+    }
+</%def>
+
+<%def name="iterate()">
+kernel void iterate(
+    const int skip,
+    const int iter,
+    ${caller.args()}
+    const global PARAMETERS* params_
+) {
+    <%self:init>
+    ${caller.init()}
+    </%self:init>
+
+    % for line in system.before_start:
+    ${line};
+    % endfor
+
+    <%self:skip>
+    </%self:skip>
+
+    <%self:iter>
+    ${caller.iter()}
+    </%self:iter>
+
+    ${caller.finish()}
+}
+</%def>
+
+<%def name="iterate_capture()">
+kernel void iterate_capture(
+    const int skip,
+    const int iter,
+    ${caller.args()}
+    global real_t* points,
+    const global PARAMETERS* params_
+) {
+    <%self:init>
+    ${caller.init()}
+    </%self:init>
+
+    % for line in system.before_start:
+    ${line};
+    % endfor
+
+    <%self:skip>
+    </%self:skip>
+
+    const size_t output_coord = id * iter;
+
+    <%self:iter>
+        pt_store(point, output_coord + i, points);
+        ${caller.iter()}
+    </%self:iter>
+
+    ${caller.finish()}
+}
+</%def>
+
+<%def name="iterate_capture_with_periods()">
+kernel void iterate_capture_with_periods(
+    const int skip,
+    const int iter,
+    const real_t tolerance,
+    const real_t infinity_check,
+    ${caller.args()}
+    const global PARAMETERS* params_,
+    global real_t* points,
+    global uint* periods
+) {
+    <%self:init>
+    ${caller.init()}
+    </%self:init>
+
+    % for line in system.before_start:
+    ${line};
+    % endfor
+
+    <%self:skip>
+    </%self:skip>
+
+    const size_t output_coord = id * iter;
+    const point_t base = point;
+
+    int period = iter;
+    int period_ready = 0;
+
+    <%self:iter>
+        pt_store(point, output_coord + i, points);
+
+        if (!period_ready && (any(isnan(point)) || any(fabs(point) > infinity_check))) {
+            period = 0;
+            period_ready = 1;
+        }
+
+        if (!period_ready && (all(fabs(base - point) < tolerance))) {
+            period = i + 1;
+            period_ready = 1;
+        }
+    </%self:iter>
+
+    periods[id] = period;
+}
+</%def>

@@ -1,0 +1,13 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+inline POINT point_from_id() {
+    POINT point;
+    // hello ub
+    return point;
+}
+
+void put_point_to_image(write_only IMAGE image, PARAMETERS*, int, int, POINT*);
+
+void put_point_to_image(write_only IMAGE image, PARAMETERS* params, int id, int i, POINT* point) {
+    // not implemented
+}

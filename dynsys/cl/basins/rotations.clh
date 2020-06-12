@@ -1,0 +1,73 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+<%include file="/common/types.clh" />
+
+#ifndef ROTATION_MAX_ITER
+#error ROTATION_MAX_ITER should be defined at compile-time!
+#endif
+
+#define ROTATION_PT_LESS(a, b) (length(a) < length(b))
+#define ROTATION_PT_GREATER(a, b) (length(a) > length(b))
+#define ROTATION_PT_NOT_EQUAL(a, b) (ROTATION_PT_LESS(a, b) || ROTATION_PT_GREATER(a, b))
+
+// Find minimal rotation of a sequence of points
+// https://en.wikipedia.org/wiki/Lexicographically_minimal_string_rotation#Booth's_Algorithm
+// TODO this algorithm requires linear amount of memory in sequence size, can we do better?
+int find_minimal_rotation(int, size_t, const global real_t*, real_t);
+
+int find_minimal_rotation(int n_points, size_t shift, const global real_t* points, real_t tol) {
+    char failure[ROTATION_MAX_ITER];
+    for (int i = 0; i < n_points; ++i) {
+        failure[i] = -1;
+    }
+
+    int k = 0;
+
+    for (int j = 1; j < n_points; ++j) {
+        const POINT sj = pt_load(shift + j, points);
+
+        int i = failure[j - k - 1];
+        POINT sj_next = pt_load(shift + ((k + i + 1) % n_points), points);
+
+        while (i != -1 && ROTATION_PT_NOT_EQUAL(sj, sj_next)) {
+            if (ROTATION_PT_LESS(sj, sj_next)) {
+                k = j - i - 1;
+            }
+            i = failure[i];
+            sj_next = pt_load(shift + ((k + i + 1) % n_points), points);
+        }
+
+        if (ROTATION_PT_NOT_EQUAL(sj, sj_next)) {
+            const POINT sk = pt_load(shift + (k % n_points), points);
+            if (ROTATION_PT_LESS(sj, sk)) {
+                k = j;
+            }
+            failure[j - k] = -1;
+        } else {
+            failure[j - k] = i + 1;
+        }
+    }
+
+    return k;
+}
+
+// Rotate sequence of points in-place
+void rotate_sequence(int, size_t, global real_t*, int);
+
+void rotate_sequence(int n_points, size_t shift, global real_t* points, int k) {
+    for (int c = 0, v = 0; c < n_points; ++v) {
+        ++c;
+        int target = v;
+        int target_next = v + k;
+        point_t tmp = pt_load(shift + v, points);
+        while (target_next != v) {
+            ++c;
+            pt_store(
+                pt_load(shift + target_next, points), shift + target, points
+            );
+            target = target_next;
+            target_next = (target_next + k) % n_points;
+        }
+        pt_store(tmp, shift + target, points);
+    }
+}

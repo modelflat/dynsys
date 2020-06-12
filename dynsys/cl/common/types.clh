@@ -1,0 +1,78 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+<%
+    dim = len(inst.system.equations)
+    real_type = inst.system._real_type_name
+%>
+
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
+typedef ${real_type}   real_t;
+#define convert_real convert_${real_type}
+
+typedef ${real_type}2 real2_t;
+
+% if dim == 1:
+
+typedef real_t point_t;
+#define pt_load(idx, ptr) *(ptr + idx)
+#define pt_store(value, idx, ptr) *(ptr + idx) = value
+
+% elif dim in {2, 3, 4, 8, 16}:
+
+typedef ${real_type}${dim} point_t;
+#define pt_load(idx, ptr) vload${dim}(idx, ptr)
+#define pt_store(value, idx, ptr) vstore${dim}(value, idx, ptr)
+
+% elif dim < 16:
+
+struct __POINT {
+% for i in range(dim):
+    real_t s${i};
+% endfor
+}
+__attribute__ ((packed));
+
+typedef struct __POINT point_t;
+
+__attribute__((vec_type_hint(float4)))
+inline point_t pt_load(size_t idx, const global real_t* ptr) {
+    point_t point = {
+% for i in range(dim):
+        *(ptr + ${dim}*idx + ${i})${'' if i == dim - 1 else ','}
+% endfor
+    };
+    return point;
+}
+
+__attribute__((vec_type_hint(float4)))
+inline void pt_store(point_t value, size_t idx, global real_t* ptr) {
+% for i in range(dim):
+    *(ptr + ${dim}*idx + ${i}) = value.s${i};
+% endfor
+}
+
+% else:
+<% raise ValueError("dim should belong to [1; 16] interval!") %>
+% endif
+
+// TODO more sophisticated rounding?
+// TODO move into separate file?
+inline point_t pt_round(point_t value, real_t tolerance) {
+% for i in range(dim):
+    value.s${i} = convert_real(convert_long_rtz(value.s${i} / tolerance)) * tolerance;
+% endfor
+    return value;
+}
+
+struct _PARAMETERS {
+% for name, type in system._parameters_with_types().items():
+    ${type} ${name};
+% endfor
+};
+
+#define POINT point_t
+#define PARAMETERS struct _PARAMETERS
+
+// TODO add support for 3D images
+#define IMAGE image2d_t

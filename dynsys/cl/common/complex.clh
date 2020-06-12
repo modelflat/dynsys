@@ -1,0 +1,157 @@
+// <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+#define IS_REAL_CHECK_THRESHOLD 1e-32
+
+#define ZERO_CHECK_THRESHOLD 1e-32
+
+#define SQRT_3_DIV_2 0.866025403784438596
+
+#define UNITY_ROOT_1 (real2_t)(-.5, +SQRT_3_DIV_2)
+
+#define UNITY_ROOT_2 (real2_t)(-.5, -SQRT_3_DIV_2)
+
+#define PI M_PI
+
+
+// a / b for complex a, b
+inline real2_t cdiv(real2_t a, real2_t b) {
+    return (real2_t)(
+        (a.x*b.x + a.y*b.y),
+        (a.y*b.x - a.x*b.y)
+    ) / (b.x*b.x + b.y*b.y);
+}
+
+// a * b for complex a, b
+inline real2_t cmul(real2_t a, real2_t b) {
+    return (real2_t)(
+        a.x*b.x - a.y*b.y, a.y*b.x + a.x*b.y
+    );
+}
+
+// z ** 2 for complex z
+inline real2_t csq(real2_t z) {
+
+    return (real2_t)(z.x*z.x - z.y*z.y, 2*z.x*z.y);
+}
+
+// z ** 3 for complex z
+inline real2_t ccb(real2_t z) {
+    return (real2_t)(
+        z.x * (z.x * z.x - 3 * z.y * z.y),
+        z.y * (3 * z.x * z.x - z.y * z.y)
+    );
+}
+
+// z ** (1/2) for complex z (principal)
+inline real2_t csqrt1(real2_t x) {
+    return (real2_t)(
+        sqrt((length(x) + x.x) / 2),
+        sign(x.y) * sqrt((length(x) - x.x) / 2)
+    );
+}
+
+// z ** (1/3) for complex z (principal)
+inline real2_t ccbrt1(real2_t x) {
+    real_t phi = atan2(x.y, x.x) / 3;
+    real_t cp; real_t sp = sincos(phi, &cp);
+    return cbrt(length(x)) * (real2_t)(cp, sp);
+}
+
+// checks if complex number is real
+inline int is_real(real2_t x) {
+
+    return fabs(x.y) <= IS_REAL_CHECK_THRESHOLD;
+}
+
+// multiplies by second cubic unity root (rotates by 2PI/3)
+inline real2_t unity_ccbrt_1_mul(const real2_t a) {
+    return (real2_t)(
+        -a.x / 2 - a.y*SQRT_3_DIV_2, -a.y / 2 + a.x*SQRT_3_DIV_2
+    );
+}
+
+// multiplies by second cubic unity root (rotates by 2PI/3)
+inline real2_t unity_ccbrt_2_mul(const real2_t a) {
+    return (real2_t)(
+        -a.x / 2 + a.y*SQRT_3_DIV_2, -a.y / 2 - a.x*SQRT_3_DIV_2
+    );
+}
+
+
+// solve_cubic -- http://www.ursoswald.ch/download/CUBIC.pdf
+//https://docplayer.net/20747283-Cubic-and-quartic-formulas-james-t-smith-san-francisco-state-university.html
+
+// TODO optimize solve_cubic functions
+// probably should be merged into single function. also pay
+// attention to things such as multiplying by unity root
+
+// solve_cubic -- general case
+inline void solve_depressed_cubic(real2_t p, real2_t q, real2_t roots[3]) {
+    const real2_t d = csqrt1(csq(q / 2) + ccb(p / 3));
+
+    real2_t u = ccbrt1(-q / 2 + d);
+    real2_t v = -cdiv(p, 3 * u);
+    roots[0] = u + v;
+
+    u = unity_ccbrt_1_mul(u);
+    v = unity_ccbrt_2_mul(v);
+    roots[1] = u + v;
+
+    u = unity_ccbrt_1_mul(u);
+    v = unity_ccbrt_2_mul(v);
+    roots[2] = u + v;
+}
+
+// solve_cubic -- real p, q
+inline void solve_depressed_real_cubic(real_t p, real_t q, real2_t roots[3]) {
+    real_t d = q*q / 4 + p*p*p / 27;
+    if        (d > 0) { // "classical" case
+        d = sqrt(d);
+        real_t u1 = cbrt(-q / 2 + d);
+        real_t v1 = cbrt(-q / 2 - d);
+        roots[0] = (real2_t)(u1 + v1, 0);
+        roots[1] = (real2_t)(-(u1 + v1) / 2, +(u1 - v1) * SQRT_3_DIV_2);
+        roots[2] = (real2_t)(-(u1 + v1) / 2, -(u1 - v1) * SQRT_3_DIV_2);
+    } else if (d < 0) { // "irreducible" case
+        const real_t acs = acos(3 * q / (2 * p) * sqrt(-3 / p)) / 3;
+        for (int i = 0; i < 3; ++i) {
+            roots[i] = (real2_t)(
+                2*sqrt(-p / 3)*cos(acs + 2*i*PI / 3)
+            , 0);
+        }
+    } else { // d == 0  // "vanishing" discriminant
+        const real_t qcb = cbrt(q / 2);
+        roots[0] = (real2_t)(qcb, 0);
+        roots[1] = (real2_t)(qcb, 0);
+        roots[2] = (real2_t)(-2 * qcb, 0);
+    }
+}
+
+// solves cubic equation given in form z**3 + a*z**2 + b*z + c = 0
+int solve_cubic(real2_t, real2_t, real2_t, real2_t[3]);
+int solve_cubic(real2_t a, real2_t b, real2_t c, real2_t roots[3]) {
+    int code;
+    if (all(fabs(b) <= (real_t)ZERO_CHECK_THRESHOLD) && all(fabs(c) <= (real_t)ZERO_CHECK_THRESHOLD)) {
+        roots[0] = -a;
+        roots[1] = +0;
+        roots[2] = +0;
+        code = 2;
+    } else {
+        const real2_t p = b - csq(a) / 3;
+        const real2_t q = (2 * ccb(a) - 9 * cmul(a, b)) / 27 + c;
+
+        if (is_real(p) && is_real(q)) {
+            solve_depressed_real_cubic(p.x, q.x, roots);
+            code = 0;
+        } else {
+            solve_depressed_cubic(p, q, roots);
+            code = 1;
+        }
+
+        roots[0] -= a / 3;
+        roots[1] -= a / 3;
+        roots[2] -= a / 3;
+    }
+
+    return code;
+}

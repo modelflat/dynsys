@@ -1,0 +1,8 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+// Initialises dense grid of values
+<%def init_dense_grid()>
+
+const linear_id = get_global_id(1) * get_global_size(0) + get_global_id(0);
+
+</%def>
