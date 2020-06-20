@@ -59,10 +59,14 @@ inline void pt_store(point_t value, size_t idx, global real_t* ptr) {
 // TODO more sophisticated rounding?
 // TODO move into separate file?
 inline point_t pt_round(point_t value, real_t tolerance) {
+% if dim == 1:
+    return convert_real(convert_long_rtz(value / tolerance)) * tolerance;
+% else:
 % for i in range(dim):
     value.s${i} = convert_real(convert_long_rtz(value.s${i} / tolerance)) * tolerance;
 % endfor
     return value;
+% endif
 }
 
 struct _PARAMETERS {

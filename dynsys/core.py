@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 import numpy
 import pyopencl as cl
@@ -43,6 +43,18 @@ def allocate_on_device(queue, buf):
 def fetch_from_device(queue, dest, buf):
     cl.enqueue_copy(queue, dest, buf)
     return dest
+
+
+def reallocate(
+        ctx: cl.Context, buf: Optional[cl.Buffer], flags: cl.mem_flags, size: int,
+        shrink_threshold: float = 0.5,
+):
+    if buf is None:
+        return cl.Buffer(ctx, flags, size)
+    if buf.size < size or size <= shrink_threshold * buf.size:
+        del buf
+        return cl.Buffer(ctx, flags, size)
+    return buf
 
 
 def get_endianness(ctx: cl.Context):

@@ -6,8 +6,20 @@
 #error ROTATION_MAX_ITER should be defined at compile-time!
 #endif
 
-#define ROTATION_PT_LESS(a, b) (length(a) < length(b))
-#define ROTATION_PT_GREATER(a, b) (length(a) > length(b))
+% if system.dimensions in {1, 2, 3, 4}:
+#define pt_length length
+% else:
+inline real_t pt_length(point_t x) {
+    return sqrt(
+        % for i in range(system.dimensions):
+        x.s${i} * x.s${i} ${"+" if i != system.dimensions - 1 else ""}
+        % endfor
+    );
+}
+% endif
+
+#define ROTATION_PT_LESS(a, b) (pt_length(a) < pt_length(b))
+#define ROTATION_PT_GREATER(a, b) (pt_length(a) > pt_length(b))
 #define ROTATION_PT_NOT_EQUAL(a, b) (ROTATION_PT_LESS(a, b) || ROTATION_PT_GREATER(a, b))
 
 // Find minimal rotation of a sequence of points

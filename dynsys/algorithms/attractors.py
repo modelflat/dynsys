@@ -1,19 +1,26 @@
 import warnings
-from typing import Tuple, Callable, List
+from typing import Tuple, Callable, List, NamedTuple
 
 import numpy
 import pyopencl as cl
 
-from core import CLImage
+from core import CLImage, reallocate
 from cl import WithProgram, assemble, load_template
 from equation import EquationSystem, Parameters
 from grid import Grid
 
 
-SOURCE = load_template("basins/kernels.cl")
+SOURCE = load_template("attractors/kernels.cl")
 
 
 UINT_SIZE = numpy.uint32(0).nbytes
+
+
+class Attractor(NamedTuple):
+    count: int
+    hash: int
+    period: int
+    values: numpy.ndarray
 
 
 class Attractors(WithProgram):
@@ -35,67 +42,48 @@ class Attractors(WithProgram):
         return assemble(SOURCE, system=self.system, **kwargs)
 
     def _allocate_buffers(self, shape: Tuple[int], n_iter: int, dimensions: int):
-        real_size = self.system.real_type(0).nbytes
-
-        new_size = dimensions * numpy.prod(shape) * n_iter * real_size
-
-        if self._points_dev is None or new_size != self._points_dev.size:
-            if self._points_dev is not None:
-                # TODO smarter reallocations - do not reallocate if smaller size needed, for example
-                del self._points_dev
-                del self._periods_dev
-            self._points_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=new_size)
-            new_size_periods = numpy.prod(shape) * UINT_SIZE
-            self._periods_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=new_size_periods)
+        new_size = dimensions * numpy.prod(shape) * n_iter * self.system.real_type(0).nbytes
+        self._points_dev = reallocate(self.ctx, self._points_dev, cl.mem_flags.READ_WRITE, new_size)
+        new_size_periods = numpy.prod(shape) * UINT_SIZE
+        self._periods_dev = reallocate(self.ctx, self._periods_dev, cl.mem_flags.READ_WRITE, new_size_periods)
 
     def _allocate_hash_table(self, queue: cl.CommandQueue, shape: Tuple[int], table_size: int):
-        new_size = UINT_SIZE * numpy.prod(shape)
-
-        if self._sequence_hashes_dev is None or new_size != self._sequence_hashes_dev.size:
-            if self._sequence_hashes_dev is not None:
-                # TODO smarter reallocations - do not reallocate if smaller size needed, for example
-                del self._sequence_hashes_dev
-            self._sequence_hashes_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=new_size)
-
+        self._sequence_hashes_dev = reallocate(
+            self.ctx, self._sequence_hashes_dev, cl.mem_flags.READ_WRITE, size=UINT_SIZE * numpy.prod(shape)
+        )
         new_size = UINT_SIZE * table_size
-        if self._table_dev is None or new_size != self._table_dev.size:
-            if self._table_dev is not None:
-                # TODO smarter reallocations - do not reallocate if smaller size needed, for example
-                del self._table_dev
-                del self._table_data_dev
-            self._table_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=new_size)
-            self._table_data_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=new_size)
+        self._table_dev = reallocate(self.ctx, self._table_dev, cl.mem_flags.READ_WRITE, new_size)
+        self._table_data_dev = reallocate(self.ctx, self._table_data_dev, cl.mem_flags.READ_WRITE, new_size)
 
-        cl.enqueue_fill_buffer(queue, self._table_dev, numpy.uint32(0), 0, self._table_dev.size)
-        cl.enqueue_fill_buffer(queue, self._table_data_dev, numpy.uint32(0), 0, self._table_data_dev.size)
+        cl.enqueue_fill_buffer(queue, self._table_dev, numpy.uint32(0), 0, new_size)
+        cl.enqueue_fill_buffer(queue, self._table_data_dev, numpy.uint32(0), 0, new_size)
 
     def _capture_points_with_periods(
             self,
             queue: cl.CommandQueue,
-            shape: Tuple[int],
+            grid: Grid,
             n_skip: int,
             n_iter: int,
             tolerance: float,
             infinity_check: float,
-            init: numpy.ndarray,
-            bounds_varied_0: tuple,
-            bounds_varied_1: tuple,
             parameters: Parameters
     ):
-        self._allocate_buffers(shape, n_iter, dimensions=self.system.dimensions)
+        self._allocate_buffers(grid.shape, n_iter, dimensions=self.system.dimensions)
 
         params = parameters.to_cl_object(self.system)
         params_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=params)
 
         self.program.iterate_capture_with_periods(
-            queue, shape, None,
+            queue, grid.shape, None,
             numpy.int32(n_skip),
             numpy.int32(n_iter),
             self.system.real_type(tolerance),
             self.system.real_type(infinity_check),
-            init,
-            numpy.array(bounds_varied_0, dtype=self.system.real_type),
-            numpy.array(bounds_varied_1, dtype=self.system.real_type),
+            grid.init(self.system.real_type),
+            *[
+                numpy.array(bounds, dtype=self.system.real_type)
+                for bounds in grid.bounds
+            ],
             params_dev,
             self._points_dev,
             self._periods_dev
@@ -232,7 +220,7 @@ class Attractors(WithProgram):
             # no attractors were found at all
             return [], n_collisions
 
-        unique_sequences = numpy.empty((total_points_count, 2), dtype=self.system.real_type)
+        unique_sequences = numpy.empty((total_points_count, self.system.dimensions), dtype=self.system.real_type)
         unique_sequences_dev = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, size=unique_sequences.nbytes)
 
         # hashes and counts
@@ -264,7 +252,7 @@ class Attractors(WithProgram):
             if n_sequences == 0:
                 continue
             sequences = unique_sequences[current_pos:current_pos + n_sequences * period] \
-                .reshape((n_sequences, period, 2))
+                .reshape((n_sequences, period, self.system.dimensions))
             current_pos += n_sequences * period
             info = unique_sequences_info[current_pos_info:current_pos_info + n_sequences] \
                 .reshape((n_sequences, 2))
@@ -278,13 +266,13 @@ class Attractors(WithProgram):
             self,
             queue: cl.CommandQueue,
             image: CLImage,
-            attractors: List[dict],
+            attractors: List[Attractor],
             color_fn: Callable
     ):
         # TODO should use raw results to avoid doing this
-        attractors.sort(key=lambda a: a["hash"])
+        attractors.sort(key=lambda a: a.hash)
 
-        hashes = numpy.array([attractor["hash"] for attractor in attractors], dtype=numpy.uint32)
+        hashes = numpy.array([attractor.hash for attractor in attractors], dtype=numpy.uint32)
         colors = numpy.array([color_fn(attractor) for attractor in attractors], dtype=numpy.float32)
 
         # TODO can we avoid searching inside this kernel? probably reuse a hash table
@@ -304,10 +292,9 @@ class Attractors(WithProgram):
             self,
             queue: cl.CommandQueue,
             grid: Grid,
+            parameters: Parameters,
             n_skip: int,
             n_iter: int,
-            parameters: Parameters,
-            init: Tuple[float] = None,
             tolerance: int = 3,
             infinity_check: float = 1e4,
             table_size: int = None,
@@ -324,7 +311,6 @@ class Attractors(WithProgram):
         :param n_skip: number of iterations to skip. No limit, but consider the running time.
         :param n_iter: number of iterations to consider for period detection. Current implementation limits this to 255.
         :param parameters: parameters for the system
-        :param init: initial conditions for the system. Up to 3 dimensions can appear in ``grid``.
         :param tolerance: which tolerance to use when detection attractors (floating point comparison precision)
         :param infinity_check: maximum value allowed for a point coordinate. If any of a point's coordinates exceeds
             this value, point is considered to be "lost in the infinity", and no further analysis is done on it.
@@ -341,36 +327,16 @@ class Attractors(WithProgram):
             # TODO support. this is due to how sequence rotation currenly works
             raise ValueError("n_iter values >= 256 are not supported")
 
-        if init is None and self.system.dimensions > 3:
-            raise ValueError("Initial conditions should be fixed along all axes when using "
-                             "with equation systems with dimensions higher than 3. Set `init` "
-                             "argument to (x, y, ..., None, None, ..., z), where x, y, ... z "
-                             "are numbers, and None represents the initial conditions along those "
-                             "axes for which basins of attraction are being computed.")
-
         tolerance = 1 / 10 ** tolerance
-
-        if init is None:
-            init = numpy.array([numpy.nan] * self.system.dimensions, dtype=self.system.real_type)
-            varied = tuple(range(self.system.dimensions))
-        else:
-            init = numpy.array([v or numpy.nan for v in init], dtype=self.system.real_type)
-            varied = tuple(numpy.argwhere(numpy.isnan(init)).flatten())
-            if len(varied) > 3:
-                raise ValueError("Can't vary more than 3 variables at the same time")
-
-        if len(varied) > grid.dimensions:
-            raise ValueError("Not enough dimensions in grid")
 
         self.compile(
             queue.context,
             defines={"ROTATION_MAX_ITER": max(n_iter, 16)},
-            template_variables={"varied": varied}
+            template_variables={"varied": grid.varied}
         )
 
         self._capture_points_with_periods(
-            queue, grid.shape, n_skip, n_iter, tolerance, infinity_check, init,
-            grid.x_bounds, grid.y_bounds, parameters
+            queue, grid, n_skip, n_iter, tolerance, infinity_check, parameters
         )
 
         # TODO add an option to raise exception if n_collisions != 0?
@@ -386,9 +352,12 @@ class Attractors(WithProgram):
             hashes = hashes[mask]
             counts = counts[mask]
             for sequence, hash, count in zip(sequences, hashes, counts):
-                attractors.append({
-                    "attractor": sequence, "hash": hash, "count": count, "period": period
-                })
+                attractors.append(Attractor(
+                    hash=hash,
+                    count=count,
+                    period=period,
+                    values=sequence,
+                ))
 
         if image is not None and color_fn is not None:
             if image.shape != grid.shape:

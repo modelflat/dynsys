@@ -2,7 +2,7 @@
 <%include file="/common/colors.clh" />
 <%include file="/common/hash.clh" />
 <%include file="/common/types.clh" />
-<%include file="/basins/rotations.clh" />
+<%include file="/attractors/rotations.clh" />
 
 // TODO include normally
 <%include file="/common/complex.clh" />
@@ -13,18 +13,25 @@
 <%iterate:iterate_capture_with_periods>
     <%def name="args()">
         const point_t init,
-        const real2_t varied_0,
-        const real2_t varied_1,
+        % for i in range(len(varied)):
+        const real2_t varied_${i},
+        % endfor
     </%def>
     <%def name="init()">
-        const real2_t normal_coord_2d = (real2_t)(
-            (real_t)(get_global_id(0)) / (real_t)(get_global_size(0) - 1),
-            (real_t)(get_global_id(1)) / (real_t)(get_global_size(1) - 1)
-        );
         point_t point = init;
         // bounds.s02 + uv * (bounds.s13 - bounds.s02)
-        point.s${varied[0]} = varied_0.s0 + normal_coord_2d.x * (varied_0.s1 - varied_0.s0);
-        point.s${varied[1]} = varied_1.s0 + normal_coord_2d.y * (varied_1.s1 - varied_1.s0);
+        % if system.dimensions == 1 and varied:
+        point = (
+            varied_0.s0 + (real_t)(get_global_id(0)) / (real_t)(get_global_size(0) - 1) * (varied_0.s1 - varied_0.s0)
+        );
+        % else:
+        % for i, idx in enumerate(varied):
+        point.s${idx} = (
+            varied_${i}.s0 +
+            (real_t)(get_global_id(${i})) / (real_t)(get_global_size(${i}) - 1) * (varied_${i}.s1 - varied_${i}.s0)
+        );
+        % endfor
+        % endif
     </%def>
 </%iterate:iterate_capture_with_periods>
 
@@ -74,7 +81,7 @@ kernel void hash_sequences(
     const uint id = get_global_id(0);
     const uint period = periods[id];
 
-    if (period <= 1 || period >= iter) {
+    if (period < 1 || period >= iter) {
         return;
     }
 
@@ -94,7 +101,7 @@ kernel void count_unique_sequences(
     const uint id = get_global_id(0);
     const uint period = periods[id];
 
-    if (period <= 1 || period >= iter) {
+    if (period < 1 || period >= iter) {
         return;
     }
 
@@ -122,7 +129,7 @@ kernel void check_collisions(
     const uint id = get_global_id(0);
     const uint period = periods[id];
 
-    if (period <= 1 || period >= iter) {
+    if (period < 1 || period >= iter) {
         return;
     }
 
@@ -133,7 +140,7 @@ kernel void check_collisions(
     for (int i = 0; i < (int)period; ++i) {
         const POINT point1 = pt_load(shift + i, points);
         const POINT point2 = pt_load(shift_by_hash + i, points);
-        if (any(fabs(point1 - point2) >= tol)) {
+        if (!pt_similar(point1, point2, tol)) {
             atomic_inc(collisions);
             break;
         }
@@ -155,7 +162,7 @@ kernel void count_periods_of_unique_sequences(
     }
 
     const uint period = periods[table_data[hash]];
-    if (period <= 1 || period >= iter) {
+    if (period < 1 || period >= iter) {
         return;
     }
 
@@ -186,7 +193,7 @@ kernel void gather_unique_sequences(
     const uint id = table_data[hash];
     const int period = periods[id];
 
-    if (period <= 1 || (uint)period >= iter) {
+    if (period < 1 || (uint)period >= iter) {
         return;
     }
 

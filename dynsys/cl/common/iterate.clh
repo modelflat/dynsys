@@ -6,18 +6,26 @@ inline void do_step(PARAMETERS* params, int id, int i, point_t* point) {
 % for name in system.parameters:
     const real_t ${name} = params->${name};
 % endfor
+% if system.dimensions == 1:
+    const real_t ${system.variables[0]} = *point;
+% else:
 % for i, name in enumerate(system.variables):
     const real_t ${name} = point->s${i};
 % endfor
+% endif
     // arbitrary user-provided code
 % for line in system.before_step:
     ${line}
 % endfor
     // actual step
+% if system.dimensions == 1:
+    *point = ${system.equations[0].expr};
+% else:
 % for i, eq in enumerate(system.equations):
     // ${eq.var}
     point->s${i} = ${eq.expr};
 % endfor
+% endif
     // arbitrary user-provided code
 % for line in system.after_step:
     ${line}
@@ -106,6 +114,30 @@ kernel void iterate_capture(
 }
 </%def>
 
+% if system.dimensions == 1:
+#define pt_should_discard(x, infinity_check) (isnan(point) || fabs(point) > infinity_check)
+#define pt_similar(x, y, tolerance) (fabs((x) - (y)) < tolerance)
+% elif system.dimensions in {2, 3, 4, 8, 16}:
+#define pt_should_discard(x, infinity_check) (any(isnan(point)) || any(fabs(point) > infinity_check))
+#define pt_similar(x, y, tolerance) (all(fabs((x) - (y)) < tolerance))
+% else:
+inline int pt_should_discard(point_t x, real_t infinity_check) {
+    return (
+    % for i in range(system.dimensions):
+        isnan(x.s${i}) || fabs(x.s${i}) > infinity_check ${"||" if i != system.dimensions - 1 else ""}
+    % endfor
+    );
+}
+
+inline int pt_similar(point_t x, point_t y, real_t tolerance) {
+    return (
+    % for i in range(system.dimensions):
+        fabs(x.s${i} - y.s${i}) < tolerance ${"&&" if i != system.dimensions - 1 else ""}
+    % endfor
+    );
+}
+% endif
+
 <%def name="iterate_capture_with_periods()">
 kernel void iterate_capture_with_periods(
     const int skip,
@@ -137,12 +169,12 @@ kernel void iterate_capture_with_periods(
     <%self:iter>
         pt_store(point, output_coord + i, points);
 
-        if (!period_ready && (any(isnan(point)) || any(fabs(point) > infinity_check))) {
+        if (!period_ready && pt_should_discard(point, infinity_check)) {
             period = 0;
             period_ready = 1;
         }
 
-        if (!period_ready && (all(fabs(base - point) < tolerance))) {
+        if (!period_ready && pt_similar(base, point, tolerance)) {
             period = i + 1;
             period_ready = 1;
         }

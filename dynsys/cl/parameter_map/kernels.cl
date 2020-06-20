@@ -1,3 +1,4 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
 // compute & color
 kernel void map_compute_color()
@@ -10,8 +11,6 @@ kernel void map_color()
 
 // get color
 kernel void get_color()
-
-
 
 
 
