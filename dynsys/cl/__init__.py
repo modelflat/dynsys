@@ -1,4 +1,5 @@
 import os
+import platform
 
 import numpy
 import pyopencl as cl
@@ -12,8 +13,9 @@ cl_template_directory = os.path.dirname(os.path.abspath(__file__))
 
 
 def ocl_compiler_env():
-    # compilation cache doesn't work with Apple on Intel
-    os.environ["PYOPENCL_NO_CACHE"] = "1"
+    # compilation cache doesn't work on Mac OS
+    if platform.system() == "Darwin":
+        os.environ["PYOPENCL_NO_CACHE"] = "1"
     # to provide more info in logs
     os.environ["PYOPENCL_COMPILER_OUTPUT"] = "1"
 

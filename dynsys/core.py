@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union, Tuple
 
 import numpy
 import pyopencl as cl
@@ -46,7 +46,10 @@ def fetch_from_device(queue, dest, buf):
 
 
 def reallocate(
-        ctx: cl.Context, buf: Optional[cl.Buffer], flags: cl.mem_flags, size: int,
+        ctx: cl.Context,
+        buf: Optional[cl.Buffer],
+        flags: cl.mem_flags,
+        size: Union[int, Tuple[int]],
         shrink_threshold: float = 0.5,
 ):
     if buf is None:

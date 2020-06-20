@@ -13,9 +13,10 @@ import numpy
 class Grid:
 
     def __init__(self, variables: Iterable):
+        self._all = None
         self._all = variables
         self._var = tuple(
-            (i, v)
+            (i, v) if len(v) == 3 else (v[0], v[1:])
             for i, v in enumerate(variables)
             if isinstance(v, Iterable)
         )

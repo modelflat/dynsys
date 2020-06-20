@@ -4,7 +4,7 @@
 <%include file="/common/types.clh" />
 <%include file="/attractors/rotations.clh" />
 
-// TODO include normally
+// TODO include on demand
 <%include file="/common/complex.clh" />
 
 <%include file="/common/iterate.clh" />

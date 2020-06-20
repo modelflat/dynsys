@@ -58,68 +58,12 @@ inline void do_step(PARAMETERS* params, int id, int i, point_t* point) {
     }
 </%def>
 
-<%def name="iterate()">
-kernel void iterate(
-    const int skip,
-    const int iter,
-    ${caller.args()}
-    const global PARAMETERS* params_
-) {
-    <%self:init>
-    ${caller.init()}
-    </%self:init>
-
-    % for line in system.before_start:
-    ${line};
-    % endfor
-
-    <%self:skip>
-    </%self:skip>
-
-    <%self:iter>
-    ${caller.iter()}
-    </%self:iter>
-
-    ${caller.finish()}
-}
-</%def>
-
-<%def name="iterate_capture()">
-kernel void iterate_capture(
-    const int skip,
-    const int iter,
-    ${caller.args()}
-    global real_t* points,
-    const global PARAMETERS* params_
-) {
-    <%self:init>
-    ${caller.init()}
-    </%self:init>
-
-    % for line in system.before_start:
-    ${line};
-    % endfor
-
-    <%self:skip>
-    </%self:skip>
-
-    const size_t output_coord = id * iter;
-
-    <%self:iter>
-        pt_store(point, output_coord + i, points);
-        ${caller.iter()}
-    </%self:iter>
-
-    ${caller.finish()}
-}
-</%def>
-
 % if system.dimensions == 1:
-#define pt_should_discard(x, infinity_check) (isnan(point) || fabs(point) > infinity_check)
-#define pt_similar(x, y, tolerance) (fabs((x) - (y)) < tolerance)
+#define pt_should_discard(x, infinity_check) (isnan(x) || fabs(x) > (infinity_check))
+#define pt_similar(x, y, tolerance) (fabs((x) - (y)) < (tolerance))
 % elif system.dimensions in {2, 3, 4, 8, 16}:
-#define pt_should_discard(x, infinity_check) (any(isnan(point)) || any(fabs(point) > infinity_check))
-#define pt_similar(x, y, tolerance) (all(fabs((x) - (y)) < tolerance))
+#define pt_should_discard(x, infinity_check) (any(isnan(x)) || any(fabs(x) > (infinity_check)))
+#define pt_similar(x, y, tolerance) (all(fabs((x) - (y)) < (tolerance)))
 % else:
 inline int pt_should_discard(point_t x, real_t infinity_check) {
     return (
@@ -128,7 +72,6 @@ inline int pt_should_discard(point_t x, real_t infinity_check) {
     % endfor
     );
 }
-
 inline int pt_similar(point_t x, point_t y, real_t tolerance) {
     return (
     % for i in range(system.dimensions):
@@ -137,6 +80,48 @@ inline int pt_similar(point_t x, point_t y, real_t tolerance) {
     );
 }
 % endif
+
+<%def name="iterate_with_periods()">
+kernel void iterate_with_periods(
+    const int skip,
+    const int iter,
+    const real_t tolerance,
+    const real_t infinity_check,
+    ${caller.args()}
+    const global PARAMETERS* params_,
+    global uint* periods
+) {
+    <%self:init>
+    ${caller.init()}
+    </%self:init>
+
+    % for line in system.before_start:
+    ${line};
+    % endfor
+
+    <%self:skip>
+    </%self:skip>
+
+    const point_t base = point;
+
+    int period = iter;
+
+    <%self:iter>
+        if (pt_should_discard(point, infinity_check)) {
+            period = 0;
+            break;
+        }
+
+        if (pt_similar(base, point, tolerance)) {
+            period = i + 1;
+            break;
+        }
+    </%self:iter>
+
+    periods[id] = period;
+}
+</%def>
+
 
 <%def name="iterate_capture_with_periods()">
 kernel void iterate_capture_with_periods(

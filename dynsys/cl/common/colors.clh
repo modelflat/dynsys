@@ -21,3 +21,69 @@ inline float4 hsv2rgb(float3 hsv) {
     }
     return (float4)(rgb + (hsv.z - c), 1.0f);
 }
+
+inline float3 hsv_for_count(int period, int n_iter) {
+    if (period <= 0) {
+        return (float3)(0.0, 0.0, 1.0);
+    }
+    if (period >= n_iter) {
+        return (float3)(0.0, 0.0, 0.0);
+    }
+
+    enum { CYCLE_SIZE = 8 };
+
+    float s = 1.0;
+    float v = clamp(1.0 - 0.2 * (period / CYCLE_SIZE), 0.0, 1.0);
+
+    switch ((period % CYCLE_SIZE) + 1) {
+        case 1:
+            return (float3)(  0, s, v);
+        case 2:
+            return (float3)( 40, s, v);
+        case 3:
+            return (float3)( 80, s, v);
+        case 4:
+            return (float3)(120, s, v);
+        case 5:
+            return (float3)(160, s, v);
+        case 6:
+            return (float3)(200, s, v);
+        case 7:
+            return (float3)(240, s, v);
+        case 8:
+            return (float3)(280, s, v);
+        default:
+            // not happening
+            return (float3)(  0, 0.25, 0.25);
+    }
+}
+
+inline float3 color_for_count_v2(int count, int total) {
+    return hsv2rgb(hsv_for_count(count, total)).xyz;
+}
+
+inline float3 color_for_count_v1(int count, int total) {
+    if (count == total) {
+        return 0.0;
+    }
+    const float d = clamp(1.0 / count * 8, 0.0, 1.0);
+
+    switch(count % 8) {
+        case 1:
+            return (float3)(1.0, 0.0, 0.0)*d;
+        case 2:
+            return (float3)(0.0, 1.0, 0.0)*d;
+        case 3:
+            return (float3)(0.0, 0.0, 1.0)*d;
+        case 4:
+            return (float3)(1.0, 0.0, 1.0)*d;
+        case 5:
+            return (float3)(1.0, 1.0, 0.0)*d;
+        case 6:
+            return (float3)(0.0, 1.0, 1.0)*d;
+        case 7:
+            return (float3)(0.5, 0.0, 0.0)*d;
+        default:
+            return count == 8 ? .5 : d;
+    }
+}

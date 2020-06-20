@@ -311,7 +311,8 @@ class Attractors(WithProgram):
         :param n_skip: number of iterations to skip. No limit, but consider the running time.
         :param n_iter: number of iterations to consider for period detection. Current implementation limits this to 255.
         :param parameters: parameters for the system
-        :param tolerance: which tolerance to use when detection attractors (floating point comparison precision)
+        :param tolerance: which tolerance to use when attractors performing attractor detection. This is a floating
+            point comparison precision, measured in decimals after floating point.
         :param infinity_check: maximum value allowed for a point coordinate. If any of a point's coordinates exceeds
             this value, point is considered to be "lost in the infinity", and no further analysis is done on it.
         :param table_size: size of hash table to use. Defaults to 2*N - 1, where N is the number of points in ``grid``.
