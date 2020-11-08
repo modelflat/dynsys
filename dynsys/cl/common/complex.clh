@@ -59,7 +59,6 @@ inline real2_t ccbrt1(real2_t x) {
 
 // checks if complex number is real
 inline int is_real(real2_t x) {
-
     return fabs(x.y) <= IS_REAL_CHECK_THRESHOLD;
 }
 

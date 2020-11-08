@@ -1,0 +1,65 @@
+<% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
+
+<%include file="/common/point.clh" />
+
+<%def name="rk4_multi(input_type, parameter_type, n_systems, name='rk4_multi', step_fn_name='rk4_multi_step')">
+
+inline void ${step_fn_name}(
+    real_t time,
+    ${input_type} var[${n_systems}],
+    ${parameter_type}* parameters
+) {
+    ${caller.body()}
+}
+
+void ${name}(int, real_t, real_t, ${input_type}[${n_systems}], ${parameter_type}*);
+void ${name}(
+    int n_iter, real_t t0, real_t t1,
+    ${input_type} y[${n_systems}],
+    ${parameter_type}* parameters
+) {
+    real_t h = (t1 - t0) / n_iter;
+    real_t time = t0;
+
+    ${input_type} k[${n_systems}];
+    ${input_type} r[${n_systems}];
+
+    for (int i = 0; i < n_iter; ++i) {
+        for (int j = 0; j < ${n_systems}; ++j) {
+            k[j] = y[j];
+        }
+
+        // k1
+        ${step_fn_name}(time, k, parameters);
+        for (int j = 0; j < ${n_systems}; ++j) {
+            k[j] = pt_mul_scalar(k[j], h / (real_t)(2.0));
+            r[j] = pt_mul_scalar(k[j], (real_t)(1.0 / 3.0));
+            k[j] = pt_add(k[j], y[j]);
+        }
+
+        // k2
+        ${step_fn_name}(time + h / (real_t)(2.0), k, parameters);
+        for (int j = 0; j < ${n_systems}; ++j) {
+            k[j] = pt_mul_scalar(k[j], h);
+            r[j] = pt_add(r[j], pt_mul_scalar(k[j], (real_t)(1.0 / 3.0)));
+            k[j] = pt_add(y[j], pt_mul_scalar(k[j], (real_t)(1.0 / 2.0)));
+        }
+
+        // k3
+        ${step_fn_name}(time + h / (real_t)(2.0), k, parameters);
+        for (int j = 0; j < ${n_systems}; ++j) {
+            k[j] = pt_mul_scalar(k[j], h);
+            r[j] = pt_add(r[j], pt_mul_scalar(k[j], (real_t)(1.0 / 3.0)));
+            k[j] = pt_add(k[j], y[j]);
+        }
+
+        // k4
+        ${step_fn_name}(time + h, k, parameters);
+        for (int j = 0; j < ${n_systems}; ++j) {
+            y[j] = pt_add(pt_add(y[j], r[j]), pt_mul_scalar(k[j], (h / (real_t)(6.0))));
+        }
+
+        time += h;
+    }
+}
+</%def>

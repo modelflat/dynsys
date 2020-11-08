@@ -25,7 +25,7 @@ class Attractor(NamedTuple):
 
 class Attractors(WithProgram):
 
-    def __init__(self, system: EquationSystem = None, ctx: cl.Context = None):
+    def __init__(self, system: EquationSystem, ctx: cl.Context = None):
         super().__init__(ctx)
         self._system = system
         self._points_dev = None

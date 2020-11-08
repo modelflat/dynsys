@@ -1,22 +1,10 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
-<%include file="/common/types.clh" />
+<%include file="/common/point.clh" />
 
 #ifndef ROTATION_MAX_ITER
 #error ROTATION_MAX_ITER should be defined at compile-time!
 #endif
-
-% if system.dimensions in {1, 2, 3, 4}:
-#define pt_length length
-% else:
-inline real_t pt_length(point_t x) {
-    return sqrt(
-        % for i in range(system.dimensions):
-        x.s${i} * x.s${i} ${"+" if i != system.dimensions - 1 else ""}
-        % endfor
-    );
-}
-% endif
 
 #define ROTATION_PT_LESS(a, b) (pt_length(a) < pt_length(b))
 #define ROTATION_PT_GREATER(a, b) (pt_length(a) > pt_length(b))

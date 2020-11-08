@@ -157,7 +157,7 @@ class WithProgram:
             self._template_variables = template_variables
             self._options = options
 
-            source_code = self.src(inst=self, **self._template_variables)
+            source_code = self.src(**self._template_variables)
 
             if _DEBUG_PRINT_CODE:
                 print(source_code)

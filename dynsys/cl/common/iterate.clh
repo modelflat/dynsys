@@ -1,35 +1,12 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
 <%include file="/common/types.clh" />
+<%include file="/common/util.clh" />
+<%namespace name="util" file="/common/util.clh" />
+
 
 inline void do_step(PARAMETERS* params, int id, int i, point_t* point) {
-% for name in system.parameters:
-    const real_t ${name} = params->${name};
-% endfor
-% if system.dimensions == 1:
-    const real_t ${system.variables[0]} = *point;
-% else:
-% for i, name in enumerate(system.variables):
-    const real_t ${name} = point->s${i};
-% endfor
-% endif
-    // arbitrary user-provided code
-% for line in system.before_step:
-    ${line}
-% endfor
-    // actual step
-% if system.dimensions == 1:
-    *point = ${system.equations[0].expr};
-% else:
-% for i, eq in enumerate(system.equations):
-    // ${eq.var}
-    point->s${i} = ${eq.expr};
-% endfor
-% endif
-    // arbitrary user-provided code
-% for line in system.after_step:
-    ${line}
-% endfor
+    <%call expr="util.system_eval(system, 'point', 'params')" />
 }
 
 <%def name="init()">

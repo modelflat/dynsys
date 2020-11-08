@@ -1,16 +1,16 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
 <%
-    dim = len(inst.system.equations)
-    real_type = inst.system._real_type_name
+    dim = len(system.equations)
+    real_type = system._real_type_name
 %>
 
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 typedef ${real_type}   real_t;
-#define convert_real convert_${real_type}
-
 typedef ${real_type}2 real2_t;
+
+#define convert_real convert_${real_type}
 
 % if dim == 1:
 
@@ -55,19 +55,6 @@ inline void pt_store(point_t value, size_t idx, global real_t* ptr) {
 % else:
 <% raise ValueError("dim should belong to [1; 16] interval!") %>
 % endif
-
-// TODO more sophisticated rounding?
-// TODO move into separate file?
-inline point_t pt_round(point_t value, real_t tolerance) {
-% if dim == 1:
-    return convert_real(convert_long_rtz(value / tolerance)) * tolerance;
-% else:
-% for i in range(dim):
-    value.s${i} = convert_real(convert_long_rtz(value.s${i} / tolerance)) * tolerance;
-% endfor
-    return value;
-% endif
-}
 
 struct _PARAMETERS {
 % for name, type in system._parameters_with_types().items():

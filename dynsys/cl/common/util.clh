@@ -1,13 +1,33 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
-inline POINT point_from_id() {
-    POINT point;
-    // hello ub
-    return point;
+<%def name="system_eval(system, point_var_name, parameters_var_name)">
+{
+% for name in system.parameters:
+    const real_t ${name} = (${parameters_var_name})->${name};
+% endfor
+% if system.dimensions == 1:
+    const real_t ${system.variables[0]} = *(${point_var_name});
+% else:
+% for i, name in enumerate(system.variables):
+    const real_t ${name} = (${point_var_name})->s${i};
+% endfor
+% endif
+    // arbitrary user-provided code
+% for line in system.before_step:
+    ${line}
+% endfor
+    // actual step
+% if system.dimensions == 1:
+    *(${point_var_name}) = ${system.equations[0].expr};
+% else:
+% for i, eq in enumerate(system.equations):
+    // ${eq.var}
+    (${point_var_name})->s${i} = ${eq.expr};
+% endfor
+% endif
+    // arbitrary user-provided code
+% for line in system.after_step:
+    ${line}
+% endfor
 }
-
-void put_point_to_image(write_only IMAGE image, PARAMETERS*, int, int, POINT*);
-
-void put_point_to_image(write_only IMAGE image, PARAMETERS* params, int id, int i, POINT* point) {
-    // not implemented
-}
+</%def>
