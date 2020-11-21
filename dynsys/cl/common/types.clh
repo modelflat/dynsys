@@ -1,7 +1,6 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
 <%
-    dim = len(system.equations)
     real_type = system._real_type_name
 %>
 
@@ -12,22 +11,22 @@ typedef ${real_type}2 real2_t;
 
 #define convert_real convert_${real_type}
 
-% if dim == 1:
+% if system.dimensions == 1:
 
 typedef real_t point_t;
 #define pt_load(idx, ptr) *(ptr + idx)
 #define pt_store(value, idx, ptr) *(ptr + idx) = value
 
-% elif dim in {2, 3, 4, 8, 16}:
+% elif system.is_represented_by_cl_type:
 
-typedef ${real_type}${dim} point_t;
-#define pt_load(idx, ptr) vload${dim}(idx, ptr)
-#define pt_store(value, idx, ptr) vstore${dim}(value, idx, ptr)
+typedef ${real_type}${system.dimensions} point_t;
+#define pt_load(idx, ptr) vload${system.dimensions}(idx, ptr)
+#define pt_store(value, idx, ptr) vstore${system.dimensions}(value, idx, ptr)
 
-% elif dim < 16:
+% elif system.dimensions < 16:
 
 struct __POINT {
-% for i in range(dim):
+% for i in range(system.dimensions):
     real_t s${i};
 % endfor
 }
@@ -38,8 +37,8 @@ typedef struct __POINT point_t;
 __attribute__((vec_type_hint(float4)))
 inline point_t pt_load(size_t idx, const global real_t* ptr) {
     point_t point = {
-% for i in range(dim):
-        *(ptr + ${dim}*idx + ${i})${'' if i == dim - 1 else ','}
+% for i in range(system.dimensions):
+        *(ptr + ${system.dimensions}*idx + ${i})${'' if i == system.dimensions - 1 else ','}
 % endfor
     };
     return point;
@@ -47,8 +46,8 @@ inline point_t pt_load(size_t idx, const global real_t* ptr) {
 
 __attribute__((vec_type_hint(float4)))
 inline void pt_store(point_t value, size_t idx, global real_t* ptr) {
-% for i in range(dim):
-    *(ptr + ${dim}*idx + ${i}) = value.s${i};
+% for i in range(system.dimensions):
+    *(ptr + ${system.dimensions}*idx + ${i}) = value.s${i};
 % endfor
 }
 

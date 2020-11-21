@@ -1,19 +1,13 @@
-import warnings
-from typing import Tuple, Callable, List, NamedTuple
+from typing import Tuple, List
 
 import numpy
 import pyopencl as cl
 
-from core import CLImage, reallocate
 from cl import WithProgram, assemble, load_template
+from core import send_to_device, allocate_on_device
 from equation import EquationSystem, Parameters
-from grid import Grid
-
 
 SOURCE = load_template("lyapunov/kernels.cl")
-
-
-UINT_SIZE = numpy.uint32(0).nbytes
 
 
 class Lyapunov(WithProgram):
@@ -30,11 +24,11 @@ class Lyapunov(WithProgram):
             **kwargs
         )
 
-    def compute_at_point(
+    def compute(
             self,
             queue: cl.CommandQueue,
-            point: Tuple,
-            parameters: Parameters,
+            parameters: List[Parameters],
+            init: Tuple = None,
             variations: EquationSystem = None,
             n_iter: int = 1000,
             t_start: float = 0.0,
@@ -46,29 +40,38 @@ class Lyapunov(WithProgram):
             'variations': variation_equations
         })
 
-        params = parameters.to_cl_object(self._system)
-        init = numpy.array(point, dtype=self._system.real_type)
-        variation_values = numpy.eye(self._system.dimensions, dtype=self._system.real_type)
-        variation_values_dev = cl.Buffer(
-            queue.context,
-            cl.mem_flags.COPY_HOST_PTR | cl.mem_flags.READ_ONLY,
-            hostbuf=variation_values,
-        )
-        result = numpy.empty((self._system.dimensions,), dtype=self._system.real_type)
-        result_dev = cl.Buffer(
-            queue.context,
-            cl.mem_flags.WRITE_ONLY | cl.mem_flags.ALLOC_HOST_PTR,
-            size=result.nbytes
-        )
+        if init is None:
+            init = tuple([0]*self._system.dimensions)
 
-        self.program.single_lyapunov_at_point(
-            queue, (1,), None,
+        init = numpy.array(init, dtype=self._system.real_type)
+        init_dev = send_to_device(queue, init)
+
+        params = numpy.array([
+            p.to_cl_object(self._system) for p in parameters
+        ], dtype=self._system.parameters_dtype())
+        params_dev = send_to_device(queue, params)
+
+        variation_values = numpy.eye(self._system.dimensions, dtype=self._system.real_type)
+        variation_values_dev = send_to_device(queue, variation_values)
+
+        result = numpy.empty((len(parameters), self._system.dimensions), dtype=self._system.real_type)
+        result_dev = allocate_on_device(queue, result)
+
+        if self._system.is_continuous:
+            temporal_args = (
+                self._system.real_type(t_start),
+                self._system.real_type(t_step),
+                numpy.int32(n_integrator_steps),
+            )
+        else:
+            temporal_args = tuple()
+
+        self.program.lyapunov_variations(
+            queue, (len(parameters),), None,
             numpy.int32(n_iter),
-            self._system.real_type(t_start),
-            self._system.real_type(t_step),
-            numpy.int32(n_integrator_steps),
-            init,
-            params,
+            *temporal_args,
+            init_dev,
+            params_dev,
             variation_values_dev,
             result_dev,
         )

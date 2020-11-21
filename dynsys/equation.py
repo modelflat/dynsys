@@ -5,6 +5,9 @@ import numpy
 import pyopencl.cltypes as cltypes
 
 
+_VALID_SYSTEM_TYPES = {"continuous", "discrete"}
+
+
 class Equation:
 
     def __init__(self, var, expr):
@@ -24,6 +27,7 @@ class EquationSystem:
             *equations,
             parameters=tuple(),
             extra_parameters=tuple(),
+            kind="discrete",
             before_start=tuple(),
             before_step=tuple(),
             after_step=tuple(),
@@ -36,11 +40,15 @@ class EquationSystem:
         if len(equations) > 16:
             raise ValueError("Systems of more than 16 equations are not currently supported")
 
+        if kind not in _VALID_SYSTEM_TYPES:
+            raise ValueError("Valid values of 'kind' are {}, got {}", _VALID_SYSTEM_TYPES, kind)
+
         equations = [
             Equation.from_str(eq) if isinstance(eq, str) else eq for eq in equations
         ]
 
         self.equations = equations
+        self._kind = kind
         self._parameter_names = parameters
         self._variable_names = [eq.var for eq in equations]
 
@@ -67,6 +75,22 @@ class EquationSystem:
     @property
     def parameters(self):
         return self._parameter_names
+
+    @property
+    def is_discrete(self):
+        return self._kind == "discrete"
+
+    @property
+    def is_continuous(self):
+        return self._kind == "continuous"
+
+    @property
+    def is_represented_by_cl_type(self):
+        return self.dimensions in {1, 2, 3, 4, 8, 16}
+
+    @property
+    def is_represented_by_geometric_cl_type(self):
+        return self.dimensions in {1, 2, 3, 4}
 
     @property
     def real_type(self):

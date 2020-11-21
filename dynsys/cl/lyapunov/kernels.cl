@@ -5,8 +5,8 @@
 
 inline real_t pt_norm(point_t* a) {
     real_t norm = pt_length(*a);
-% if system.dimensions in {1, 2, 3, 4, 8, 16}:
-    *a = *a / norm;
+% if system.is_represented_by_cl_type:
+    *a /= norm;
 % else:
 % for i in range(system.dimensions):
     (*a).s${i} /= norm;
@@ -17,7 +17,7 @@ inline real_t pt_norm(point_t* a) {
 
 // a - b * c
 inline point_t pt_sub_mul(point_t a, point_t b, real_t c) {
-% if system.dimensions in {1, 2, 3, 4, 8, 16}:
+% if system.is_represented_by_cl_type:
     b *= c;
 % else:
 % for i in range(system.dimensions):
@@ -27,7 +27,7 @@ inline point_t pt_sub_mul(point_t a, point_t b, real_t c) {
     return pt_sub(a, b);
 }
 
-<%call expr="integrate.rk4_multi('point_t', 'PARAMETERS', n_systems=system.dimensions + 1, name='rk4_multi_variations')">
+<%def name="lyapunov_step_variations()">
 % if system.dimensions == 1:
     const real_t ${system.variables[0]} = *('var[0]');
 % else:
@@ -39,17 +39,34 @@ inline point_t pt_sub_mul(point_t a, point_t b, real_t c) {
 <%call expr="util.system_eval(variations, var, 'parameters')" />
 % endfor
 <%call expr="util.system_eval(system, 'var', 'parameters')" />
+</%def>
+
+% if system.is_continuous:
+<%call expr="integrate.rk4_multi('point_t', 'PARAMETERS', n_systems=system.dimensions + 1, name='rk4_multi_variations')">
+<%call expr="lyapunov_step_variations()" />
 </%call>
+% else:
+void discrete_step_variations(int, point_t[${system.dimensions + 1}], PARAMETERS*);
+void discrete_step_variations(int i, point_t var[${system.dimensions + 1}], PARAMETERS* parameters) {
+<%call expr="lyapunov_step_variations()" />
+}
+% endif
 
-
-private void lyapunov_variations(
-    int, real_t, real_t, int,
+private void _lyapunov_variations(
+    int,
+% if system.is_continuous:
+    real_t, real_t, int,
+% endif
     point_t[${system.dimensions + 1}],
     PARAMETERS*,
     real_t[${system.dimensions}]
 );
-private void lyapunov_variations(
-    int n_iter, real_t t_start, real_t t_step, int n_integrator_steps,
+private void _lyapunov_variations(
+    int n_iter,
+% if system.is_continuous:
+    real_t t_start, real_t t_step,
+    int n_integrator_steps,
+% endif
     point_t system_with_variations[${system.dimensions + 1}],
     PARAMETERS* parameters,
     real_t L[${system.dimensions}]
@@ -57,18 +74,22 @@ private void lyapunov_variations(
     real_t gsc  [${system.dimensions}];
     real_t norms[${system.dimensions}];
     real_t S    [${system.dimensions}];
-
+% if system.is_continuous:
     real_t t = t_start;
+% endif
+    #define V (system_with_variations + 1)
 
     for (int i = 0; i < ${system.dimensions}; ++i) {
         S[i] = 0;
     }
 
     for (int i = 0; i < n_iter; ++i) {
+% if system.is_continuous:
         rk4_multi_variations(n_integrator_steps, t, t + t_step, system_with_variations, parameters);
         t += t_step;
-
-        #define V (system_with_variations + 1)
+% else:
+        discrete_step_variations(i, system_with_variations, parameters);
+% endif
 
         // orthonormalize according to Gram-Schmidt
         for (int j = 0; j < ${system.dimensions}; ++j) {
@@ -83,43 +104,58 @@ private void lyapunov_variations(
             norms[j] = pt_norm(V + j);
         }
 
-        // Accumulate sum of log of norms
+        // accumulate sum of log of norms
         for (int j = 0; j < ${system.dimensions}; ++j) {
-            S[j] += log(norms[j]);
+            // TODO different sources suggest different bases for this logarithm
+            // some suggest 2 and the others suggest e. It shouldn't really matter,
+            // but it would be nice to have a single source of truth here
+            S[j] += log2(norms[j]);
         }
     }
 
     for (int i = 0; i < ${system.dimensions}; ++i) {
-        // TODO ???
-        // L[i] = t_step * S[i] / n_iter;
+% if system.is_continuous:
         L[i] = S[i] / (t - t_start);
+% else:
+        L[i] = S[i] / n_iter;
+% endif
     }
+    #undef V
 }
 
-kernel void single_lyapunov_at_point(
+kernel void lyapunov_variations(
     const int n_iter,
+% if system.is_continuous:
     const real_t t_start,
     const real_t t_step,
     const int n_integrator_steps,
-    point_t system,
-    PARAMETERS parameters,
+% endif
+    const global real_t* init,
+    const global PARAMETERS* _parameters,
     global real_t* variations,
     global real_t* L
 ) {
+    const int id = get_global_id(0);
+    PARAMETERS parameters = _parameters[id];
+
     point_t system_with_variations[${system.dimensions + 1}];
 
-    system_with_variations[0] = system;
+    system_with_variations[0] = pt_load(0, init);
     for (int i = 1; i < ${system.dimensions + 1}; ++i) {
         system_with_variations[i] = pt_load(i - 1, variations);
     }
 
     real_t L_private[${system.dimensions}];
 
-    lyapunov_variations(
-        n_iter, t_start, t_step, n_integrator_steps,
+    _lyapunov_variations(
+        n_iter,
+% if system.is_continuous:
+        t_start, t_step, n_integrator_steps,
+% endif
         system_with_variations, &parameters, L_private
     );
 
+    L += ${system.dimensions} * id;
     for (int i = 0; i < ${system.dimensions}; ++i) {
         L[i] = L_private[i];
     }

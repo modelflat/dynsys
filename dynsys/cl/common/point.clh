@@ -2,16 +2,12 @@
 
 <%include file="/common/types.clh" />
 
-<%
-    dim = len(system.equations)
-%>
-
 inline point_t pt_round(point_t value, real_t tolerance) {
 // TODO more sophisticated rounding?
-% if dim == 1:
+% if system.dimensions == 1:
     return convert_real(convert_long_rtz(value / tolerance)) * tolerance;
 % else:
-% for i in range(dim):
+% for i in range(system.dimensions):
     value.s${i} = convert_real(convert_long_rtz(value.s${i} / tolerance)) * tolerance;
 % endfor
     return value;
@@ -19,10 +15,10 @@ inline point_t pt_round(point_t value, real_t tolerance) {
 }
 
 inline point_t pt_add(point_t a, point_t b) {
-% if dim in {1, 2, 3, 4, 8, 16}:
+% if system.is_represented_by_cl_type:
     return a + b;
 % else:
-% for i in range(dim):
+% for i in range(system.dimensions):
     a.s${i} += b.s${i};
 % endfor
     return a;
@@ -30,10 +26,10 @@ inline point_t pt_add(point_t a, point_t b) {
 }
 
 inline point_t pt_sub(point_t a, point_t b) {
-% if dim in {1, 2, 3, 4, 8, 16}:
+% if system.is_represented_by_cl_type:
     return a - b;
 % else:
-% for i in range(dim):
+% for i in range(system.dimensions):
     a.s${i} -= b.s${i};
 % endfor
     return a;
@@ -41,10 +37,10 @@ inline point_t pt_sub(point_t a, point_t b) {
 }
 
 inline point_t pt_mul(point_t a, point_t b) {
-% if dim in {1, 2, 3, 4, 8, 16}:
+% if system.is_represented_by_cl_type:
     return a * b;
 % else:
-% for i in range(dim):
+% for i in range(system.dimensions):
     a.s${i} *= b.s${i};
 % endfor
     return a;
@@ -52,10 +48,10 @@ inline point_t pt_mul(point_t a, point_t b) {
 }
 
 inline point_t pt_mul_scalar(point_t a, real_t b) {
-% if dim in {1, 2, 3, 4, 8, 16}:
+% if system.is_represented_by_cl_type:
     return a * b;
 % else:
-% for i in range(dim):
+% for i in range(system.dimensions):
     a.s${i} *= b;
 % endfor
     return a;
@@ -63,12 +59,12 @@ inline point_t pt_mul_scalar(point_t a, real_t b) {
 }
 
 inline real_t pt_sum(point_t a) {
-% if dim == 1:
+% if system.dimensions == 1:
     return a;
 % else:
     // TODO use pairwise summation
     real_t s = 0;
-% for i in range(dim):
+% for i in range(system.dimensions):
     s += a.s${i};
 % endfor
     return s;
@@ -76,7 +72,7 @@ inline real_t pt_sum(point_t a) {
 }
 
 inline real_t pt_length(point_t a) {
-% if dim in {1, 2, 3, 4}:
+% if system.is_represented_by_geometric_cl_type:
     return length(a);
 % else:
     return sqrt(pt_sum(pt_mul(a, a)));
@@ -84,7 +80,7 @@ inline real_t pt_length(point_t a) {
 }
 
 inline real_t pt_dot(point_t a, point_t b) {
-% if dim in {1, 2, 3, 4}:
+% if system.is_represented_by_geometric_cl_type:
     return dot(a, b);
 % else:
     return pt_sum(pt_mul(a, b));
