@@ -14,7 +14,7 @@ from PySide2.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PySide2.QtCore import Signal
 
 
-from core import create_context_and_queue
+from dynsys.core import create_context_and_queue
 
 
 def _parse_args():

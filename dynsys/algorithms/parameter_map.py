@@ -4,10 +4,10 @@ from typing import Tuple
 import numpy
 import pyopencl as cl
 
-from cl import WithProgram, assemble, load_template
-from core import CLImage, reallocate
-from equation import EquationSystem, Parameters
-from grid import Grid
+from dynsys.cl import WithProgram, assemble, load_template
+from dynsys.core import CLImage, reallocate
+from dynsys.equation import EquationSystem, Parameters
+from dynsys.grid import Grid
 
 SOURCE = load_template("parameter_map/kernels.cl")
 

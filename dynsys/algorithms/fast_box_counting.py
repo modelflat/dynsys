@@ -2,8 +2,8 @@ import numpy
 import pyopencl as cl
 from scipy.stats import linregress
 
-from cl import load_template, WithProgram, assemble
-from core import CLImage
+from dynsys.cl import load_template, WithProgram, assemble
+from dynsys.core import CLImage
 
 SOURCE = load_template("fbc/kernels.cl")
 

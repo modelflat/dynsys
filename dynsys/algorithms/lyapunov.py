@@ -3,9 +3,9 @@ from typing import Tuple, List
 import numpy
 import pyopencl as cl
 
-from cl import WithProgram, assemble, load_template
-from core import send_to_device, allocate_on_device
-from equation import EquationSystem, Parameters
+from dynsys.cl import WithProgram, assemble, load_template
+from dynsys.core import send_to_device, allocate_on_device
+from dynsys.equation import EquationSystem, Parameters
 
 SOURCE = load_template("lyapunov/kernels.cl")
 

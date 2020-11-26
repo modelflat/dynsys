@@ -4,10 +4,10 @@ from typing import Tuple, Callable, List, NamedTuple
 import numpy
 import pyopencl as cl
 
-from core import CLImage, reallocate
-from cl import WithProgram, assemble, load_template
-from equation import EquationSystem, Parameters
-from grid import Grid
+from dynsys.core import CLImage, reallocate
+from dynsys.cl import WithProgram, assemble, load_template
+from dynsys.equation import EquationSystem, Parameters
+from dynsys.grid import Grid
 
 
 SOURCE = load_template("attractors/kernels.cl")
