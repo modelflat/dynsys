@@ -5,14 +5,15 @@ import sys
 import abc
 
 import numpy
-from PySide2 import QtCore
-from PySide2.QtGui import QVector3D, QImage, QPixmap, QColor, QPainter, QPen
-from PySide2.QtDataVisualization import QtDataVisualization
-from PySide2.QtGui import QMouseEvent
-from PySide2.QtWidgets import QApplication, QDesktopWidget, QVBoxLayout, QLayout
-from PySide2.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PySide2.QtCore import Signal
 
+from PyQt5 import QtCore
+from PyQt5.QtGui import QVector3D, QImage, QPixmap, QColor, QPainter, QPen
+
+from PyQt5.QtDataVisualization import QCustom3DVolume, Q3DScatter, Q3DTheme, Q3DCamera, QAbstract3DGraph, Q3DInputHandler
+from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtWidgets import QApplication, QDesktopWidget, QVBoxLayout, QLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PyQt5.QtCore import QPoint, pyqtSignal as Signal
 
 from dynsys.core import create_context_and_queue
 
@@ -281,56 +282,57 @@ def exchange_left_and_right_button_state(event: QMouseEvent) -> QMouseEvent:
     return event
 
 
-class Custom3DInputHander(QtDataVisualization.Q3DInputHandler):
+class Custom3DInputHander(Q3DInputHandler):
 
-    def mousePressEvent(self, event, QPoint):
-        super().mousePressEvent(exchange_left_and_right_button_state(event), QPoint)
+    def mousePressEvent(self, event: QMouseEvent, point: QPoint):
+        super().mousePressEvent(exchange_left_and_right_button_state(event), point)
 
-    def mouseReleaseEvent(self, event, QPoint):
-        super().mouseReleaseEvent(exchange_left_and_right_button_state(event), QPoint)
+    def mouseReleaseEvent(self, event: QMouseEvent, point: QPoint):
+        super().mouseReleaseEvent(exchange_left_and_right_button_state(event), point)
 
-    def mouseMoveEvent(self, event: QMouseEvent, QPoint):
-        super().mouseMoveEvent(exchange_left_and_right_button_state(event), QPoint)
+    def mouseMoveEvent(self, event: QMouseEvent, point: QPoint):
+        super().mouseMoveEvent(exchange_left_and_right_button_state(event), point)
 
 
 class Image3D(ImageWidget):
 
-    def __init__(self,
-                 space_shape: tuple = (-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
-                 segment_shape: tuple = (8, 8, 8),
-                 swap_right_and_left_buttons=True,
-                 use_theme=QtDataVisualization.Q3DTheme.ThemeQt
-                 ):
+    def __init__(
+            self,
+            space_shape: tuple = (-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+            segment_shape: tuple = (8, 8, 8),
+            swap_right_and_left_buttons=True,
+            use_theme=Q3DTheme.ThemeQt
+    ):
         super().__init__()
 
-        self._graph = QtDataVisualization.Q3DScatter()
+        self._graph = Q3DScatter()
         if swap_right_and_left_buttons:
             self._graph.setActiveInputHandler(Custom3DInputHander())
         self._graph.setOrthoProjection(True)
         self._graph.activeTheme().setType(use_theme)
         self._graph.activeTheme().setBackgroundEnabled(True)
-        self._graph.setShadowQuality(QtDataVisualization.QAbstract3DGraph.ShadowQualityNone)
+        self._graph.setShadowQuality(QAbstract3DGraph.ShadowQualityNone)
         self._graph.activeInputHandler().setZoomAtTargetEnabled(False)
-        self._graph.scene().activeCamera().setCameraPreset(QtDataVisualization.Q3DCamera.CameraPresetIsometricLeft)
+        self._graph.scene().activeCamera().setCameraPreset(Q3DCamera.CameraPresetIsometricLeft)
         self._graph.scene().activeCamera().setZoomLevel(180)
-        self._graph.axisX().setSegmentCount(1)#segment_shape[0])
+        self._graph.axisX().setSegmentCount(segment_shape[0])
         self._graph.axisX().setTitle("X")
         self._graph.axisX().setTitleVisible(True)
         self._graph.axisX().setAutoAdjustRange(True)
 
-        self._graph.axisY().setSegmentCount(1)#segment_shape[1])
+        self._graph.axisY().setSegmentCount(segment_shape[1])
         self._graph.axisY().setTitle("Z")
         self._graph.axisY().setTitleVisible(True)
         self._graph.axisY().setAutoAdjustRange(True)
 
-        self._graph.axisZ().setSegmentCount(1)#segment_shape[2])
+        self._graph.axisZ().setSegmentCount(segment_shape[2])
         self._graph.axisZ().setTitle("Y")
         self._graph.axisZ().setTitleVisible(True)
         self._graph.axisZ().setAutoAdjustRange(True)
 
-        # self._graph.setAspectRatio(1)
+        self._graph.setAspectRatio(1)
 
-        self._volume = QtDataVisualization.QCustom3DVolume()
+        self._volume = QCustom3DVolume()
         self._volume.setUseHighDefShader(True)
         self._volume.setAlphaMultiplier(1.0)
         self._volume.setPreserveOpacity(False)
@@ -360,7 +362,7 @@ class Image3D(ImageWidget):
             (space_shape[0] + space_shape[1]) / 2.0,
             (space_shape[2] + space_shape[3]) / 2.0,
             (space_shape[4] + space_shape[5]) / 2.0,
-            ))
+        ))
 
     def texture_shape(self):
         return self._current_texture.shape
@@ -374,13 +376,13 @@ class Image3D(ImageWidget):
         self._volume.setTextureData(data.tobytes())
 
     def target_px(self) -> tuple:
-        raise RuntimeError("Image3D supports sink mode only")
+        raise NotImplementedError("Image3D does not support selecting coordinates")
 
     def set_target_px(self, target: tuple) -> None:
         raise NotImplementedError()
 
     def target(self) -> tuple:
-        raise RuntimeError("Image3D supports sink mode only")
+        raise NotImplementedError("Image3D does not support selecting coordinates")
 
     def set_target(self, target: tuple) -> None:
         raise NotImplementedError()

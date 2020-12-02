@@ -1,5 +1,6 @@
-<%include file="/common/integrate.clh" />
-<%namespace name="integrate" file="/common/integrate.clh" />
+<%include file="/common/rk4.clh" />
+<%namespace name="rk4" file="/common/rk4.clh" />
+
 <%include file="/common/util.clh" />
 <%namespace name="util" file="/common/util.clh" />
 
@@ -36,13 +37,17 @@ inline point_t pt_sub_mul(point_t a, point_t b, real_t c) {
 % endfor
 % endif
 % for var in map(lambda i: f'var + {i}', range(1, system.dimensions + 1)):
-<%call expr="util.system_eval(variations, var, 'parameters')" />
+{
+    <%call expr="util.system_eval(variations, var, 'parameters')" />
+}
 % endfor
-<%call expr="util.system_eval(system, 'var', 'parameters')" />
+{
+    <%call expr="util.system_eval(system, 'var', 'parameters')" />
+}
 </%def>
 
 % if system.is_continuous:
-<%call expr="integrate.rk4_multi('point_t', 'PARAMETERS', n_systems=system.dimensions + 1, name='rk4_multi_variations')">
+<%call expr="rk4.rk4('point_t', 'PARAMETERS', n_systems=system.dimensions + 1)">
 <%call expr="lyapunov_step_variations()" />
 </%call>
 % else:
@@ -85,7 +90,7 @@ private void _lyapunov_variations(
 
     for (int i = 0; i < n_iter; ++i) {
 % if system.is_continuous:
-        rk4_multi_variations(n_integrator_steps, t, t + t_step, system_with_variations, parameters);
+        rk4(n_integrator_steps, t, t + t_step, system_with_variations, parameters);
         t += t_step;
 % else:
         discrete_step_variations(i, system_with_variations, parameters);
@@ -106,10 +111,7 @@ private void _lyapunov_variations(
 
         // accumulate sum of log of norms
         for (int j = 0; j < ${system.dimensions}; ++j) {
-            // TODO different sources suggest different bases for this logarithm
-            // some suggest 2 and the others suggest e. It shouldn't really matter,
-            // but it would be nice to have a single source of truth here
-            S[j] += log2(norms[j]);
+            S[j] += log(norms[j]);
         }
     }
 

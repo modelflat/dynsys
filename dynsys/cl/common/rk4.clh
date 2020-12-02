@@ -2,7 +2,7 @@
 
 <%include file="/common/point.clh" />
 
-<%def name="rk4_multi(input_type, parameter_type, n_systems, name='rk4_multi', step_fn_name='rk4_multi_step')">
+<%def name="rk4(input_type, parameter_type, n_systems, name='rk4', step_fn_name='rk4_step')">
 
 inline void ${step_fn_name}(
     real_t time,

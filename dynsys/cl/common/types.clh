@@ -8,6 +8,7 @@
 
 typedef ${real_type}   real_t;
 typedef ${real_type}2 real2_t;
+typedef ${real_type}3 real3_t;
 
 #define convert_real convert_${real_type}
 
@@ -63,6 +64,3 @@ struct _PARAMETERS {
 
 #define POINT point_t
 #define PARAMETERS struct _PARAMETERS
-
-// TODO add support for 3D images
-#define IMAGE image2d_t

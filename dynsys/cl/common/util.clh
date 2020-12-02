@@ -1,7 +1,6 @@
 <% if mako_include_guard(globals()["_template_uri"]): return STOP_RENDERING %>
 
 <%def name="system_eval(system, point_var_name, parameters_var_name)">
-{
 % for name in system.parameters:
     const real_t ${name} = (${parameters_var_name})->${name};
 % endfor
@@ -29,5 +28,4 @@
 % for line in system.after_step:
     ${line}
 % endfor
-}
 </%def>
