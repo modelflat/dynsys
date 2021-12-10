@@ -4,7 +4,7 @@ import numpy
 import pyopencl as cl
 from pyopencl import create_some_context, CommandQueue
 
-from algorithms.fast_box_counting import FastBoxCounting
+from dynsys.algorithms.fast_box_counting import FastBoxCounting
 from dynsys.core import CLImage
 
 

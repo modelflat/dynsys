@@ -3,10 +3,10 @@ import unittest
 import numpy
 from pyopencl import create_some_context, CommandQueue
 
-from algorithms.parameter_map import ParameterMap
+from dynsys.algorithms.parameter_map import ParameterMap
 from dynsys.equation import EquationSystem, Parameters
 from dynsys.grid import Grid
-from algorithms.attractors import Attractors
+from dynsys.algorithms.attractors import Attractors
 
 
 class TestAttractorFinder(unittest.TestCase):

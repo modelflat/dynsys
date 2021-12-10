@@ -5,7 +5,7 @@ from pyopencl import create_some_context, CommandQueue
 
 from dynsys.equation import EquationSystem, Parameters
 from dynsys.grid import Grid
-from algorithms.attractors import Attractors
+from dynsys.algorithms.attractors import Attractors
 
 
 class TestAttractorFinder(unittest.TestCase):

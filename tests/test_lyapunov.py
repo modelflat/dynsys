@@ -3,7 +3,7 @@ import unittest
 import numpy
 from pyopencl import create_some_context, CommandQueue
 
-from algorithms.lyapunov import Lyapunov
+from dynsys.algorithms.lyapunov import Lyapunov
 from dynsys.equation import EquationSystem, Parameters
 
 
@@ -37,6 +37,7 @@ class TestLyapunov(unittest.TestCase):
         )[0]
 
         result = list(numpy.round(result, 3))
+        print(result)
 
         assert numpy.allclose(result, [0.606, -2.343])
 
@@ -67,7 +68,6 @@ class TestLyapunov(unittest.TestCase):
         )[0]
 
         result = list(numpy.round(result, 2))
-        print(result)
 
         assert numpy.allclose(result, [0.13, 0.0, -14.14])
 
@@ -97,8 +97,6 @@ class TestLyapunov(unittest.TestCase):
             n_iter=10000,
             t_step=5e-3
         )[0]
-
-        print(result)
 
         assert numpy.allclose(list(numpy.round(result, 3)), [0.911, -0.02, -14.558])
         assert numpy.allclose(sum(result), -13.66667)
