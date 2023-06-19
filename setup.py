@@ -36,7 +36,7 @@ setup(
 
     packages=find_packages(exclude=["examples"]),
 
-    install_requires=["pyopencl", "PyQt5", "PySide2"],
+    install_requires=["pyopencl", "PyQt5", "PySide2", "mako", "pillow"],
 
     include_package_data=True,
 
